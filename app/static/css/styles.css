@@ -10,7 +10,7 @@ a { color: #0f4c81; text-decoration: none; }
 .app-shell { min-height: 100vh; display: flex; }
 .sidebar { width: 260px; background: #0f172a; color: white; padding: 22px 18px; position: fixed; inset: 0 auto 0 0; }
 .sidebar-logo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding-bottom: 24px; margin-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.12); color: white; text-align: center; }
-.sidebar-logo img { width: 118px; height: 118px; object-fit: contain; border-radius: 12px; }
+.sidebar-logo img { width: 130px; height: 130px; object-fit: contain; border-radius: 12px; }
 .sidebar-logo span { display: block; font-size: 18px; font-weight: bold; line-height: 1.25; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 8px; }
 .sidebar-nav a { color: #cbd5e1; padding: 13px 14px; border-radius: 10px; font-weight: 600; }
