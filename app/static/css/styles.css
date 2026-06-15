@@ -1252,3 +1252,85 @@ button:disabled, .btn:disabled {
 .compact-header {
   margin-bottom: 0.75rem;
 }
+
+/* Heat map module */
+.heatmap-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+.heatmap-layout {
+    display: grid;
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+.heatmap-controls input,
+.heatmap-controls select {
+    margin-bottom: 10px;
+}
+.heatmap-controls hr {
+    border: 0;
+    border-top: 1px solid #e2e8f0;
+    margin: 18px 0;
+}
+.heatmap-button-row .btn {
+    min-width: 80px;
+}
+.heatmap-main {
+    min-width: 0;
+}
+.heatmap-map-card {
+    padding: 0;
+    overflow: hidden;
+}
+#heatMap {
+    width: 100%;
+    height: 620px;
+    min-height: 520px;
+}
+.heatmap-record-table {
+    min-width: 1250px;
+}
+.warning-row td {
+    background: #fff7ed;
+}
+.heatmap-popup {
+    max-width: 300px;
+    font-size: 13px;
+    line-height: 1.45;
+}
+@media (max-width: 1000px) {
+    .heatmap-layout {
+        grid-template-columns: 1fr;
+    }
+    #heatMap {
+        height: 520px;
+    }
+}
+
+
+/* Attendance module */
+.attendance-tabs .btn { margin-top: 0; }
+.attendance-id-card {
+    width: 360px;
+    max-width: 100%;
+    background: #fff;
+    border: 1px solid #dbe7f3;
+    border-radius: 18px;
+    padding: 26px;
+    text-align: center;
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.10);
+}
+.attendance-id-card .id-card-logo {
+    font-weight: 800;
+    color: #0f4c81;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 18px;
+}
+@media print {
+    .attendance-tabs, .topbar, .sidebar, .form-actions, button { display: none !important; }
+    .attendance-id-card { box-shadow: none; border: 1px solid #000; margin: 0 auto; }
+}

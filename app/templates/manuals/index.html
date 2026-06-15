@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="section-header">
+  <div><h1>Manuals</h1><p class="muted">MFF Manual library, indexes, PDF search and acknowledgement tracking.</p></div>
+  {% if is_manual_admin %}<div class="button-row"><a class="btn" href="{{ url_for('manuals.upload_manual') }}">Upload Manual</a><a class="btn secondary" href="{{ url_for('manuals.upload_index') }}">Upload Index</a></div>{% endif %}
+</section>
+<div class="royalty-dashboard-grid">
+  <div class="metric-card"><span>Total manuals</span><strong>{{ manuals|length }}</strong></div>
+  <div class="metric-card"><span>Index documents</span><strong>{{ indexes_count }}</strong></div>
+  <div class="metric-card"><span>Acknowledgements</span><strong>{{ acknowledgements }}</strong></div>
+</div>
+<div class="dashboard-action-grid">
+  <a class="dashboard-action-card" href="{{ url_for('manuals.library') }}"><strong>Manual Library</strong><span>Open published manuals and versions.</span></a>
+  <a class="dashboard-action-card" href="{{ url_for('manuals.indexes') }}"><strong>Manual Indexes</strong><span>View PDF index documents.</span></a>
+  <a class="dashboard-action-card" href="{{ url_for('manuals.search') }}"><strong>Search PDFs</strong><span>Search inside manuals and indexes.</span></a>
+</div>
+<div class="form-section-card" style="margin-top:18px;"><h2>Latest Manuals</h2><div class="table-responsive"><table><thead><tr><th>Manual</th><th>Latest Version</th><th>Uploaded</th><th>Action</th></tr></thead><tbody>{% for manual in manuals %}{% set latest=latest_map.get(manual.id) %}<tr><td>{{ manual.title }}</td><td>{{ latest.version_label if latest else 'No published version' }}</td><td>{{ latest.uploaded_at.strftime('%Y-%m-%d') if latest else '-' }}</td><td><a class="btn small" href="{{ url_for('manuals.manual_detail', manual_id=manual.id) }}">Open</a></td></tr>{% else %}<tr><td colspan="4">No manuals loaded yet.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

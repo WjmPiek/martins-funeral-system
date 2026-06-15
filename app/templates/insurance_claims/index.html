@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="section-header">
+  <div>
+    <h1>Insurance Claims</h1>
+    <p class="muted">Built-in franchise claims analytics, PolicyData import, Claims import, claim cases, documents and reporting.</p>
+  </div>
+  <div class="button-row">
+    {% if current_user.has_permission('insurance_claims:add') %}<a class="btn" href="{{ url_for('insurance_claims.new_claim') }}">New Claim</a>{% endif %}
+    <a class="btn secondary" href="{{ url_for('insurance_claims.claims') }}">Claim Cases</a>
+    {% if current_user.has_permission('insurance_claims:export') %}<a class="btn secondary" href="{{ url_for('insurance_claims.report_csv') }}">Export CSV</a>{% endif %}
+  </div>
+</section>
+
+<div class="royalty-dashboard-grid">
+  <article class="metric-card"><span>Franchises</span><strong>{{ totals.total_franchises }}</strong></article>
+  <article class="metric-card"><span>Policy Months</span><strong>{{ totals.policy_months }}</strong></article>
+  <article class="metric-card"><span>Retail Premium</span><strong>R {{ "{:,.2f}".format(totals.total_retail) }}</strong></article>
+  <article class="metric-card"><span>Risk Premium</span><strong>R {{ "{:,.2f}".format(totals.total_risk) }}</strong></article>
+  <article class="metric-card"><span>Claims</span><strong>R {{ "{:,.2f}".format(totals.total_claims) }}</strong></article>
+  <article class="metric-card"><span>Claim Ratio</span><strong>{{ "{:,.2f}".format(totals.claim_ratio) }}%</strong></article>
+  <article class="metric-card"><span>Open Cases</span><strong>{{ totals.open_cases }}</strong></article>
+</div>
+
+{% if current_user.has_permission('insurance_claims:import') %}
+<div class="grid">
+  <article class="form-section-card">
+    <h2>Import PolicyData</h2>
+    <p class="muted">Uses MEM rows when a Relation column exists. Required columns can include Franchise, Relation, AUL Risk/Risk Premium, Retail/Retail Premium and MPIA.</p>
+    <form method="post" action="{{ url_for('insurance_claims.import_policy_data') }}" enctype="multipart/form-data">
+      <label>Import month</label><input type="month" name="import_month" required>
+      <label>PolicyData Excel file</label><input type="file" name="file" accept=".xlsx,.xls" required>
+      <button type="submit">Import PolicyData</button>
+    </form>
+  </article>
+  <article class="form-section-card">
+    <h2>Import Claims</h2>
+    <p class="muted">Reads franchise, claim paid date and amount columns from a claims workbook and rolls them up by franchise/month.</p>
+    <form method="post" action="{{ url_for('insurance_claims.import_claims_data') }}" enctype="multipart/form-data">
+      <label>Claims Excel file</label><input type="file" name="file" accept=".xlsx,.xls" required>
+      <button type="submit">Import Claims</button>
+    </form>
+  </article>
+</div>
+{% endif %}
+
+<div class="form-section-card">
+  <h2>Recent Import History</h2>
+  <div class="table-responsive"><table class="table-compact"><thead><tr><th>Date</th><th>Type</th><th>File</th><th>Months</th><th>Rows</th><th>Status</th><th>Message</th></tr></thead><tbody>
+  {% for row in imports %}<tr><td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ row.import_type }}</td><td>{{ row.source_file }}</td><td>{{ row.imported_months }}</td><td>{{ row.row_count }}</td><td>{{ row.status }}</td><td>{{ row.message }}</td></tr>{% else %}<tr><td colspan="7">No imports yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+
+<div class="form-section-card">
+  <h2>Monthly Policy / Risk Totals</h2>
+  <div class="table-responsive"><table class="system-report-table"><thead><tr><th>Franchise</th><th>Month</th><th>Retail Premium</th><th>Risk Premium</th><th>Policies</th><th>R1 Fee</th><th>2.1% Fee</th><th>Source</th></tr></thead><tbody>
+  {% for row in recent_policy %}<tr><td>{{ row.franchise_name }}</td><td>{{ row.import_month }}</td><td>R {{ "{:,.2f}".format(row.retail_premium or 0) }}</td><td>R {{ "{:,.2f}".format(row.risk_premium or 0) }}</td><td>{{ row.policy_qty }}</td><td>R {{ "{:,.2f}".format(row.r1_policy_fee or 0) }}</td><td>R {{ "{:,.2f}".format(row.underwriter_2_1_fee or 0) }}</td><td>{{ row.source_file }}</td></tr>{% else %}<tr><td colspan="8">No PolicyData imported yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+
+<div class="form-section-card">
+  <h2>Monthly Claims Totals</h2>
+  <div class="table-responsive"><table class="system-report-table"><thead><tr><th>Franchise</th><th>Month</th><th>Claims</th><th>Claim Count</th><th>Paid Franchise</th><th>Paid Client</th><th>Pending/Repudiated</th><th>Source</th></tr></thead><tbody>
+  {% for row in recent_claims %}<tr><td>{{ row.claims_franchise_name }}</td><td>{{ row.claim_month }}</td><td>R {{ "{:,.2f}".format(row.claims_amount or 0) }}</td><td>{{ row.claim_count }}</td><td>R {{ "{:,.2f}".format(row.claim_paid_franchise or 0) }}</td><td>R {{ "{:,.2f}".format(row.claim_paid_client or 0) }}</td><td>R {{ "{:,.2f}".format(row.repudiated_pending or 0) }}</td><td>{{ row.source_file }}</td></tr>{% else %}<tr><td colspan="8">No claims imported yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+{% endblock %}

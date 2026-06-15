@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="section-header">
+  <div>
+    <h1>Heat Map</h1>
+    <p class="muted">Density, clusters and pins for Martins Funeral records. Excel uploads with a <strong>Relation</strong> column only import <strong>MEM</strong> rows.</p>
+  </div>
+</section>
+
+{% if not google_maps_api_key %}
+  <div class="alert warning">GOOGLE_MAPS_API_KEY is not configured. The map will not load until this environment variable is added locally and on Render.</div>
+{% endif %}
+
+<section class="heatmap-stats-grid">
+  <article class="metric-card"><span>Total records</span><strong id="heatTotal">0</strong></article>
+  <article class="metric-card"><span>Mapped</span><strong id="heatMapped">0</strong></article>
+  <article class="metric-card"><span>Unmapped</span><strong id="heatUnmapped">0</strong></article>
+  <article class="metric-card"><span>Current view</span><strong id="heatModeLabel">Density</strong></article>
+</section>
+
+<section class="heatmap-layout">
+  <aside class="form-section-card heatmap-controls">
+    <h2>Controls</h2>
+    <label for="heatFranchiseFilter">Franchise</label>
+    <select id="heatFranchiseFilter">
+      <option value="">All accessible franchises</option>
+      {% for franchise in franchises %}
+        <option value="{{ franchise.id }}" {% if selected_franchise and selected_franchise.id == franchise.id %}selected{% endif %}>{{ franchise.business_name }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="heatTownFilter">Town search</label>
+    <input id="heatTownFilter" type="search" placeholder="Search city or town">
+
+    <label for="heatProvinceFilter">Province</label>
+    <select id="heatProvinceFilter">
+      <option value="">All provinces</option>
+      {% for province in provinces %}<option value="{{ province }}">{{ province }}</option>{% endfor %}
+    </select>
+
+    <label>Display mode</label>
+    <div class="button-row heatmap-button-row">
+      <button type="button" class="btn small" data-heat-mode="density">Density</button>
+      <button type="button" class="btn small secondary" data-heat-mode="clusters">Clusters</button>
+      <button type="button" class="btn small secondary" data-heat-mode="pins">Pins</button>
+      <button type="button" class="btn small secondary" data-heat-mode="both">Pins + density</button>
+    </div>
+
+    <label for="heatRadius">Density radius</label>
+    <input id="heatRadius" type="range" min="10" max="80" value="30">
+
+    <div class="button-row">
+      <button id="heatFitBoundsBtn" type="button" class="btn secondary button-auto">Fit map</button>
+      {% if can_modify_heatmap %}<button id="heatGeocodeBtn" type="button" class="btn button-auto">Geocode missing</button>{% endif %}
+    </div>
+
+    {% if can_modify_heatmap %}
+    <hr>
+    <h2>Import Excel</h2>
+    <form method="post" action="{{ url_for('heatmap.import_excel') }}" enctype="multipart/form-data">
+      <label for="heatImportFranchise">Import to franchise</label>
+      <select id="heatImportFranchise" name="franchise_id" required>
+        <option value="">Select franchise</option>
+        {% for franchise in franchises %}
+          <option value="{{ franchise.id }}" {% if selected_franchise and selected_franchise.id == franchise.id %}selected{% endif %}>{{ franchise.business_name }}</option>
+        {% endfor %}
+      </select>
+      <label for="heatFile">Excel file</label>
+      <input id="heatFile" name="file" type="file" accept=".xlsx,.xls" required>
+      <button type="submit" class="btn button-auto">Import Heat Map File</button>
+    </form>
+    {% endif %}
+  </aside>
+
+  <section class="heatmap-main">
+    <div class="form-section-card heatmap-map-card">
+      <div id="heatMap"></div>
+    </div>
+
+    <div class="form-section-card">
+      <h2>Current records</h2>
+      <div class="table-responsive heatmap-record-table-wrap">
+        <table class="system-report-table heatmap-record-table">
+          <thead>
+            <tr>
+              <th>MF File</th><th>Franchise</th><th>Name</th><th>Town</th><th>Province</th><th>Address</th><th>Contact</th>{% if can_modify_heatmap %}<th>Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody id="heatRows"><tr><td colspan="8">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</section>
+
+<script>
+window.HEATMAP_CONTEXT = {
+  dataUrl: "{{ url_for('heatmap.data') }}",
+  saveUrl: "{{ url_for('heatmap.save_record') }}",
+  canModify: {{ 'true' if can_modify_heatmap else 'false' }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/heatmap.js') }}"></script>
+{% if google_maps_api_key %}
+<script async defer src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=visualization&callback=initMartinsHeatMap"></script>
+{% endif %}
+{% endblock %}

@@ -269,3 +269,22 @@ Important setup notes:
 - Configure email settings in `.env` before password reset emails and agreement expiry reminders can send in production.
 - Add a cron job or scheduled task to run `flask check-franchise-expiry` daily for the 60-day and 30-day agreement reminder emails.
 - The first registered user becomes Admin automatically.
+
+
+## Heat Map Module
+
+The Martins Funerals System now includes an integrated Heat Map module at `/heat-map`.
+
+Required environment variable for map display:
+
+```env
+GOOGLE_MAPS_API_KEY=your_google_maps_browser_key
+```
+
+After deploying the updated code, run database migrations before using the module:
+
+```bash
+flask db upgrade
+```
+
+The Heat Map import accepts Excel files with columns such as MF File, Deceased Name, Deceased Surname, DOD, Address, City, Province, Country, Full Address, Latitude, Longitude, Weight, Next of Kin Name, Next of Kin Surname, Relationship, Relation, and Contact Number. If a `Relation` column exists, only `MEM` rows are imported for client-density accuracy.

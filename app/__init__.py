@@ -21,6 +21,10 @@ def create_app(config_class=Config):
     from app.franchise.routes import franchise_bp
     from app.monthly.routes import monthly_bp
     from app.royalties.routes import royalties_bp
+    from app.heatmap.routes import heatmap_bp
+    from app.attendance.routes import attendance_bp
+    from app.manuals.routes import manuals_bp
+    from app.insurance_claims.routes import insurance_claims_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -28,6 +32,10 @@ def create_app(config_class=Config):
     app.register_blueprint(franchise_bp)
     app.register_blueprint(monthly_bp)
     app.register_blueprint(royalties_bp)
+    app.register_blueprint(heatmap_bp)
+    app.register_blueprint(attendance_bp)
+    app.register_blueprint(manuals_bp)
+    app.register_blueprint(insurance_claims_bp)
 
     @app.context_processor
     def inject_franchise_context():

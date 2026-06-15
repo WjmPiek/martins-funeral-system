@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block app_content %}
+<section class="section-header"><div><h1>Manual Indexes</h1><p class="muted">Index PDFs linked to manuals where possible.</p></div><div class="button-row"><a class="btn secondary" href="{{ url_for('manuals.index') }}">Back</a>{% if is_manual_admin %}<a class="btn" href="{{ url_for('manuals.upload_index') }}">Upload Index</a>{% endif %}</div></section>
+<div class="form-section-card"><div class="table-responsive"><table><thead><tr><th>Title</th><th>Linked manual</th><th>File</th><th>Action</th></tr></thead><tbody>{% for doc in documents %}<tr><td>{{ doc.title }}</td><td>{{ doc.manual.title if doc.manual else '-' }}</td><td>{{ doc.filename }}</td><td><a class="btn small" target="_blank" href="{{ url_for('manuals.open_index', document_id=doc.id) }}">Open PDF</a></td></tr>{% else %}<tr><td colspan="4">No index documents loaded.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

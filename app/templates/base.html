@@ -20,8 +20,10 @@
                         <div class="nav-group-title">Selected Franchise</div>
                         <a href="{{ url_for('dashboard.index') }}">Franchise Dashboard</a>
                         <a href="{{ url_for('franchise.details') }}">Franchise Details</a>
+                        <a href="{{ url_for('heatmap.index') }}">Heat Map</a>
                         <a href="{{ url_for('monthly.index') }}">Monthly Figures</a>
                         <a href="{{ url_for('royalties.index') }}">Royalties</a>
+                        {% if current_user.has_permission('attendance:view') %}<a href="{{ url_for('attendance.index') }}">Attendance</a>{% endif %}
                         <div class="nav-group-title">Admin</div>
                         <a href="{{ url_for('dashboard.main_dashboard') }}">Back to Main Dashboard</a>
                     {% else %}
@@ -36,8 +38,9 @@
 
                         {% if current_user.has_permission('joinings:view') %}<a href="#">Joinings</a>{% endif %}
                         {% if current_user.has_permission('funeral_services:view') %}<a href="#">Funeral Services</a>{% endif %}
-                        {% if current_user.has_permission('insurance_claims:view') %}<a href="#">Insurance Claims</a>{% endif %}
-                        {% if current_user.has_permission('heat_map:view') %}<a href="#">Heat Map</a>{% endif %}
+                        {% if current_user.has_permission('insurance_claims:view') %}<a href="{{ url_for('insurance_claims.index') }}">Insurance Claims</a>{% endif %}
+                        {% if current_user.has_permission('heat_map:view') %}<a href="{{ url_for('heatmap.index') }}">Heat Map</a>{% endif %}
+                        {% if current_user.has_permission('manuals:view') %}<a href="{{ url_for('manuals.index') }}">Manuals</a>{% endif %}
                         {% if current_user.has_permission('royalties:view') %}<a href="{{ url_for('royalties.index') }}">Royalties</a>{% endif %}
                         {% if current_user.has_permission('monthly_figures:view') %}<a href="{{ url_for('monthly.index') }}">Monthly Figures</a>{% endif %}
                         {% if current_user.has_permission('finance:view') %}<a href="#">Finance</a>{% endif %}

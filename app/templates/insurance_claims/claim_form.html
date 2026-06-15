@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="section-header"><div><h1>{% if case %}{{ case.claim_ref }}{% else %}New Insurance Claim{% endif %}</h1><p class="muted">Capture and manage insurance claim details inside Martins Funeral System.</p></div><div class="button-row"><a class="btn secondary" href="{{ url_for('insurance_claims.claims') }}">Claim Cases</a></div></section>
+<form method="post" class="professional-form">
+  <div class="form-section-card"><h2>Claim Details</h2><div class="form-grid">
+    <label>Claim reference</label><input name="claim_ref" value="{{ case.claim_ref if case else '' }}" {% if case %}readonly{% endif %} placeholder="Auto-generated if blank">
+    <label>Franchise</label><select name="franchise_id"><option value="">Select franchise</option>{% for f in franchises %}<option value="{{ f.id }}" {% if case and case.franchise_id==f.id %}selected{% endif %}>{{ f.business_name }}</option>{% endfor %}</select>
+    <label>Claimant name</label><input name="claimant_name" value="{{ case.claimant_name if case else '' }}">
+    <label>Policy number</label><input name="policy_number" value="{{ case.policy_number if case else '' }}">
+    <label>ID number</label><input name="id_number" value="{{ case.id_number if case else '' }}">
+    <label>Claim type</label><input name="claim_type" value="{{ case.claim_type if case else 'Funeral Claim' }}">
+    <label>Claim date</label><input type="date" name="claim_date" value="{{ case.claim_date if case and case.claim_date else '' }}">
+    <label>Date of death</label><input type="date" name="date_of_death" value="{{ case.date_of_death if case and case.date_of_death else '' }}">
+    <label>Claim amount</label><input name="claim_amount" value="{{ case.claim_amount if case else '' }}">
+    <label>Status</label><select name="status">{% for s in ['Open','Pending Documents','Submitted','Approved','Rejected','Closed'] %}<option value="{{ s }}" {% if case and case.status==s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select>
+    <label>Priority</label><select name="priority">{% for p in ['Low','Normal','High','Urgent'] %}<option value="{{ p }}" {% if case and case.priority==p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select>
+    <label>Notes</label><textarea name="notes">{{ case.notes if case else '' }}</textarea>
+  </div><div class="form-actions"><button class="button-auto" type="submit">Save Claim</button></div></div>
+</form>
+{% if case %}
+<div class="grid">
+  <article class="form-section-card"><h2>Documents</h2><form method="post" enctype="multipart/form-data" action="{{ url_for('insurance_claims.upload_attachment', claim_id=case.id) }}"><input type="file" name="file" required><button>Upload Document</button></form><ul>{% for a in case.attachments %}<li><a href="{{ url_for('insurance_claims.download_attachment', attachment_id=a.id) }}">{{ a.filename }}</a> <small>{{ a.created_at.strftime('%Y-%m-%d') }}</small></li>{% else %}<li>No documents uploaded.</li>{% endfor %}</ul></article>
+  <article class="form-section-card"><h2>Notes</h2><form method="post" action="{{ url_for('insurance_claims.add_note', claim_id=case.id) }}"><textarea name="note" required></textarea><button>Add Note</button></form>{% for n in case.claim_notes %}<div class="alert info"><strong>{{ n.user_email }}</strong><br>{{ n.note }}<br><small>{{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</small></div>{% else %}<p class="muted">No notes yet.</p>{% endfor %}</article>
+</div>
+{% endif %}
+{% endblock %}

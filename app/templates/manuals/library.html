@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block app_content %}
+<section class="section-header"><div><h1>Manual Library</h1><p class="muted">Published Martins manuals.</p></div><div class="button-row"><a class="btn secondary" href="{{ url_for('manuals.index') }}">Back</a>{% if is_manual_admin %}<a class="btn" href="{{ url_for('manuals.upload_manual') }}">Upload Manual</a>{% endif %}</div></section>
+<div class="branch-grid">{% for manual in manuals %}{% set latest=latest_map.get(manual.id) %}<a class="branch-card" href="{{ url_for('manuals.manual_detail', manual_id=manual.id) }}"><h2>{{ manual.title }}</h2><p>{{ manual.confidentiality_note or 'Internal manual' }}</p><div class="branch-meta"><span>{{ latest.version_label if latest else 'No version' }}</span><span>Open</span></div></a>{% else %}<div class="form-section-card">No manuals available.</div>{% endfor %}</div>
+{% endblock %}

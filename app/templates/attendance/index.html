@@ -1,0 +1,10 @@
+{% extends "attendance/base.html" %}{% block attendance_title %}Attendance Dashboard{% endblock %}{% block attendance_content %}
+<div class="royalty-dashboard-grid">
+  <div class="metric-card"><span>Total Staff</span><strong>{{ total_staff }}</strong></div>
+  <div class="metric-card"><span>Active Staff</span><strong>{{ active_staff }}</strong></div>
+  <div class="metric-card"><span>Today Events</span><strong>{{ today_events }}</strong></div>
+  <div class="metric-card"><span>Pending Approvals</span><strong>{{ pending_events }}</strong></div>
+  <div class="metric-card"><span>Pending Leave</span><strong>{{ pending_leave }}</strong></div>
+</div>
+<div class="form-section-card"><h2>Recent Attendance Events</h2><div class="table-responsive"><table><thead><tr><th>Staff</th><th>Action</th><th>Time</th><th>Office</th><th>GPS</th><th>Status</th></tr></thead><tbody>{% for e in recent_events %}<tr><td>{{ e.staff.full_name }}</td><td>{{ e.action.replace('_',' ')|title }}</td><td>{{ e.event_time.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ e.office.name if e.office else '' }}</td><td>{{ e.gps_status }}</td><td><span class="badge {{ 'success' if e.approval_status == 'approved' else 'warning' }}">{{ e.approval_status }}</span></td></tr>{% else %}<tr><td colspan="6">No attendance records yet.</td></tr>{% endfor %}</tbody></table></div></div>
+{% endblock %}

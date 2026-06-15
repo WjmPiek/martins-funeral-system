@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="section-header">
+  <div><h1>{% block attendance_title %}Attendance{% endblock %}</h1><p class="muted">Integrated attendance register, office QR sign-in, staff records, approvals, history and leave tracking.</p></div>
+  <div class="button-row attendance-tabs">
+    <a class="btn secondary" href="{{ url_for('attendance.index') }}">Overview</a>
+    <a class="btn secondary" href="{{ url_for('attendance.staff') }}">Staff</a>
+    <a class="btn secondary" href="{{ url_for('attendance.offices') }}">Office QR</a>
+    <a class="btn secondary" href="{{ url_for('attendance.manual_event') }}">Manual Event</a>
+    <a class="btn secondary" href="{{ url_for('attendance.history') }}">History</a>
+    <a class="btn secondary" href="{{ url_for('attendance.approvals') }}">Approvals</a>
+    <a class="btn secondary" href="{{ url_for('attendance.leave') }}">Leave</a>
+  </div>
+</div>
+{% block attendance_content %}{% endblock %}
+{% endblock %}

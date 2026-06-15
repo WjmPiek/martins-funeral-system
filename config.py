@@ -15,3 +15,7 @@ class Config:
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
     APP_BASE_URL = os.getenv("APP_BASE_URL", "http://127.0.0.1:5000")
+    GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
+
+# MFF Manuals PDF storage. On Render, set MANUALS_STORAGE_ROOT to a persistent disk path.
+MANUALS_STORAGE_ROOT = os.environ.get("MANUALS_STORAGE_ROOT", "")

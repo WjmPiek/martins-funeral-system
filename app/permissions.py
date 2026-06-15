@@ -8,6 +8,7 @@ MODULES = [
     "Funeral Services",
     "Insurance Claims",
     "Heat Map",
+    "Attendance",
     "Royalties",
     "Monthly Figures",
     "Finance",
@@ -39,7 +40,7 @@ ROLE_DEFAULTS = {
     "Regional Manager": {
         "Dashboard": ["view"], "Franchise Settings": ["view"], "Franchise Details": ["view", "export"], "Franchise Management": ["view"],
         "Joinings": ["view", "export"], "Funeral Services": ["view", "export"],
-        "Insurance Claims": ["view", "export"], "Heat Map": ["view", "export"],
+        "Insurance Claims": ["view", "export"], "Heat Map": ["view", "export"], "Attendance": ["view", "add", "edit", "export", "approve", "manage"],
         "Royalties": ["view", "export"], "Monthly Figures": ["view", "export"],
     },
     "Finance Manager": {
@@ -55,19 +56,19 @@ ROLE_DEFAULTS = {
     "Franchise Manager": {
         "Dashboard": ["view"], "Franchise Settings": ["view"], "Franchise Details": ["view", "edit", "export"],
         "Joinings": ["view", "add", "edit", "export"], "Funeral Services": ["view", "add", "edit", "export"],
-        "Insurance Claims": ["view", "add", "edit", "export"], "Heat Map": ["view", "export"],
+        "Insurance Claims": ["view", "add", "edit", "export"], "Heat Map": ["view", "export"], "Attendance": ["view", "add", "edit", "export", "approve", "manage"],
         "Royalties": ["view", "export"], "Monthly Figures": ["view", "edit", "export"],
     },
     "Franchise User": {
         "Dashboard": ["view"], "Franchise Settings": ["view"], "Franchise Details": ["view", "edit", "export"],
         "Joinings": ["view", "add", "edit", "export"], "Funeral Services": ["view", "add", "edit", "export"],
-        "Insurance Claims": ["view", "add", "edit", "export"], "Heat Map": ["view"],
+        "Insurance Claims": ["view", "add", "edit", "export"], "Heat Map": ["view"], "Attendance": ["view", "add", "edit", "export"],
         "Royalties": ["view", "export"], "Monthly Figures": ["view", "edit", "export"],
     },
     "Read Only User": {
         "Dashboard": ["view"], "Franchise Settings": ["view"], "Franchise Details": ["view", "export"],
         "Joinings": ["view"], "Funeral Services": ["view"], "Insurance Claims": ["view"],
-        "Heat Map": ["view"], "Royalties": ["view"], "Monthly Figures": ["view"],
+        "Heat Map": ["view"], "Attendance": ["view"], "Royalties": ["view"], "Monthly Figures": ["view"],
     },
 }
 

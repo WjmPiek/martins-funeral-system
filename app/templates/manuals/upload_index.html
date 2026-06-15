@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block app_content %}
+<section class="section-header"><div><h1>Upload Index</h1><p class="muted">Upload a PDF index and optionally link it to a manual.</p></div><a class="btn secondary" href="{{ url_for('manuals.indexes') }}">Back</a></section>
+<div class="form-section-card"><form method="post" enctype="multipart/form-data"><div class="form-grid"><label>Index Title</label><input name="title"><label>Link to Manual</label><select name="manual_id"><option value="">Auto-link from title or filename</option>{% for manual in manuals %}<option value="{{ manual.id }}">{{ manual.title }}</option>{% endfor %}</select><label>PDF File</label><input type="file" name="file" accept="application/pdf,.pdf" required></div><div class="form-actions"><button class="btn" type="submit">Upload Index</button></div></form></div>
+{% endblock %}
