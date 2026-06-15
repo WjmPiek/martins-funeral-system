@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Review Imported Monthly Figures</h1>
+      <p class="muted">Imported PDF values are locked. Enter the Insurance Payover now and save, or use Save for Later if the payover is not available yet.</p>
+    </div>
+    <a class="btn secondary button-auto" href="{{ url_for('monthly.index') }}">Back</a>
+  </div>
+
+  <form method="post" class="professional-form">
+    <div class="form-section-card">
+      <h2>Reporting Period</h2>
+      <div class="form-grid">
+        <label>Month</label>
+        <input type="text" value="{% for value, label in months %}{% if monthly_figure.month == value %}{{ label }}{% endif %}{% endfor %}" disabled>
+
+        <label>Year</label>
+        <input type="text" value="{{ monthly_figure.year }}" disabled>
+      </div>
+    </div>
+
+    <div class="form-section-card">
+      <h2>Imported Monthly Figures</h2>
+      <p class="muted">These figures come from the imported PDF and cannot be changed manually.</p>
+      <div class="form-grid">
+        <label>GROSS TURNOVER</label>
+        <input type="text" value="{{ '%.2f'|format(monthly_figure.gross_turnover|float) }}" disabled>
+
+        <label>CASH</label>
+        <input type="text" value="{{ '%.2f'|format(monthly_figure.cash|float) }}" disabled>
+
+        <label>Funeral Receipts</label>
+        <input type="text" value="{{ '%.2f'|format(monthly_figure.funeral_receipts|float) }}" disabled>
+
+        <label>SOCIET RECEIPTS</label>
+        <input type="text" value="{{ '%.2f'|format(monthly_figure.society_receipts|float) }}" disabled>
+
+        <label>Cash Sales</label>
+        <input type="text" value="{{ '%.2f'|format(monthly_figure.cash_sales|float) }}" disabled>
+
+        <label>Tombstone Receipts</label>
+        <input type="text" value="{{ '%.2f'|format(monthly_figure.tombstone_receipts|float) }}" disabled>
+
+        <label>OBO Services Receipts</label>
+        <input type="text" value="{{ '%.2f'|format(monthly_figure.obo_service_receipts|float) }}" disabled>
+
+        <label>SALES</label>
+        <input type="text" value="{{ '%.2f'|format(monthly_figure.sales|float) }}" disabled>
+
+        <label>INSURANCE RECEIPTS</label>
+        <input type="text" value="{{ '%.2f'|format(monthly_figure.insurance_receipts|float) }}" disabled>
+
+        <label for="insurance_payover">INSURANCE PAYOVER</label>
+        <input id="insurance_payover" name="insurance_payover" type="number" step="0.01" value="{{ '%.2f'|format(monthly_figure.insurance_payover|float) }}">
+        <small class="muted field-help">Leave this as 0.00 and click Save for Later if you do not have the payover yet.</small>
+
+        <label>ADMIN FEE</label>
+        <input type="text" value="{{ '%.2f'|format(monthly_figure.admin_fee|float) }}" disabled>
+
+        <label>INSURANCE JOININGS</label>
+        <input type="text" value="{{ monthly_figure.insurance_joinings }}" disabled>
+
+        <label>MF FILES</label>
+        <input type="text" value="{{ monthly_figure.mf_files }}" disabled>
+      </div>
+    </div>
+
+    <div class="form-section-card protected-section">
+      <h2>Royalty Calculation</h2>
+      <div class="monthly-summary-grid">
+        <div><span>Gross Turnover</span><strong>{{ '%.2f'|format(monthly_figure.gross_turnover|float) }}</strong></div>
+        <div><span>Royalty Base</span><strong>{{ '%.2f'|format(monthly_figure.gross_revenue|float) }}</strong></div>
+        <div><span>Calculation Method</span><strong>Sales + Insurance Receipts</strong></div>
+        <div><span>Cash</span><strong>{{ '%.2f'|format(monthly_figure.cash|float) }}</strong></div>
+        <div><span>Insurance Payover</span><strong>{{ '%.2f'|format(monthly_figure.insurance_payover|float) }}</strong></div>
+        <div><span>Admin Fee</span><strong>{{ '%.2f'|format(monthly_figure.admin_fee|float) }}</strong></div>
+        <div><span>Royalty %</span><strong>{{ '%.2f'|format(monthly_figure.royalty_percentage|float) }}%</strong></div>
+        <div><span>Royalty Amount</span><strong>{{ '%.2f'|format(monthly_figure.royalty_amount|float) }}</strong></div>
+        <div><span>Minimum Applied</span><strong>{% if monthly_figure.minimum_royalty_applied %}Yes{% else %}No{% endif %}</strong></div>
+        <div><span>Status</span><strong>{{ monthly_figure.status }}</strong></div>
+      </div>
+      <p class="muted">Save Figures recalculates Cash, Gross Turnover, Admin Fee, Royalty %, and Royalty Amount using the entered Insurance Payover.</p>
+    </div>
+
+    <div class="form-section-card">
+      <h2>Notes</h2>
+      <textarea name="notes" rows="5">{{ monthly_figure.notes or '' }}</textarea>
+    </div>
+
+    <div class="form-actions sticky-actions no-print">
+      <button class="button-auto" type="submit" name="action" value="save_calculate">Save Figures</button>
+      <button class="btn secondary button-auto" type="submit" name="action" value="save_later">Save for Later</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

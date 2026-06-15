@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="section-header">
+    <div>
+        <h1>Allocate Unmatched Contact Row</h1>
+        <p class="muted">Select the correct franchise, then save the contact-list values to that Franchise Details page.</p>
+    </div>
+</div>
+
+<div class="quick-actions no-print">
+    <a class="button-secondary" href="{{ url_for('admin.import_contact_list') }}">Back to Contact Import</a>
+</div>
+
+<div class="form-section-card">
+    <h2>Spreadsheet Row</h2>
+    <div class="table-responsive">
+        <table class="table-compact">
+            <tbody>
+                <tr><th>Row</th><td>{{ row_data.row_number }}</td></tr>
+                <tr><th>Spreadsheet Name</th><td>{{ row_data.spreadsheet_name }}</td></tr>
+                <tr><th>Branch</th><td>{{ row_data.branch }}</td></tr>
+                <tr><th>Outlet</th><td>{{ row_data.outlet }}</td></tr>
+                <tr><th>Names Tried</th><td>{{ row_data.tried }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="form-section-card">
+    <form method="post" class="professional-form">
+        <input type="hidden" name="row_number" value="{{ row_data.row_number }}">
+        <input type="hidden" name="spreadsheet_name" value="{{ row_data.spreadsheet_name }}">
+
+        <div class="form-grid">
+            <label for="franchise_id">Correct Franchise</label>
+            <select id="franchise_id" name="franchise_id" required>
+                <option value="">Select franchise...</option>
+                {% for franchise in franchises %}
+                    <option value="{{ franchise.id }}">{{ franchise.business_name }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="contact_name">Franchisee Name / Surname</label>
+            <input id="contact_name" name="contact_name" value="{{ row_data.contact_name }}">
+
+            <label for="office_number">Office / 24-Hour / Cell Number</label>
+            <input id="office_number" name="office_number" value="{{ row_data.office_number }}">
+
+            <label for="email">Email / Public Email</label>
+            <input id="email" name="email" value="{{ row_data.email }}">
+
+            <label for="address">Office Address</label>
+            <textarea id="address" name="address" rows="4">{{ row_data.address }}</textarea>
+        </div>
+
+        <div class="quick-actions">
+            <button class="button-primary" type="submit">Save to Franchise Details</button>
+            <a class="button-secondary" href="{{ url_for('admin.import_contact_list') }}">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

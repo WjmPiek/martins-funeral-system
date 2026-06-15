@@ -1,0 +1,515 @@
+from datetime import datetime
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+import re
+
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.pagesizes import A4, landscape, portrait
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    PageBreak, Image
+)
+
+
+MARTINS_BLUE = colors.HexColor("#1f3f6d")
+LIGHT_BLUE = colors.HexColor("#eaf2fb")
+LIGHT_GREY = colors.HexColor("#f4f6f8")
+DARK_TEXT = colors.HexColor("#111827")
+
+
+def _styles():
+    base = getSampleStyleSheet()
+
+    for name in ["CoverTitle", "CoverSubtitle", "SmallSafe", "TableCell", "TableHead", "TinyCell", "TinyHead", "SectionTitle"]:
+        if name in base.byName:
+            continue
+
+    base.add(ParagraphStyle(
+        name="CoverTitle",
+        parent=base["Title"],
+        alignment=TA_CENTER,
+        fontName="Helvetica-Bold",
+        fontSize=22,
+        leading=26,
+        textColor=DARK_TEXT,
+        spaceAfter=8,
+    ))
+    base.add(ParagraphStyle(
+        name="CoverSubtitle",
+        parent=base["Heading2"],
+        alignment=TA_CENTER,
+        fontName="Helvetica-Bold",
+        fontSize=14,
+        leading=18,
+        textColor=DARK_TEXT,
+        spaceAfter=8,
+    ))
+    base.add(ParagraphStyle(
+        name="SectionTitle",
+        parent=base["Heading2"],
+        alignment=TA_LEFT,
+        fontName="Helvetica-Bold",
+        fontSize=12,
+        leading=15,
+        textColor=DARK_TEXT,
+        spaceAfter=6,
+    ))
+    base.add(ParagraphStyle(
+        name="SmallSafe",
+        parent=base["BodyText"],
+        fontSize=8,
+        leading=10,
+        alignment=TA_LEFT,
+        textColor=DARK_TEXT,
+    ))
+    base.add(ParagraphStyle(
+        name="TableCell",
+        parent=base["BodyText"],
+        fontSize=8,
+        leading=9,
+        alignment=TA_LEFT,
+        wordWrap="CJK",
+        textColor=DARK_TEXT,
+    ))
+    base.add(ParagraphStyle(
+        name="TableHead",
+        parent=base["BodyText"],
+        fontName="Helvetica-Bold",
+        fontSize=8,
+        leading=9,
+        alignment=TA_LEFT,
+        wordWrap="CJK",
+        textColor=DARK_TEXT,
+    ))
+    base.add(ParagraphStyle(
+        name="TinyCell",
+        parent=base["BodyText"],
+        fontSize=5.8,
+        leading=6.4,
+        alignment=TA_LEFT,
+        wordWrap="CJK",
+        textColor=DARK_TEXT,
+    ))
+    base.add(ParagraphStyle(
+        name="TinyHead",
+        parent=base["BodyText"],
+        fontName="Helvetica-Bold",
+        fontSize=5.5,
+        leading=6.2,
+        alignment=TA_LEFT,
+        wordWrap="CJK",
+        textColor=DARK_TEXT,
+    ))
+    return base
+
+
+def _clean_text(text):
+    text = "" if text is None else str(text)
+    # Remove any simple HTML tags that previously printed literally in PDFs.
+    text = re.sub(r"</?b>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", "", text)
+    return text
+
+
+def _p(text, style):
+    text = _clean_text(text)
+    safe = (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\n", "<br/>")
+    )
+    return Paragraph(safe, style)
+
+
+def _money(value):
+    try:
+        return f"{float(value or 0):,.2f}"
+    except Exception:
+        return "0.00"
+
+
+def _logo_path():
+    static = Path(__file__).resolve().parents[1] / "static"
+    candidates = [
+        static / "uploads" / "system" / "logo.png",
+        static / "img" / "logo.png",
+        static / "img" / "logo-placeholder.svg",
+    ]
+    for candidate in candidates:
+        if candidate.exists() and candidate.suffix.lower() != ".svg":
+            return candidate
+    return None
+
+
+def _try_logo(story, styles, max_width=48 * mm, max_height=24 * mm):
+    logo = _logo_path()
+    if logo:
+        try:
+            img = Image(str(logo), width=max_width, height=max_height, kind="proportional")
+            img.hAlign = "CENTER"
+            story.append(img)
+            story.append(Spacer(1, 5 * mm))
+            return
+        except Exception:
+            pass
+
+    story.append(_p("Martins Funeral System", styles["CoverSubtitle"]))
+    story.append(Spacer(1, 5 * mm))
+
+
+def _footer(canvas, doc, report_title, franchise):
+    canvas.saveState()
+    width, height = doc.pagesize
+    y = 9 * mm
+
+    canvas.setStrokeColor(colors.lightgrey)
+    canvas.line(doc.leftMargin, y + 5 * mm, width - doc.rightMargin, y + 5 * mm)
+
+    canvas.setFont("Helvetica", 7)
+    canvas.setFillColor(colors.black)
+    canvas.drawString(doc.leftMargin, y, datetime.now().strftime("Generated %d/%m/%Y %H:%M"))
+    canvas.drawCentredString(width / 2, y, "Confidential")
+    canvas.drawRightString(width - doc.rightMargin, y, f"Page {doc.page}")
+
+    canvas.setFont("Helvetica-Bold", 8)
+    canvas.drawString(doc.leftMargin, height - 12 * mm, _clean_text(getattr(franchise, "business_name", "") or "Franchise"))
+    canvas.drawCentredString(width / 2, height - 12 * mm, _clean_text(report_title))
+    canvas.restoreState()
+
+
+def _info_table(franchise, generated_by, styles, available_width):
+    rows = [
+        ["Franchise Name", getattr(franchise, "business_name", "")],
+        ["Franchise Code", getattr(franchise, "franchise_code", "")],
+        ["PTY Number", getattr(franchise, "pty_number", "")],
+        ["VAT Number", getattr(franchise, "vat_number", "")],
+        ["Address", getattr(franchise, "office_address", "")],
+        ["Office Number", getattr(franchise, "office_number", "")],
+        ["24-Hour Number", getattr(franchise, "after_hours_number", "")],
+        ["Email", getattr(franchise, "public_email", "") or getattr(franchise, "franchisee_email", "")],
+        ["Generated By", getattr(generated_by, "full_name", "System")],
+        ["Generated On", datetime.now().strftime("%d %B %Y %H:%M")],
+    ]
+
+    # Compact 4-column layout: Label / Value / Label / Value.
+    compact = []
+    for idx in range(0, len(rows), 2):
+        left = rows[idx]
+        right = rows[idx + 1] if idx + 1 < len(rows) else ["", ""]
+        compact.append([
+            _p(left[0], styles["TableHead"]),
+            _p(left[1], styles["TableCell"]),
+            _p(right[0], styles["TableHead"]),
+            _p(right[1], styles["TableCell"]),
+        ])
+
+    table = Table(
+        compact,
+        colWidths=[available_width * 0.17, available_width * 0.33, available_width * 0.17, available_width * 0.33],
+    )
+    table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ("BACKGROUND", (0, 0), (0, -1), LIGHT_GREY),
+        ("BACKGROUND", (2, 0), (2, -1), LIGHT_GREY),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    return table
+
+
+def add_cover_page(story, report_title, franchise, generated_by, styles, available_width):
+    _try_logo(story, styles)
+    story.append(_p("MARTINS FUNERAL SYSTEM", styles["CoverSubtitle"]))
+    story.append(_p(report_title.upper(), styles["CoverTitle"]))
+    story.append(_p(getattr(franchise, "business_name", "") or "Franchise Name", styles["CoverSubtitle"]))
+    story.append(Spacer(1, 6 * mm))
+
+    story.append(_info_table(franchise, generated_by, styles, available_width))
+    story.append(Spacer(1, 10 * mm))
+
+    story.append(_p("Confidentiality Notice", styles["SectionTitle"]))
+    story.append(_p(
+        "This document contains confidential franchise business information and is intended solely for authorised personnel.",
+        styles["SmallSafe"],
+    ))
+    story.append(PageBreak())
+
+
+def safe_table(headers, rows, styles, page_width, tiny=False):
+    col_count = len(headers)
+    style_head = styles["TinyHead"] if tiny else styles["TableHead"]
+    style_cell = styles["TinyCell"] if tiny else styles["TableCell"]
+    col_width = page_width / max(col_count, 1)
+
+    data = [[_p(header, style_head) for header in headers]]
+    for row in rows:
+        data.append([_p(cell, style_cell) for cell in row])
+
+    table = Table(data, colWidths=[col_width] * col_count, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), LIGHT_BLUE),
+        ("TEXTCOLOR", (0, 0), (-1, 0), DARK_TEXT),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 2 if tiny else 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 2 if tiny else 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    return table
+
+
+def build_report_pdf(report_title, franchise, generated_by, headers, rows, pagesize=None, tiny=False):
+    styles = _styles()
+    pagesize = pagesize or (landscape(A4) if len(headers) > 8 else portrait(A4))
+
+    tmp = NamedTemporaryFile(delete=False, suffix=".pdf")
+    tmp.close()
+
+    doc = SimpleDocTemplate(
+        tmp.name,
+        pagesize=pagesize,
+        rightMargin=9 * mm,
+        leftMargin=9 * mm,
+        topMargin=18 * mm,
+        bottomMargin=16 * mm,
+    )
+
+    available_width = pagesize[0] - doc.leftMargin - doc.rightMargin
+    story = []
+    add_cover_page(story, report_title, franchise, generated_by, styles, available_width)
+    story.append(safe_table(headers, rows, styles, available_width, tiny=tiny))
+
+    doc.build(
+        story,
+        onFirstPage=lambda c, d: _footer(c, d, report_title, franchise),
+        onLaterPages=lambda c, d: _footer(c, d, report_title, franchise),
+    )
+    return tmp.name
+
+
+
+def _gross_method_label(franchise):
+    method = (getattr(franchise, "royalty_gross_method", "") or "").strip().lower()
+    if method not in {"new", "old"}:
+        start_date = getattr(franchise, "agreement_start_date", None)
+        method = "new" if start_date and getattr(start_date, "year", 0) >= 2018 else "old"
+    return "Gross = New Gross Method" if method == "new" else "Gross = Old"
+
+def build_franchise_details_pdf(franchise, scales, generated_by):
+    headers = ["Section", "Field", "Value"]
+    rows = [
+        ["Business", "Franchise Name", getattr(franchise, "business_name", "")],
+        ["Business", "Franchise Code", getattr(franchise, "franchise_code", "")],
+        ["Business", "PTY Number", getattr(franchise, "pty_number", "")],
+        ["Business", "VAT Number", getattr(franchise, "vat_number", "")],
+        ["Business", "Address", getattr(franchise, "office_address", "")],
+        ["Contact", "Office Number", getattr(franchise, "office_number", "")],
+        ["Contact", "24-Hour Number", getattr(franchise, "after_hours_number", "")],
+        ["Franchisee", "Name", getattr(franchise, "franchisee_full_name", "")],
+        ["Franchisee", "Cell", getattr(franchise, "franchisee_cell", "")],
+        ["Franchisee", "Email", getattr(franchise, "franchisee_email", "")],
+        ["Online", "Facebook", getattr(franchise, "facebook_url", "")],
+        ["Online", "Instagram", getattr(franchise, "instagram_url", "")],
+        ["Online", "TikTok", getattr(franchise, "tiktok_url", "")],
+        ["Online", "Website", getattr(franchise, "website_url", "")],
+        ["Agreement", "From", getattr(franchise, "agreement_start_date", "")],
+        ["Agreement", "To", getattr(franchise, "agreement_end_date", "")],
+        ["Royalty", "Minimum Royalty Amount", _money(getattr(franchise, "minimum_royalty_amount", 0))],
+        ["Royalty", "Gross Method", _gross_method_label(franchise)],
+    ]
+    for scale in scales:
+        rows.append([
+            "Royalty Scale",
+            f"Row {scale.row_number}",
+            f"{_money(scale.amount_from)} to {_money(scale.amount_to)} - {scale.percentage}%",
+        ])
+    return build_report_pdf("Franchise Details Report", franchise, generated_by, headers, rows)
+
+
+def build_monthly_figure_pdf(monthly_figure, generated_by):
+    franchise = monthly_figure.franchise
+
+    gross_method = _gross_method_label(franchise)
+    minimum_applied = "Yes" if getattr(monthly_figure, "minimum_royalty_applied", False) else "No"
+
+    # A4 landscape with fixed widths and short headings to prevent cut-off.
+    # Full descriptions are shown in the legend below the table.
+    headers = [
+        "Gross",
+        "Cash",
+        "Funeral",
+        "Society",
+        "Cash Sales",
+        "Tombstone",
+        "OBO",
+        "Sales",
+        "Insurance",
+        "Payover",
+        "Admin Fee",
+        "Joinings",
+        "MF Files",
+        "Royalty Base",
+        "Method",
+        "Royalty %",
+        "Royalty",
+        "Min.",
+        "Period",
+        "Status",
+    ]
+
+    rows = [[
+        _money(monthly_figure.gross_turnover),
+        _money(monthly_figure.cash),
+        _money(monthly_figure.funeral_receipts),
+        _money(monthly_figure.society_receipts),
+        _money(monthly_figure.cash_sales),
+        _money(monthly_figure.tombstone_receipts),
+        _money(monthly_figure.obo_service_receipts),
+        _money(monthly_figure.sales),
+        _money(monthly_figure.insurance_receipts),
+        _money(monthly_figure.insurance_payover),
+        _money(monthly_figure.admin_fee),
+        monthly_figure.insurance_joinings,
+        monthly_figure.mf_files,
+        _money(monthly_figure.gross_revenue),
+        gross_method,
+        f"{float(monthly_figure.royalty_percentage or 0):.2f}%",
+        _money(monthly_figure.royalty_amount),
+        minimum_applied,
+        monthly_figure.period_label,
+        monthly_figure.status,
+    ]]
+
+    styles = _styles()
+    pagesize = landscape(A4)
+    tmp = NamedTemporaryFile(delete=False, suffix=".pdf")
+    tmp.close()
+
+    doc = SimpleDocTemplate(
+        tmp.name,
+        pagesize=pagesize,
+        rightMargin=7 * mm,
+        leftMargin=7 * mm,
+        topMargin=18 * mm,
+        bottomMargin=16 * mm,
+    )
+
+    available_width = pagesize[0] - doc.leftMargin - doc.rightMargin
+    story = []
+    add_cover_page(story, "Monthly Figures Report", franchise, generated_by, styles, available_width)
+
+    story.append(_p("Monthly Figures Summary", styles["SectionTitle"]))
+
+    # Fixed proportional widths. These add up to the available page width and avoid text overlap/cut-off.
+    weights = [
+        1.05, 0.95, 1.00, 0.95, 1.00, 1.05, 0.75, 0.95, 1.05, 1.00,
+        1.00, 0.80, 0.80, 1.10, 1.00, 0.85, 1.00, 0.65, 0.85, 0.85
+    ]
+    total_weight = sum(weights)
+    col_widths = [(available_width * weight / total_weight) for weight in weights]
+
+    data = [[_p(header, styles["TinyHead"]) for header in headers]]
+    for row in rows:
+        data.append([_p(cell, styles["TinyCell"]) for cell in row])
+
+    table = Table(data, colWidths=col_widths, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), LIGHT_BLUE),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 1.2),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 1.2),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    story.append(table)
+
+    doc.build(
+        story,
+        onFirstPage=lambda c, d: _footer(c, d, "Monthly Figures Report", franchise),
+        onLaterPages=lambda c, d: _footer(c, d, "Monthly Figures Report", franchise),
+    )
+    return tmp.name
+
+
+
+def build_monthly_figures_period_pdf(figures, franchise, generated_by, period_label=None):
+    title = "Monthly Figures" + (f" - {period_label}" if period_label else "")
+    headers = [
+        "Period",
+        "Franchise",
+        "Status",
+        "Gross Turnover",
+        "Cash",
+        "Sales",
+        "Insurance Receipts",
+        "Insurance Payover",
+        "Admin Fee",
+        "Insurance Joinings",
+        "MF Files",
+        "Royalty Base",
+        "Royalty %",
+        "Royalty Amount",
+    ]
+    rows = []
+    for item in figures:
+        rows.append([
+            item.period_label,
+            getattr(getattr(item, "franchise", None), "business_name", ""),
+            item.status,
+            _money(item.gross_turnover),
+            _money(item.cash),
+            _money(item.sales),
+            _money(item.insurance_receipts),
+            _money(item.insurance_payover),
+            _money(item.admin_fee),
+            str(item.insurance_joinings or 0),
+            str(item.mf_files or 0),
+            _money(item.gross_revenue),
+            f"{float(item.royalty_percentage or 0):.2f}%",
+            _money(item.royalty_amount),
+        ])
+    return build_report_pdf(title, franchise, generated_by, headers, rows, pagesize=landscape(A4), tiny=True)
+
+
+def build_royalty_history_pdf(figures, franchise, generated_by, period_label=None):
+    headers = [
+        "Period",
+        "Status",
+        "Gross Method",
+        "Royalty Base",
+        "Royalty %",
+        "Royalty Amount",
+        "Minimum Applied",
+        "Cash",
+        "Admin Fee",
+        "Insurance Receipts",
+        "Insurance Payover",
+    ]
+    rows = []
+    for item in figures:
+        rows.append([
+            item.period_label,
+            item.status,
+            _gross_method_label(item.franchise),
+            _money(item.gross_revenue),
+            f"{float(item.royalty_percentage or 0):.2f}%",
+            _money(item.royalty_amount),
+            "Yes" if item.minimum_royalty_applied else "No",
+            _money(item.cash),
+            _money(item.admin_fee),
+            _money(item.insurance_receipts),
+            _money(item.insurance_payover),
+        ])
+    return build_report_pdf("Royalty Calculation & History" + (f" - {period_label}" if period_label else ""), franchise, generated_by, headers, rows, pagesize=landscape(A4), tiny=True)

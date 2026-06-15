@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="button-row" style="margin-bottom:1rem;"><a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a></div>
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Import Monthly Figures PDF</h1>
+      <p class="muted">Upload the Royalty Calculation PDF. After import, the system opens the payover capture page where Insurance Payover can be entered or saved for later.</p>
+    </div>
+    <a class="btn secondary button-auto" href="{{ url_for('monthly.index') }}">Back</a>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="professional-form">
+    <div class="form-section-card">
+      <h2>PDF File</h2>
+      <div class="form-grid">
+        <label for="franchise_id">Allocate to Franchise</label>
+        <select id="franchise_id" name="franchise_id" required>
+          {% for franchise in franchises %}
+            <option value="{{ franchise.id }}" {% if selected_franchise and selected_franchise.id == franchise.id %}selected{% endif %}>
+              {{ franchise.business_name or 'Unnamed Franchise' }}
+            </option>
+          {% endfor %}
+        </select>
+
+        <label for="pdf_file">Select PDF</label>
+        <input id="pdf_file" name="pdf_file" type="file" accept="application/pdf,.pdf" required>
+      </div>
+      <p class="muted">If PDF import fails, install the PDF reader package with: pip install pypdf</p>
+    </div>
+
+    <div class="form-section-card">
+      <h2>Imported Fields</h2>
+      <p class="muted">The PDF should be the Martins Month-End Report. Claim Receipts is removed. Insurance Payover is captured manually after import before the final figures are saved.</p>
+    </div>
+
+    <div class="form-actions sticky-actions no-print">
+      <button class="button-auto" type="submit">Import PDF & Capture Payover</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

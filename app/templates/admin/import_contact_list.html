@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="button-row" style="margin-bottom:1rem;"><a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a></div>
+<div class="section-header">
+    <div>
+        <h1>Import Franchise Contact List</h1>
+        <p class="muted">Upload the Martins Funerals contact list to populate each Franchise Details page with branch contact information.</p>
+    </div>
+</div>
+
+<div class="quick-actions no-print">
+    <a class="button-secondary" href="{{ url_for('admin.import_contract_summary') }}">Import Contract Summary</a>
+</div>
+
+<div class="form-section-card">
+    <form method="post" enctype="multipart/form-data" class="professional-form">
+        <div class="form-grid">
+            <label for="excel_file">Contact List Excel File</label>
+            <input id="excel_file" type="file" name="excel_file" accept=".xlsx,.xlsm,.xls" required>
+        </div>
+        <div class="quick-actions">
+            <button class="button-primary" type="submit">Import Contact List</button>
+            <a class="button-secondary" href="{{ url_for('admin.users') }}">Back</a>
+        </div>
+    </form>
+</div>
+
+<div class="form-section-card">
+    <h2>Import Mapping</h2>
+    <div class="table-responsive">
+        <table class="table-compact">
+            <tbody>
+                <tr><th>Franchise Name</th><td>B + C, starting from row 2. The importer tries C first, then B + C, then B, and uses safe fuzzy matching if names differ slightly.</td></tr>
+                <tr><th>Franchisee Name/Surname</th><td>D2:Dend</td></tr>
+                <tr><th>Cell Phone Number</th><td>F2:Fend</td></tr>
+                <tr><th>Office Number</th><td>F2:Fend</td></tr>
+                <tr><th>24-Hour Number</th><td>F2:Fend</td></tr>
+                <tr><th>Email Address</th><td>G2:Gend</td></tr>
+                <tr><th>Public Email Address</th><td>G2:Gend</td></tr>
+                <tr><th>Office Address</th><td>H2:Hend</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if import_complete %}
+<div class="form-section-card">
+    <h2>Import Results</h2>
+    <p><strong>{{ processed }}</strong> rows processed.</p>
+    <p><strong>{{ matched }}</strong> matched and updated.</p>
+
+    {% if unmatched %}
+        <h3>Unmatched Branches</h3>
+        <p class="muted">Click an unmatched spreadsheet name to manually allocate it to the correct franchise.</p>
+        <div class="table-responsive">
+            <table class="table-compact">
+                <thead>
+                    <tr>
+                        <th>Row</th>
+                        <th>Spreadsheet Name</th>
+                        <th>Names Tried</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in unmatched %}
+                    <tr>
+                        <td>{{ item.row }}</td>
+                        <td>
+                            <a class="user-name-link" href="{{ url_for('admin.manual_allocate_contact_list_row', row=item.row, name=item.name, branch=item.branch, outlet=item.outlet, contact_name=item.contact_name, office_number=item.office_number, email=item.email, address=item.address, tried=item.tried) }}">
+                                {{ item.name }}
+                            </a>
+                        </td>
+                        <td>{{ item.tried }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% if updated %}
+        <h3>Updated Franchise Records</h3>
+        <div class="table-responsive">
+            <table class="table-compact">
+                <thead>
+                    <tr>
+                        <th>Row</th>
+                        <th>Spreadsheet Name</th>
+                        <th>Matched Franchise</th>
+                        <th>Matched By</th>
+                        <th>Email</th>
+                        <th>Number</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in updated[:100] %}
+                    <tr>
+                        <td>{{ item.row }}</td>
+                        <td>{{ item.spreadsheet_name }}</td>
+                        <td>{{ item.matched_franchise }}</td>
+                        <td>{{ item.matched_by }}</td>
+                        <td>{{ item.email }}</td>
+                        <td>{{ item.office_number }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

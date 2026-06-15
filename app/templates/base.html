@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Martins Funerals System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body class="app-body">
+    {% if current_user.is_authenticated %}
+        <div class="app-shell">
+            <aside class="sidebar">
+                <a class="sidebar-logo" href="{{ url_for('dashboard.index') }}">
+                    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="System Logo">
+                    <span>Martins Funerals System</span>
+                </a>
+
+                <nav class="sidebar-nav">
+                    {% if privileged_user and franchise_view_mode %}
+                        <div class="nav-group-title">Selected Franchise</div>
+                        <a href="{{ url_for('dashboard.index') }}">🏠 Franchise Dashboard</a>
+                        <a href="{{ url_for('franchise.details') }}">🏢 Franchise Details</a>
+                        <a href="{{ url_for('monthly.index') }}">📊 Monthly Figures</a>
+                        <a href="{{ url_for('royalties.index') }}">💰 Royalties</a>
+                        <div class="nav-group-title">Admin</div>
+                        <a href="{{ url_for('dashboard.main_dashboard') }}">⬅ Back to Main Dashboard</a>
+                    {% else %}
+                        {% if current_user.has_permission('dashboard:view') %}
+                            <a href="{{ url_for('dashboard.index') }}">🏠 Dashboard</a>
+                        {% endif %}
+
+                        {% if current_user.has_permission('franchise_settings:view') %}
+                            <div class="nav-group-title">🏢 Franchise Settings</div>
+                            {% if current_user.has_permission('franchise_details:view') %}<a href="{{ url_for('franchise.details') }}">Franchise Details</a>{% endif %}
+                        {% endif %}
+
+                        {% if current_user.has_permission('joinings:view') %}<a href="#">👥 Joinings</a>{% endif %}
+                        {% if current_user.has_permission('funeral_services:view') %}<a href="#">⚰️ Funeral Services</a>{% endif %}
+                        {% if current_user.has_permission('insurance_claims:view') %}<a href="#">📋 Insurance Claims</a>{% endif %}
+                        {% if current_user.has_permission('heat_map:view') %}<a href="#">🗺️ Heat Map</a>{% endif %}
+                        {% if current_user.has_permission('royalties:view') %}<a href="{{ url_for('royalties.index') }}">💰 Royalties</a>{% endif %}
+                        {% if current_user.has_permission('monthly_figures:view') %}<a href="{{ url_for('monthly.index') }}">📊 Monthly Figures</a>{% endif %}
+                        {% if current_user.has_permission('finance:view') %}<a href="#">💵 Finance</a>{% endif %}
+
+                        {% set nav_role_names = current_user.roles|map(attribute='name')|list %}{% if current_user.has_permission('users:view') or current_user.has_permission('user_roles:view') or 'Admin' in nav_role_names or 'Finance Manager' in nav_role_names or 'Finance Assistant' in nav_role_names %}
+                            <div class="nav-group-title">Admin</div>
+                            {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.users') }}">👥 Users</a>{% endif %}
+                            {% if current_user.has_permission('user_roles:view') %}<a href="{{ url_for('admin.roles') }}">🔐 User Roles</a>{% endif %}
+                            {% if current_user.has_permission('franchise_management:view') %}<a href="#">🏢 Franchise Management</a>{% endif %}
+                            {% if current_user.has_permission('finance:view') %}<a href="#">💵 Finance</a>{% endif %}
+                            {% set nav_role_names = current_user.roles|map(attribute='name')|list %}{% if 'Admin' in nav_role_names or 'Finance Manager' in nav_role_names or 'Finance Assistant' in nav_role_names %}<a href="{{ url_for('admin.imports_data') }}">📂 Imports & Data</a>{% endif %}
+                            {% if current_user.has_permission('audit_logs:view') %}<a href="{{ url_for('admin.audit_logs') }}">📋 Audit Logs</a>{% endif %}
+                            {% if current_user.has_permission('system_administration:view') %}<a href="#">⚙️ System Administration</a>{% endif %}
+                        {% endif %}
+                    {% endif %}
+                </nav>
+            </aside>
+
+            <div class="main-panel">
+                <header class="topbar">
+                    <div class="page-title">
+                        Martins Funerals System
+                        {% if franchise_view_mode and selected_franchise %}
+                            <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
+                        {% endif %}
+                    </div>
+                    <div class="topbar-user">
+                        <span>Logged in as</span>
+                        <strong>{{ current_user.full_name }}</strong>
+                        <small>{{ current_user.roles|map(attribute='name')|join(', ') or 'No Role' }}</small>
+                        {% if privileged_user and franchise_view_mode %}
+                            <a class="logout-link secondary-link" href="{{ url_for('dashboard.main_dashboard') }}">Main Dashboard</a>
+                        {% endif %}
+                        <a class="logout-link" href="{{ url_for('auth.logout') }}">Logout</a>
+                    </div>
+                </header>
+
+                <main class="content-area">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            <div class="messages">
+                                {% for category, message in messages %}
+                                    <div class="alert {{ category }}">{{ message }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+                    {% block app_content %}{% endblock %}
+                </main>
+            </div>
+        </div>
+    {% else %}
+        <nav class="nav">
+            <div class="brand">Martins Funerals System</div>
+            <div>
+                <a href="{{ url_for('auth.login') }}">Login</a>
+                <a href="{{ url_for('auth.register') }}">Register</a>
+            </div>
+        </nav>
+        <main class="container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="messages">
+                        {% for category, message in messages %}
+                            <div class="alert {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            {% block auth_content %}{% endblock %}
+        </main>
+    {% endif %}
+
+<script>
+// V3.5: hold mouse button and drag tables left/right or up/down.
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.table-responsive, .system-report-wrap').forEach(function (wrap) {
+    if (wrap.dataset.dragScrollReady === '1') return;
+    wrap.dataset.dragScrollReady = '1';
+
+    var isDown = false;
+    var startX = 0;
+    var startY = 0;
+    var scrollLeft = 0;
+    var scrollTop = 0;
+
+    wrap.addEventListener('mousedown', function (event) {
+      if (event.button !== 0) return;
+      if (event.target.closest('a, button, input, select, textarea, label')) return;
+      isDown = true;
+      wrap.classList.add('is-dragging');
+      startX = event.pageX - wrap.offsetLeft;
+      startY = event.pageY - wrap.offsetTop;
+      scrollLeft = wrap.scrollLeft;
+      scrollTop = wrap.scrollTop;
+    });
+
+    wrap.addEventListener('mouseleave', function () {
+      isDown = false;
+      wrap.classList.remove('is-dragging');
+    });
+
+    wrap.addEventListener('mouseup', function () {
+      isDown = false;
+      wrap.classList.remove('is-dragging');
+    });
+
+    wrap.addEventListener('mousemove', function (event) {
+      if (!isDown) return;
+      event.preventDefault();
+      var x = event.pageX - wrap.offsetLeft;
+      var y = event.pageY - wrap.offsetTop;
+      wrap.scrollLeft = scrollLeft - (x - startX);
+      wrap.scrollTop = scrollTop - (y - startY);
+    });
+  });
+});
+</script>
+
+</body>
+</html>

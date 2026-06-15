@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="button-row" style="margin-bottom:1rem;"><a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a></div>
+<div class="section-header">
+    <div>
+        <h1>Import Contract Summary</h1>
+        <p class="muted">Upload the contract summary Excel sheet to populate Franchise Details, agreement dates, business registration details, franchisee names and royalty scales.</p>
+    </div>
+</div>
+
+<div class="quick-actions no-print">
+    <a class="button-secondary" href="{{ url_for('admin.import_contact_list') }}">Import Contact List</a>
+</div>
+
+<div class="form-section-card">
+    <form method="post" enctype="multipart/form-data" class="professional-form">
+        <div class="form-grid">
+            <label for="excel_file">Contract Summary Excel File</label>
+            <input id="excel_file" type="file" name="excel_file" accept=".xlsx,.xlsm,.xls" required>
+        </div>
+        <div class="quick-actions">
+            <button class="button-primary" type="submit">Import Contract Summary</button>
+            <a class="button-secondary" href="{{ url_for('admin.users') }}">Back</a>
+        </div>
+    </form>
+</div>
+
+<div class="form-section-card">
+    <h2>Import Mapping</h2>
+    <div class="table-responsive">
+        <table class="table-compact">
+            <tbody>
+                <tr><th>Franchise Name</th><td>B2:B375</td></tr>
+                <tr><th>Agreement Start Date</th><td>D2:D375</td></tr>
+                <tr><th>Agreement Expiry Date</th><td>E2:E375</td></tr>
+                <tr><th>CK Business Name</th><td>J2:J375</td></tr>
+                <tr><th>CK Number</th><td>K2:K375</td></tr>
+                <tr><th>PTY Business Name</th><td>L2:L375</td></tr>
+                <tr><th>PTY Number</th><td>M2:M375</td></tr>
+                <tr><th>Franchisee Name/Surname</th><td>N2:N375</td></tr>
+                <tr><th>Royalty Scale & Percentage</th><td>R2:R375, split per line into range and %</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if import_complete %}
+<div class="form-section-card">
+    <h2>Import Results</h2>
+    <p><strong>{{ processed }}</strong> franchises processed.</p>
+    <p><strong>{{ matched }}</strong> matched and updated.</p>
+    <p><strong>{{ updated_scales }}</strong> royalty scale sets updated.</p>
+    {% if unmatched %}
+        <h3>Unmatched Franchises</h3>
+        <p class="muted">These names were found in the spreadsheet but could not be matched to an existing franchise.</p>
+        <ul>
+            {% for name in unmatched %}<li>{{ name }}</li>{% endfor %}
+        </ul>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

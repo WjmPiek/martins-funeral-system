@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="button-row" style="margin-bottom:1rem;"><a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a></div>
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Import Monthly Figures Excel Workbook</h1>
+      <p class="muted">Upload the Syfers workbook. The system reads franchise names from C1:FJ1 (with row 2 as fallback for older sheets), uses B6:B17 as headings, allocates each franchise column's data per month, and links the matching franchise user.</p>
+    </div>
+    <a class="btn secondary button-auto" href="{{ url_for('monthly.index') }}">Back</a>
+  </div>
+
+  {% if result %}
+    <div class="form-section-card protected-section">
+      <h2>Import Complete</h2>
+      <div class="monthly-summary-grid">
+        <div><span>New Monthly Records</span><strong>{{ result.imported }}</strong></div>
+        <div><span>Updated Monthly Records</span><strong>{{ result.updated }}</strong></div>
+        <div><span>Franchises Allocated</span><strong>{{ result.franchise_count }}</strong></div>
+        <div><span>Periods Imported</span><strong>{{ result.period_count }}</strong></div>
+        <div><span>First Period</span><strong>{{ result.first_period or '-' }}</strong></div>
+        <div><span>Last Period</span><strong>{{ result.last_period or '-' }}</strong></div>
+        <div><span>New Franchises Created</span><strong>{{ result.franchises_created }}</strong></div>
+        <div><span>New Franchise Users Created</span><strong>{{ result.users_created }}</strong></div>
+      </div>
+      <p class="muted">Existing records for the same franchise/month/year are updated, not duplicated.</p>
+      <div class="form-actions no-print">
+        <a class="btn button-auto" href="{{ url_for('monthly.index') }}">View Monthly Figures</a>
+        <a class="btn secondary button-auto" href="{{ url_for('monthly.import_excel') }}">Import Another Workbook</a>
+      </div>
+    </div>
+  {% else %}
+    <form method="post" enctype="multipart/form-data" class="professional-form">
+      <div class="form-section-card">
+        <h2>Excel File</h2>
+        <div class="form-grid">
+          <label for="excel_file">Select Excel Workbook</label>
+          <input id="excel_file" name="excel_file" type="file" accept=".xlsx,.xlsm" required>
+
+          <label for="allocate_users">Allocate to Franchise Users</label>
+          <select id="allocate_users" name="allocate_users">
+            <option value="yes" selected>Yes - link each franchise to its matching franchise user</option>
+            <option value="no">No - import monthly figures only</option>
+          </select>
+        </div>
+        <p class="muted">Expected layout: franchise names in C1:FJ1, headings in B6:B17, monthly values in C6:FJ17, and one sheet per month such as Jan'19, Feb'19, etc. Total and Data columns are ignored.</p>
+      </div>
+
+      <div class="form-section-card">
+        <h2>What will be imported</h2>
+        <p class="muted">Funeral Receipts, Claim Receipts, Society Receipts, Cash Sales, Tombstone Receipts, OBO Services Receipts, Insurance Receipts, Insurance Payover, Insurance Joinings and MF Files. SALES, ADMIN FEE, CASH and royalty values are recalculated by the system per franchise.</p>
+      </div>
+
+      <div class="form-actions sticky-actions no-print">
+        <button class="button-auto" type="submit">Import Excel Workbook</button>
+      </div>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

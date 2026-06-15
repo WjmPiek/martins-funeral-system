@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="card narrow-card">
+  <h1>Add New Role</h1>
+  <form method="post" class="form-grid">
+    <label for="name">Role Name</label>
+    <input id="name" name="name" required>
+    <label for="description">Description</label>
+    <input id="description" name="description">
+    <div></div><button type="submit">Create Role</button>
+  </form>
+</section>
+{% endblock %}

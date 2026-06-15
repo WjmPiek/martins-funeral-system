@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>User Roles</h1>
+      <p>Create role templates and control exactly what each role can view, add, edit, delete, export, approve, import, or manage.</p>
+    </div>
+    <div class="button-row">
+      <a class="btn" href="{{ url_for('admin.seed') }}">Create/Update Default Roles</a>
+      <a class="btn secondary" href="{{ url_for('admin.new_role') }}">Add New Role</a>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>Role</th><th>Description</th><th>Permissions</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for role in roles %}
+        <tr>
+          <td><strong>{{ role.name }}</strong></td>
+          <td>{{ role.description or '-' }}</td>
+          <td>{{ role.permissions|length }}</td>
+          <td><a class="btn small" href="{{ url_for('admin.edit_role', role_id=role.id) }}">Edit Permissions</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4">No roles yet. Use Create/Update Default Roles.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

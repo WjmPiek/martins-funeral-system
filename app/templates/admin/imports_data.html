@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block app_content %}
+{% set role_names = current_user.roles|map(attribute='name')|list %}
+{% set is_import_admin = is_import_admin|default('Admin' in role_names) %}
+{% set is_import_finance = is_import_finance|default('Finance Manager' in role_names or 'Finance Assistant' in role_names) %}
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Imports & Data</h1>
+      <p>Import tools are shown according to user role.</p>
+    </div>
+  </div>
+
+  <div class="card-grid import-card-grid">
+    {% if is_import_admin %}
+    <article class="dashboard-card">
+      <h2>Monthly Figures Excel</h2>
+      <p>Import branch monthly figures from the Syfers workbook and allocate figures to franchises.</p>
+      <a class="btn button-auto" href="{{ url_for('monthly.import_excel') }}">Import Monthly Excel</a>
+    </article>
+    {% endif %}
+
+    {% if is_import_admin or is_import_finance %}
+    <article class="dashboard-card">
+      <h2>Monthly Figures PDF</h2>
+      <p>Import monthly figures from PDF statements where needed.</p>
+      <a class="btn secondary button-auto" href="{{ url_for('monthly.import_pdf') }}">Import Monthly PDF</a>
+    </article>
+    {% endif %}
+
+    {% if is_import_admin %}
+    <article class="dashboard-card">
+      <h2>Contract Summary</h2>
+      <p>Import agreement dates, CK/PTY details, franchisee names and royalty scale brackets.</p>
+      <a class="btn button-auto" href="{{ url_for('admin.import_contract_summary') }}">Import Contract Summary</a>
+    </article>
+
+    <article class="dashboard-card">
+      <h2>Contact List</h2>
+      <p>Import branch contact details and manually allocate unmatched rows.</p>
+      <a class="btn button-auto" href="{{ url_for('admin.import_contact_list') }}">Import Contact List</a>
+    </article>
+
+    <article class="dashboard-card">
+      <h2>Franchise Users</h2>
+      <p>Import franchise users from the franchise-name workbook.</p>
+      <a class="btn button-auto" href="{{ url_for('admin.import_franchise_users') }}">Import Franchise Users</a>
+    </article>
+
+    <article class="dashboard-card">
+      <h2>Grouped Franchises</h2>
+      <p>Import linked franchise groups. The first franchise in each row becomes the main franchise for grouped royalty calculation.</p>
+      <a class="btn button-auto" href="{{ url_for('admin.import_grouped_franchises') }}">Import Grouped Franchises</a>
+    </article>
+    {% endif %}
+
+    {% if not is_import_admin and not is_import_finance %}
+    <article class="dashboard-card">
+      <h2>No import access</h2>
+      <p>Your user role does not have access to data-import tools.</p>
+    </article>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

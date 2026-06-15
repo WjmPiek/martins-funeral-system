@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="button-row" style="margin-bottom:1rem;"><a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a></div>
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Import Franchise Users</h1>
+      <p>Upload the Excel sheet where franchise names are in row 1 from A1 onward. TOTAL columns are ignored automatically.</p>
+    </div>
+    <a class="btn secondary button-auto" href="{{ url_for('admin.users') }}">Back to Users</a>
+  </div>
+
+  <div class="form-section-card">
+    <form method="post" enctype="multipart/form-data">
+      <div class="form-grid">
+        <label>
+          Excel file
+          <input type="file" name="excel_file" accept=".xlsx,.xlsm,.xltx,.xltm" required>
+        </label>
+        <label>
+          Create users as
+          <select name="target_role">
+            {% for role in allowed_roles %}
+              <option value="{{ role }}" {% if role == selected_role %}selected{% endif %}>{{ role }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+
+      <div class="notice-card">
+        <strong>Import rules:</strong>
+        <ul>
+          <li>Each franchise name creates or updates one franchise and one assigned franchise user.</li>
+          <li>Cells named TOTAL are skipped.</li>
+          <li>No separate finance users are created. Finance access is controlled by User Roles/Admin.</li>
+          <li>Regional Manager users can only be created by Admin or Finance Assistant users.</li>
+        </ul>
+      </div>
+
+      <div class="quick-actions">
+        <button class="btn button-auto" type="submit">Import Users</button>
+      </div>
+    </form>
+  </div>
+
+  {% if import_complete %}
+  <div class="form-section-card">
+    <h2>Temporary passwords for newly created users</h2>
+    <p class="muted">Copy these now. Existing users keep their current passwords.</p>
+    <div class="table-responsive">
+      <table class="system-report-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Franchise Access</th>
+            <th>Temporary Password</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for name, email, password, franchise, role in generated %}
+          <tr>
+            <td>{{ name }}</td>
+            <td>{{ email }}</td>
+            <td>{{ role }}</td>
+            <td>{{ franchise }}</td>
+            <td><code>{{ password }}</code></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="center-cell">No new users were created. Existing users were updated only.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="button-row" style="margin-bottom:1rem;"><a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a></div>
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Import Grouped Franchises</h1>
+      <p class="muted">Upload the grouped franchises workbook. Each row must list franchises in one cell separated by commas. The first name becomes the main franchise; all remaining names are linked to that main franchise user for grouped royalty calculation.</p>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="form-card">
+    <div class="form-group">
+      <label for="excel_file">Grouped Franchises Excel File</label>
+      <input id="excel_file" type="file" name="excel_file" accept=".xlsx,.xls" required>
+    </div>
+    <div class="button-row">
+      <button class="btn button-auto" type="submit">Import Grouped Franchises</button>
+    </div>
+  </form>
+
+  {% if import_complete %}
+  <div class="summary-cards" style="margin-top:1rem;">
+    <div class="summary-card"><span>Rows Processed</span><strong>{{ processed }}</strong></div>
+    <div class="summary-card"><span>Groups Updated</span><strong>{{ matched }}</strong></div>
+    <div class="summary-card"><span>Users Created</span><strong>{{ created_users }}</strong></div>
+    <div class="summary-card"><span>Unmatched Names</span><strong>{{ unmatched|length }}</strong></div>
+  </div>
+
+  <div class="panel-card" style="margin-top:1rem;">
+    <h2>Updated Groups</h2>
+    <div class="table-scroll draggable-scroll">
+      <table>
+        <thead>
+          <tr><th>Row</th><th>Main Franchise</th><th>Main User</th><th>Linked Franchises</th><th>Unmatched In Row</th></tr>
+        </thead>
+        <tbody>
+          {% for item in grouped %}
+          <tr>
+            <td>{{ item.row }}</td>
+            <td><strong>{{ item.main }}</strong></td>
+            <td>{{ item.user }}<br><span class="muted">{{ item.email }}</span></td>
+            <td>{{ item.linked|join(' + ') }}</td>
+            <td>{% if item.unmatched %}{{ item.unmatched|join(', ') }}{% else %}-{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if unmatched %}
+  <div class="panel-card" style="margin-top:1rem;">
+    <h2>Unmatched Names</h2>
+    <div class="table-scroll draggable-scroll">
+      <table>
+        <thead><tr><th>Row</th><th>Name</th><th>Reason</th><th>Group Context</th></tr></thead>
+        <tbody>
+          {% for item in unmatched %}
+          <tr><td>{{ item.row }}</td><td>{{ item.name }}</td><td>{{ item.reason }}</td><td>{{ item.linked|join(' + ') }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+</section>
+{% endblock %}

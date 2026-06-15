@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-section pdf-landscape">
+  <div class="section-header">
+    <div>
+      <h1>Edit Role: {{ role.name }}</h1>
+      <p>Tick exactly what this role may use. These selections are enforced for every user with this role, including Admin users.</p>
+    </div>
+    <a class="btn secondary" href="{{ url_for('admin.roles') }}">Back to Roles</a>
+  </div>
+  <form method="post">
+    <div class="table-responsive">
+      <table class="permission-matrix table-compact">
+        <thead>
+          <tr><th>Module / Page</th>{% for action in actions %}<th>{{ action|title }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+        {% for module, permissions in grouped_permissions.items() %}
+          <tr>
+            <td><strong>{{ module }}</strong></td>
+            {% for action in actions %}
+              {% set permission = permissions|selectattr('action','equalto',action)|first %}
+              <td class="center-cell">
+                {% if permission %}
+                  <input type="checkbox" name="permission_ids" value="{{ permission.id }}" {% if permission.id in selected %}checked{% endif %}>
+                {% else %}-{% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="form-actions"><button type="submit">Save Permissions</button></div>
+  </form>
+</section>
+{% endblock %}

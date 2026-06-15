@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Monthly Figures</h1>
+      <p class="muted">Monthly figures can be imported from the Royalty Calculation PDF or from the group Excel workbook. Excel import allocates each franchise column to the matching franchise user.</p>
+    </div>
+    {% set role_names = current_user.roles|map(attribute='name')|list %}
+    <div class="button-row">
+      {% if current_user.has_permission('monthly_figures:export') %}
+        <a class="btn button-auto" href="{{ url_for('monthly.export_period_pdf', month=selected_month, year=selected_year) }}">Export PDF</a>
+      {% endif %}
+      {% if 'Admin' in role_names or 'Finance Manager' in role_names or 'Finance Assistant' in role_names %}
+        <a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Open Imports & Data</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="filter-card branch-context-card">
+    {% if show_all_franchises %}
+      <h2>All Branches</h2>
+      <p class="muted">Admin view: showing active franchises with imported monthly figures for {{ selected_period_label }} only.</p>
+    {% elif selected %}
+      <h2>Selected Branch: {{ selected.business_name or 'Unnamed Franchise' }}</h2>
+      <p class="muted">Showing monthly figures for {{ selected_period_label }} for this branch only.</p>
+    {% endif %}
+    {% if accessible_franchises and accessible_franchises|length > 1 %}
+      <div class="branch-selector-row">
+        <label for="branchSelector"><strong>Open branch dashboard</strong></label>
+        <select id="branchSelector" onchange="if (this.value) window.location.href=this.value;">
+          <option value="">Select a branch...</option>
+          {% for franchise in accessible_franchises %}
+            <option value="{{ url_for('dashboard.select_franchise', franchise_id=franchise.id) }}" {% if selected and selected.id == franchise.id and not show_all_franchises %}selected{% endif %}>{{ franchise.business_name or 'Unnamed Franchise' }}</option>
+          {% endfor %}
+        </select>
+        <form method="get" action="{{ url_for('monthly.index') }}" class="period-filter-form">
+          <label for="monthlyMonth"><strong>Month</strong></label>
+          <select id="monthlyMonth" name="month">
+            {% for value, label in month_options %}
+              <option value="{{ value }}" {% if selected_month == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <label for="monthlyYear"><strong>Year</strong></label>
+          <select id="monthlyYear" name="year">
+            {% for year in year_options %}
+              <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn secondary button-auto" type="submit">Apply</button>
+        </form>
+        {% if not show_all_franchises and current_user.has_permission('franchise_management:view') %}
+          <a class="btn secondary button-auto" href="{{ url_for('dashboard.main_dashboard') }}">Show All Branches</a>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% if not (accessible_franchises and accessible_franchises|length > 1) %}
+      <div class="branch-selector-row">
+        <form method="get" action="{{ url_for('monthly.index') }}" class="period-filter-form">
+          <label for="monthlyMonthSolo"><strong>Month</strong></label>
+          <select id="monthlyMonthSolo" name="month">
+            {% for value, label in month_options %}
+              <option value="{{ value }}" {% if selected_month == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <label for="monthlyYearSolo"><strong>Year</strong></label>
+          <select id="monthlyYearSolo" name="year">
+            {% for year in year_options %}
+              <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn secondary button-auto" type="submit">Apply</button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+
+
+  {% if grouped_view %}
+    <div class="form-section-card linked-dashboard-group">
+      <h2>Linked Monthly Figures Group</h2>
+      <p class="muted">Each linked franchise is shown in its own card for {{ selected_period_label }}. The grouped figures below are the combined totals used for royalty calculation.</p>
+      <p><strong>{{ linked_group_names|join(' + ') }}</strong></p>
+    </div>
+
+    {% if grouped_total %}
+    <div class="form-section-card linked-branch-card grouped-total-card">
+      <h2>Grouped Total for Royalty Calculation</h2>
+      <p class="muted">Main franchise: <strong>{{ grouped_total.franchise.business_name }}</strong>. These are the totals from all linked franchises for {{ selected_period_label }}.</p>
+      <div class="table-responsive">
+        <table class="system-report-table monthly-table monthly-import-table monthly-figures-table">
+          <thead>
+            <tr>
+              <th>Period</th>
+              <th>Gross Method</th>
+              <th>Royalty Base</th>
+              <th>Royalty %</th>
+              <th>Royalty Amount</th>
+              <th>Cash</th>
+              <th>Sales</th>
+              <th>Admin Fee</th>
+              <th>Insurance Receipts</th>
+              <th>Insurance Payover</th>
+              <th>Insurance Joinings</th>
+              <th>MF Files</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>{{ grouped_total.period_label }}</strong></td>
+              <td>{% if grouped_total.gross_method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
+              <td>{{ '%.2f'|format(grouped_total.gross_revenue|float) }}</td>
+              <td>{{ '%.2f'|format(grouped_total.royalty_percentage|float) }}%</td>
+              <td><strong>{{ '%.2f'|format(grouped_total.royalty_amount|float) }}</strong></td>
+              <td>{{ '%.2f'|format(grouped_total.cash|float) }}</td>
+              <td>{{ '%.2f'|format(grouped_total.sales|float) }}</td>
+              <td>{{ '%.2f'|format(grouped_total.admin_fee|float) }}</td>
+              <td>{{ '%.2f'|format(grouped_total.insurance_receipts|float) }}</td>
+              <td>{{ '%.2f'|format(grouped_total.insurance_payover|float) }}</td>
+              <td>{{ grouped_total.insurance_joinings }}</td>
+              <td>{{ grouped_total.mf_files }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% for branch in figures_by_branch %}
+      <div class="form-section-card linked-branch-card">
+        <div class="section-header compact-header">
+          <div>
+            <h2>{{ branch.franchise.business_name or 'Unnamed Franchise' }}</h2>
+            <p class="muted">Monthly figures for this linked franchise only.</p>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="system-report-table monthly-table monthly-import-table monthly-figures-table">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Status</th>
+                <th>GROSS TURNOVER</th>
+                <th>CASH</th>
+                <th>Funeral Receipts</th>
+                <th>SOCIET RECEIPTS</th>
+                <th>Cash Sales</th>
+                <th>Tombstone Receipts</th>
+                <th>OBO Services Receipts</th>
+                <th>SALES</th>
+                <th>INSURANCE RECEIPTS</th>
+                <th>INSURANCE PAYOVER</th>
+                <th>ADMIN FEE</th>
+                <th>INSURANCE JOININGS</th>
+                <th>MF FILES</th>
+                <th>Royalty Base</th>
+                <th>Method</th>
+                <th>Royalty %</th>
+                <th>Royalty Amount</th>
+                <th>Minimum Applied</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in branch.figures %}
+              <tr>
+                <td><strong>{{ item.period_label }}</strong></td>
+                <td><span class="badge {% if item.status == 'Approved' %}success{% elif item.status in ['Submitted', 'Imported', 'Pending Payover'] %}warning{% endif %}">{{ 'Calc' if item.status == 'Calculated' else item.status }}</span></td>
+                <td>{{ '%.2f'|format(item.gross_turnover|float) }}</td>
+                <td>{{ '%.2f'|format(item.cash|float) }}</td>
+                <td>{{ '%.2f'|format(item.funeral_receipts|float) }}</td>
+                <td>{{ '%.2f'|format(item.society_receipts|float) }}</td>
+                <td>{{ '%.2f'|format(item.cash_sales|float) }}</td>
+                <td>{{ '%.2f'|format(item.tombstone_receipts|float) }}</td>
+                <td>{{ '%.2f'|format(item.obo_service_receipts|float) }}</td>
+                <td>{{ '%.2f'|format(item.sales|float) }}</td>
+                <td>{{ '%.2f'|format(item.insurance_receipts|float) }}</td>
+                <td>{{ '%.2f'|format(item.insurance_payover|float) }}</td>
+                <td>{{ '%.2f'|format(item.admin_fee|float) }}</td>
+                <td>{{ item.insurance_joinings }}</td>
+                <td>{{ item.mf_files }}</td>
+                <td>{{ '%.2f'|format(item.gross_revenue|float) }}</td>
+                <td>{% if item.franchise and item.franchise.royalty_gross_method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
+                <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
+                <td>{{ '%.2f'|format(item.royalty_amount|float) }}</td>
+                <td>{% if item.minimum_royalty_applied %}<span class="badge warning">Yes</span>{% else %}No{% endif %}</td>
+                <td>
+                  <div class="button-row">
+                    {% if current_user.has_permission('monthly_figures:edit') %}
+                      <a class="btn small" href="{{ url_for('monthly.edit', figure_id=item.id) }}">{% if item.status == 'Pending Payover' %}Add Payover{% else %}Payover{% endif %}</a>
+                    {% endif %}
+                    {% if current_user.has_permission('monthly_figures:export') %}
+                      <a class="btn small secondary" href="{{ url_for('monthly.export_pdf', figure_id=item.id) }}">PDF</a>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="21" class="center-cell">No monthly figures found for this linked franchise in {{ selected_period_label }}.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+  <div class="table-responsive">
+    <table class="system-report-table monthly-table monthly-import-table monthly-figures-table">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th>Franchise / Branch</th>
+          <th>Status</th>
+          <th>GROSS TURNOVER</th>
+          <th>CASH</th>
+          <th>Funeral Receipts</th>
+          <th>SOCIET RECEIPTS</th>
+          <th>Cash Sales</th>
+          <th>Tombstone Receipts</th>
+          <th>OBO Services Receipts</th>
+          <th>SALES</th>
+          <th>INSURANCE RECEIPTS</th>
+          <th>INSURANCE PAYOVER</th>
+          <th>ADMIN FEE</th>
+          <th>INSURANCE JOININGS</th>
+          <th>MF FILES</th>
+          <th>Royalty Base</th>
+          <th>Method</th>
+          <th>Royalty %</th>
+          <th>Royalty Amount</th>
+          <th>Minimum Applied</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in figures %}
+        <tr>
+          <td><strong>{{ item.period_label }}</strong></td>
+          <td><strong>{{ item.franchise.business_name if item.franchise else 'Unknown Branch' }}</strong></td>
+          <td><span class="badge {% if item.status == 'Approved' %}success{% elif item.status in ['Submitted', 'Imported', 'Pending Payover'] %}warning{% endif %}">{{ 'Calc' if item.status == 'Calculated' else item.status }}</span></td>
+          <td>{{ '%.2f'|format(item.gross_turnover|float) }}</td>
+          <td>{{ '%.2f'|format(item.cash|float) }}</td>
+          <td>{{ '%.2f'|format(item.funeral_receipts|float) }}</td>
+          <td>{{ '%.2f'|format(item.society_receipts|float) }}</td>
+          <td>{{ '%.2f'|format(item.cash_sales|float) }}</td>
+          <td>{{ '%.2f'|format(item.tombstone_receipts|float) }}</td>
+          <td>{{ '%.2f'|format(item.obo_service_receipts|float) }}</td>
+          <td>{{ '%.2f'|format(item.sales|float) }}</td>
+          <td>{{ '%.2f'|format(item.insurance_receipts|float) }}</td>
+          <td>{{ '%.2f'|format(item.insurance_payover|float) }}</td>
+          <td>{{ '%.2f'|format(item.admin_fee|float) }}</td>
+          <td>{{ item.insurance_joinings }}</td>
+          <td>{{ item.mf_files }}</td>
+          <td>{{ '%.2f'|format(item.gross_revenue|float) }}</td>
+          <td>{% if item.franchise and item.franchise.royalty_gross_method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
+          <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
+          <td>{{ '%.2f'|format(item.royalty_amount|float) }}</td>
+          <td>{% if item.minimum_royalty_applied %}<span class="badge warning">Yes</span>{% else %}No{% endif %}</td>
+          <td>
+            <div class="button-row">
+              {% if current_user.has_permission('monthly_figures:edit') %}
+                <a class="btn small" href="{{ url_for('monthly.edit', figure_id=item.id) }}">{% if item.status == 'Pending Payover' %}Add Payover{% else %}Payover{% endif %}</a>
+              {% endif %}
+              {% if current_user.has_permission('monthly_figures:export') %}
+                <a class="btn small secondary" href="{{ url_for('monthly.export_pdf', figure_id=item.id) }}">PDF</a>
+              {% endif %}
+              {% if current_user.has_permission('monthly_figures:approve') %}
+                <form method="post" action="{{ url_for('monthly.delete', figure_id=item.id) }}" onsubmit="return confirm('Delete this imported Monthly Figures record and its imported PDF? Audit history and franchise data will be kept.');">
+                  <button class="small danger-btn" type="submit">Delete</button>
+                </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="22" class="center-cell">No active franchise figures found for {{ selected_period_label }}.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% endif %}
+</section>
+{% endblock %}

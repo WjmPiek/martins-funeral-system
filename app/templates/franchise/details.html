@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="section-header">
+    <div>
+        <h1>Franchise Details</h1>
+        <p class="muted">Maintain the franchise profile used across dashboards, reports, PDF cover pages, and notifications. After saving, the dashboard will show the saved franchise and the form will be cleared from the screen.</p>
+    </div>
+    {% if not can_view_agreement and not can_view_scale %}
+        <span class="badge warning">Agreement and Royalty Scale hidden by role permissions</span>
+    {% elif readonly_finance_fields %}
+        <span class="badge warning">Agreement/Royalty Scale locked for this user</span>
+    {% else %}
+        <span class="badge success">Agreement/Royalty Scale edit access enabled for Admin/Franchise Manager</span>
+    {% endif %}
+</div>
+
+<form method="post" class="professional-form">
+    {% if current_user.has_permission('franchise_details:export') %}
+    <div class="quick-actions no-print">
+        <a class="button-secondary" href="{{ url_for('franchise.export_details_pdf') }}">Export Franchise Details PDF</a>
+    </div>
+    {% endif %}
+    <div class="form-section-card">
+        <h2>Business Information</h2>
+        <div class="form-grid">
+            <label for="business_name">Business / Franchise Name</label>
+            <input id="business_name" name="business_name" value="{{ franchise.business_name or '' }}" required>
+
+            <label for="franchise_code">Franchise Code</label>
+            <input id="franchise_code" name="franchise_code" value="{{ franchise.franchise_code or '' }}" placeholder="Example: NCL001">
+
+            <label for="ck_business_name">CK Business Name</label>
+            <input id="ck_business_name" name="ck_business_name" value="{{ franchise.ck_business_name or '' }}">
+
+            <label for="ck_number">CK Number</label>
+            <input id="ck_number" name="ck_number" value="{{ franchise.ck_number or '' }}">
+
+            <label for="pty_business_name">PTY Business Name</label>
+            <input id="pty_business_name" name="pty_business_name" value="{{ franchise.pty_business_name or '' }}">
+
+            <label for="pty_number">PTY Number</label>
+            <input id="pty_number" name="pty_number" value="{{ franchise.pty_number or '' }}">
+
+            <label for="vat_number">VAT Number</label>
+            <input id="vat_number" name="vat_number" value="{{ franchise.vat_number or '' }}">
+
+            <label for="office_address">Office Address</label>
+            <textarea id="office_address" name="office_address" rows="4">{{ franchise.office_address or '' }}</textarea>
+
+            <label for="office_number">Office Number</label>
+            <input id="office_number" name="office_number" inputmode="tel" placeholder="(010) 448 0921" value="{{ franchise.office_number or '' }}">
+
+            <label for="after_hours_number">24-Hour Number</label>
+            <input id="after_hours_number" name="after_hours_number" inputmode="tel" placeholder="(010) 448 0921" value="{{ franchise.after_hours_number or '' }}">
+        </div>
+    </div>
+
+    <div class="form-section-card">
+        <h2>Franchisee Contact Person</h2>
+        <div class="form-grid">
+            <label for="franchisee_name">Franchisee Name</label>
+            <input id="franchisee_name" name="franchisee_name" value="{{ franchise.franchisee_name or '' }}">
+
+            <label for="franchisee_surname">Franchisee Surname</label>
+            <input id="franchisee_surname" name="franchisee_surname" value="{{ franchise.franchisee_surname or '' }}">
+
+            <label for="franchisee_cell">Cell Phone Number</label>
+            <input id="franchisee_cell" name="franchisee_cell" inputmode="tel" placeholder="(010) 448 0921" value="{{ franchise.franchisee_cell or '' }}">
+
+            <label for="franchisee_email">Email Address</label>
+            <input id="franchisee_email" type="email" name="franchisee_email" value="{{ franchise.franchisee_email or '' }}">
+        </div>
+    </div>
+
+    <div class="form-section-card">
+        <h2>Online & Social Media</h2>
+        <div class="form-grid">
+            <label for="facebook_url">Facebook</label>
+            <input id="facebook_url" name="facebook_url" value="{{ franchise.facebook_url or '' }}" placeholder="https://facebook.com/...">
+
+            <label for="instagram_url">Instagram</label>
+            <input id="instagram_url" name="instagram_url" value="{{ franchise.instagram_url or '' }}" placeholder="https://instagram.com/...">
+
+            <label for="tiktok_url">TikTok</label>
+            <input id="tiktok_url" name="tiktok_url" value="{{ franchise.tiktok_url or '' }}" placeholder="https://tiktok.com/@...">
+
+            <label for="website_url">Website Address</label>
+            <input id="website_url" name="website_url" value="{{ franchise.website_url or '' }}" placeholder="https://...">
+
+            <label for="public_email">Public Email Address</label>
+            <input id="public_email" type="email" name="public_email" value="{{ franchise.public_email or '' }}">
+        </div>
+    </div>
+
+    {% if can_view_agreement %}
+    <div class="form-section-card protected-section {% if not can_edit_agreement %}locked-section{% endif %}">
+        <div class="section-title-row">
+            <div>
+                <h2>Franchise Agreement</h2>
+                <p class="muted">Only Admin and Finance Manager can edit this section. Other users see it as read-only when they have view permission.</p>
+            </div>
+            {% if not can_edit_agreement %}<span class="badge">View Only</span>{% endif %}
+        </div>
+        <div class="form-grid">
+            <label for="agreement_start_date">Agreement Start Date</label>
+            <input id="agreement_start_date" name="agreement_start_date" type="date" value="{{ franchise.agreement_start_date or '' }}" {% if not can_edit_agreement %}disabled{% endif %}>
+
+            <label for="agreement_end_date">Agreement End Date</label>
+            <input id="agreement_end_date" name="agreement_end_date" type="date" value="{{ franchise.agreement_end_date or '' }}" {% if not can_edit_agreement %}disabled{% endif %}>
+
+            <label for="regional_manager_email">Regional Manager Email</label>
+            <input id="regional_manager_email" name="regional_manager_email" type="email" value="{{ franchise.regional_manager_email or '' }}" {% if not can_edit_agreement %}disabled{% endif %}>
+
+            <label for="finance_manager_email">Finance Manager Email</label>
+            <input id="finance_manager_email" name="finance_manager_email" type="email" value="{{ franchise.finance_manager_email or '' }}" {% if not can_edit_agreement %}disabled{% endif %}>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if can_view_scale %}
+    <div class="form-section-card protected-section {% if not can_edit_scale %}locked-section{% endif %}">
+        <div class="section-title-row">
+            <div>
+                <h2>Royalty Scale</h2>
+
+                <div class="form-grid">
+                    <label for="minimum_royalty_amount">Minimum Royalty Amount</label>
+                    <input id="minimum_royalty_amount"
+                           name="minimum_royalty_amount"
+                           type="number"
+                           step="0.01"
+                           min="0"
+                           value="{{ franchise.minimum_royalty_amount or 0 }}"
+                           {% if not can_edit_scale %}disabled{% endif %}>
+
+                                        <label>Royalty Calculation Method</label>
+                    <input type="text" value="{% if franchise.royalty_gross_method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}" disabled>
+                    <p class="muted small">Automatic from agreement start date: 2018 or newer uses New Gross Method; before 2018 uses Old Gross. Only Admin and Finance Manager can edit royalty scale fields.</p>
+                    <input type="hidden" name="royalty_gross_method" value="{{ franchise.royalty_gross_method or 'old' }}">
+
+                </div>
+
+                <p class="muted">Royalty brackets are saved into the fields below. Contract Summary column R is split into Amount From, Amount To and Royalty % during import.</p>
+            </div>
+            {% if not can_edit_scale %}<span class="badge">View Only</span>{% endif %}
+        </div>
+        <div class="table-responsive">
+            <table class="table-compact royalty-table" id="royalty-scale-table">
+                <thead>
+                    <tr>
+                        <th>Row</th>
+                        <th>Amount From</th>
+                        <th>Amount To</th>
+                        <th>Royalty %</th>
+                        {% if can_edit_scale %}<th>Action</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody id="royalty-scale-body">
+                    {% for scale in scales %}
+                    <tr class="royalty-scale-row">
+                        <td class="text-center row-number">{{ loop.index }}</td>
+                        <td><input type="number" step="0.01" name="scale_{{ scale.id }}_amount_from" value="{{ '%.2f'|format(scale.amount_from|float) }}" {% if not can_edit_scale %}disabled{% endif %}></td>
+                        <td><input type="number" step="0.01" name="scale_{{ scale.id }}_amount_to" value="{{ '%.2f'|format(scale.amount_to|float) }}" {% if not can_edit_scale %}disabled{% endif %}></td>
+                        <td><input type="number" step="0.01" name="scale_{{ scale.id }}_percentage" value="{{ '%.2f'|format(scale.percentage|float) }}" {% if not can_edit_scale %}disabled{% endif %}></td>
+                        {% if can_edit_scale %}
+                        <td>
+                            <button type="button" class="danger-btn small" onclick="deleteExistingRoyaltyScaleRow(this, '{{ scale.id }}')">Delete</button>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    {% if not can_edit_scale %}
+                    <tr><td colspan="4" class="center-cell">No royalty scale rows saved for this franchise.</td></tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if can_edit_scale %}
+        <div id="deleted-royalty-scales"></div>
+        <div class="button-row">
+            <button type="button" class="btn secondary" onclick="addRoyaltyScaleRow()">+ Add Royalty Scale Row</button>
+        </div>
+        <p class="muted small">Only the rows saved here are used for this franchise's royalty calculation. Delete rows that do not apply to this franchise.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+
+    <div class="form-section-card">
+        <h2>Franchise Users</h2>
+        <p class="muted">All users linked to this franchise are listed below.</p>
+        <div class="table-responsive">
+            <table class="table-compact">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Roles</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in franchise_users %}
+                    <tr>
+                        <td><strong>{{ user.full_name }}</strong></td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.roles|map(attribute='name')|join(', ') or 'No Role' }}</td>
+                        <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="center-cell">No franchise users assigned yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="form-actions sticky-actions no-print">
+        <button class="button-auto" type="submit">Save Franchise Details</button>
+    </div>
+</form>
+
+{% if can_edit_scale %}
+<script>
+function updateRoyaltyScaleRowNumbers() {
+    document.querySelectorAll('#royalty-scale-body .royalty-scale-row').forEach(function(row, index) {
+        const cell = row.querySelector('.row-number');
+        if (cell) cell.textContent = index + 1;
+    });
+}
+
+function deleteExistingRoyaltyScaleRow(button, scaleId) {
+    const deleted = document.getElementById('deleted-royalty-scales');
+    if (deleted && scaleId) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'delete_scale_ids';
+        input.value = scaleId;
+        deleted.appendChild(input);
+    }
+    const row = button.closest('tr');
+    if (row) row.remove();
+    updateRoyaltyScaleRowNumbers();
+}
+
+function deleteNewRoyaltyScaleRow(button) {
+    const row = button.closest('tr');
+    if (row) row.remove();
+    updateRoyaltyScaleRowNumbers();
+}
+
+function addRoyaltyScaleRow() {
+    const body = document.getElementById('royalty-scale-body');
+    if (!body) return;
+    const emptyRow = body.querySelector('.center-cell');
+    if (emptyRow) emptyRow.closest('tr').remove();
+
+    const row = document.createElement('tr');
+    row.className = 'royalty-scale-row';
+    row.innerHTML = `
+        <td class="text-center row-number"></td>
+        <td><input type="number" step="0.01" name="new_scale_amount_from[]" value="0.00"></td>
+        <td><input type="number" step="0.01" name="new_scale_amount_to[]" value="0.00"></td>
+        <td><input type="number" step="0.01" name="new_scale_percentage[]" value="0.00"></td>
+        <td><button type="button" class="danger-btn small" onclick="deleteNewRoyaltyScaleRow(this)">Delete</button></td>
+    `;
+    body.appendChild(row);
+    updateRoyaltyScaleRowNumbers();
+}
+
+updateRoyaltyScaleRowNumbers();
+</script>
+{% endif %}
+
+{% endblock %}
