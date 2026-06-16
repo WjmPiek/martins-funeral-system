@@ -1,4 +1,3 @@
-cat > merge_legacy_data_to_martins.py <<'PY'
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -267,4 +266,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-PY
