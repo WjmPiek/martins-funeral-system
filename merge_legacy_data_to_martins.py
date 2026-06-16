@@ -1,129 +1,159 @@
+cat > merge_legacy_data_to_martins.py <<'PY'
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
 TARGET_URL = os.environ["DATABASE_URL"]
+OLD_CLAIMS_URL = os.environ["OLD_CLAIMS_DATABASE_URL"]
+OLD_HEATMAP_URL = os.environ["OLD_HEATMAP_DATABASE_URL"]
+OLD_ATTENDANCE_URL = os.environ["OLD_ATTENDANCE_DATABASE_URL"]
 
-OLD_CLAIMS_URL = os.environ.get("OLD_CLAIMS_DATABASE_URL")
-OLD_HEATMAP_URL = os.environ.get("OLD_HEATMAP_DATABASE_URL")
-OLD_ATTENDANCE_URL = os.environ.get("OLD_ATTENDANCE_DATABASE_URL")
 
-
-def conn(url):
+def connect(url):
     return psycopg2.connect(url)
 
 
-def copy_claims(target):
-    if not OLD_CLAIMS_URL:
-        print("Skipping claims: OLD_CLAIMS_DATABASE_URL missing")
-        return
+def upsert(cur, table, row):
+    row = {k: v for k, v in row.items() if v is not None}
+    cols = list(row.keys())
+    placeholders = [f"%({c})s" for c in cols]
+    updates = [f"{c}=EXCLUDED.{c}" for c in cols if c != "id"]
 
-    source = conn(OLD_CLAIMS_URL)
+    sql = f"""
+        INSERT INTO {table} ({", ".join(cols)})
+        VALUES ({", ".join(placeholders)})
+        ON CONFLICT (id) DO UPDATE SET {", ".join(updates)}
+    """
+    cur.execute(sql, row)
+
+
+def copy_claims(target):
+    source = connect(OLD_CLAIMS_URL)
+
     with source.cursor(cursor_factory=RealDictCursor) as s, target.cursor() as t:
         s.execute("SELECT * FROM app_claim_cases ORDER BY id")
         rows = s.fetchall()
 
         for r in rows:
-            t.execute("""
-                INSERT INTO insurance_claim_cases (
-                    id, claim_ref, franchise_name, claimant_name, policy_number,
-                    claim_date, claim_amount, status, priority, assigned_to_email,
-                    created_by_email, created_at, updated_at, closed_at, description,
-                    created_by_id, due_date, archived, deceased_name, deceased_id_number,
-                    member_verification_status, member_verification_details, verified_policy_row_id
-                )
-                VALUES (
-                    %(id)s, %(claim_ref)s, %(franchise_name)s, %(claimant_name)s, %(policy_number)s,
-                    %(claim_date)s, %(claim_amount)s, %(status)s, %(priority)s, %(assigned_to_email)s,
-                    %(created_by_email)s, %(created_at)s, %(updated_at)s, %(closed_at)s, %(description)s,
-                    %(created_by_id)s, %(due_date)s, %(archived)s, %(deceased_name)s, %(deceased_id_number)s,
-                    %(member_verification_status)s, %(member_verification_details)s, %(verified_policy_row_id)s
-                )
-                ON CONFLICT (id) DO UPDATE SET
-                    claim_ref = EXCLUDED.claim_ref,
-                    franchise_name = EXCLUDED.franchise_name,
-                    claimant_name = EXCLUDED.claimant_name,
-                    policy_number = EXCLUDED.policy_number,
-                    claim_date = EXCLUDED.claim_date,
-                    claim_amount = EXCLUDED.claim_amount,
-                    status = EXCLUDED.status,
-                    priority = EXCLUDED.priority,
-                    assigned_to_email = EXCLUDED.assigned_to_email,
-                    created_by_email = EXCLUDED.created_by_email,
-                    updated_at = EXCLUDED.updated_at,
-                    closed_at = EXCLUDED.closed_at,
-                    description = EXCLUDED.description,
-                    due_date = EXCLUDED.due_date,
-                    archived = EXCLUDED.archived,
-                    deceased_name = EXCLUDED.deceased_name,
-                    deceased_id_number = EXCLUDED.deceased_id_number,
-                    member_verification_status = EXCLUDED.member_verification_status,
-                    member_verification_details = EXCLUDED.member_verification_details,
-                    verified_policy_row_id = EXCLUDED.verified_policy_row_id
-            """, r)
+            row = {
+                "id": r.get("id"),
+                "claim_ref": r.get("claim_ref"),
+                "franchise_name": r.get("franchise_name"),
+                "claimant_name": r.get("claimant_name"),
+                "policy_number": r.get("policy_number"),
+                "id_number": r.get("deceased_id_number"),
+                "claim_type": "Legacy Import",
+                "claim_date": r.get("claim_date"),
+                "date_of_death": None,
+                "claim_amount": r.get("claim_amount"),
+                "status": r.get("status"),
+                "priority": r.get("priority"),
+                "assigned_to_id": None,
+                "created_by_id": None,
+                "archived": r.get("archived"),
+                "notes": r.get("description"),
+                "closed_at": r.get("closed_at"),
+                "created_at": r.get("created_at"),
+                "updated_at": r.get("updated_at"),
+            }
+            upsert(t, "insurance_claim_cases", row)
 
-    source.close()
     target.commit()
+    source.close()
     print(f"Claims copied: {len(rows)}")
 
 
-def copy_heatmap(target):
-    if not OLD_HEATMAP_URL:
-        print("Skipping heatmap: OLD_HEATMAP_DATABASE_URL missing")
-        return
+def copy_claim_notes(target):
+    source = connect(OLD_CLAIMS_URL)
 
-    source = conn(OLD_HEATMAP_URL)
+    with source.cursor(cursor_factory=RealDictCursor) as s, target.cursor() as t:
+        s.execute("SELECT * FROM app_claim_notes ORDER BY id")
+        rows = s.fetchall()
+
+        for r in rows:
+            row = {
+                "id": r.get("id"),
+                "claim_id": r.get("claim_id"),
+                "user_id": r.get("user_id"),
+                "user_email": r.get("user_email"),
+                "note": r.get("note") or r.get("body") or r.get("text"),
+                "created_at": r.get("created_at"),
+            }
+            upsert(t, "insurance_claim_notes", row)
+
+    target.commit()
+    source.close()
+    print(f"Claim notes copied: {len(rows)}")
+
+
+def copy_claim_attachments(target):
+    source = connect(OLD_CLAIMS_URL)
+
+    with source.cursor(cursor_factory=RealDictCursor) as s, target.cursor() as t:
+        s.execute("SELECT * FROM app_claim_attachments ORDER BY id")
+        rows = s.fetchall()
+
+        for r in rows:
+            row = {
+                "id": r.get("id"),
+                "claim_id": r.get("claim_id"),
+                "filename": r.get("filename") or r.get("original_filename"),
+                "stored_filename": r.get("stored_filename") or r.get("filename"),
+                "file_path": r.get("file_path") or r.get("path"),
+                "content_type": r.get("content_type") or r.get("mime_type"),
+                "size_bytes": r.get("size_bytes"),
+                "uploaded_by_id": r.get("uploaded_by_id") or r.get("user_id"),
+                "created_at": r.get("created_at"),
+            }
+            upsert(t, "insurance_claim_attachments", row)
+
+    target.commit()
+    source.close()
+    print(f"Claim attachments copied: {len(rows)}")
+
+
+def copy_heatmap(target):
+    source = connect(OLD_HEATMAP_URL)
+
     with source.cursor(cursor_factory=RealDictCursor) as s, target.cursor() as t:
         s.execute("SELECT * FROM record ORDER BY id")
         rows = s.fetchall()
 
         for r in rows:
-            t.execute("""
-                INSERT INTO heatmap_records (
-                    id, franchise_id, mf_file, deceased_name, deceased_surname, dod,
-                    address, city, province, country, full_address, latitude, longitude,
-                    weight, next_of_kin_name, next_of_kin_surname, relationship, relation,
-                    contact_number, source_filename, created_by_id, created_at, updated_at
-                )
-                VALUES (
-                    %(id)s, NULL, %(mf_file)s, %(deceased_name)s, %(deceased_surname)s, %(dod)s,
-                    %(address)s, %(city)s, %(province)s, %(country)s, %(full_address)s, %(latitude)s, %(longitude)s,
-                    %(weight)s, %(next_of_kin_name)s, %(next_of_kin_surname)s, %(relationship)s, %(relationship)s,
-                    %(contact_number)s, 'legacy_heatmap_import', NULL, %(created_at)s, %(updated_at)s
-                )
-                ON CONFLICT (id) DO UPDATE SET
-                    mf_file = EXCLUDED.mf_file,
-                    deceased_name = EXCLUDED.deceased_name,
-                    deceased_surname = EXCLUDED.deceased_surname,
-                    dod = EXCLUDED.dod,
-                    address = EXCLUDED.address,
-                    city = EXCLUDED.city,
-                    province = EXCLUDED.province,
-                    country = EXCLUDED.country,
-                    full_address = EXCLUDED.full_address,
-                    latitude = EXCLUDED.latitude,
-                    longitude = EXCLUDED.longitude,
-                    weight = EXCLUDED.weight,
-                    next_of_kin_name = EXCLUDED.next_of_kin_name,
-                    next_of_kin_surname = EXCLUDED.next_of_kin_surname,
-                    relationship = EXCLUDED.relationship,
-                    relation = EXCLUDED.relation,
-                    contact_number = EXCLUDED.contact_number,
-                    updated_at = EXCLUDED.updated_at
-            """, r)
+            row = {
+                "id": r.get("id"),
+                "franchise_id": None,
+                "mf_file": r.get("mf_file"),
+                "deceased_name": r.get("deceased_name"),
+                "deceased_surname": r.get("deceased_surname"),
+                "dod": r.get("dod"),
+                "address": r.get("address"),
+                "city": r.get("city"),
+                "province": r.get("province"),
+                "country": r.get("country"),
+                "full_address": r.get("full_address"),
+                "latitude": r.get("latitude"),
+                "longitude": r.get("longitude"),
+                "weight": r.get("weight"),
+                "next_of_kin_name": r.get("next_of_kin_name"),
+                "next_of_kin_surname": r.get("next_of_kin_surname"),
+                "relationship": r.get("relationship"),
+                "relation": r.get("relationship"),
+                "contact_number": r.get("contact_number"),
+                "source_filename": "legacy_heatmap_import",
+                "created_by_id": None,
+                "created_at": r.get("created_at"),
+                "updated_at": r.get("updated_at"),
+            }
+            upsert(t, "heatmap_records", row)
 
-    source.close()
     target.commit()
+    source.close()
     print(f"Heatmap copied: {len(rows)}")
 
 
 def copy_attendance(target):
-    if not OLD_ATTENDANCE_URL:
-        print("Skipping attendance: OLD_ATTENDANCE_DATABASE_URL missing")
-        return
-
-    source = conn(OLD_ATTENDANCE_URL)
-
+    source = connect(OLD_ATTENDANCE_URL)
     user_to_staff = {}
 
     with source.cursor(cursor_factory=RealDictCursor) as s, target.cursor() as t:
@@ -131,93 +161,81 @@ def copy_attendance(target):
         staff_rows = s.fetchall()
 
         for r in staff_rows:
-            user_to_staff[r["user_id"]] = r["id"]
+            user_to_staff[r.get("user_id")] = r.get("id")
 
-            t.execute("""
-                INSERT INTO attendance_staff (
-                    id, franchise_id, first_name, surname, email, phone, id_number,
-                    employee_number, position, staff_type, website_url, is_active,
-                    notes, created_by_id, created_at, updated_at
-                )
-                VALUES (
-                    %(id)s, %(franchise_user_id)s, %(name)s, %(surname)s, %(email)s, %(contact_number)s, %(id_number)s,
-                    %(employee_number)s, %(employee_role)s, 'employee', NULL, %(is_active)s,
-                    'Imported from legacy attendance_register employee_users', NULL, %(created_at)s, %(updated_at)s
-                )
-                ON CONFLICT (id) DO UPDATE SET
-                    franchise_id = EXCLUDED.franchise_id,
-                    first_name = EXCLUDED.first_name,
-                    surname = EXCLUDED.surname,
-                    email = EXCLUDED.email,
-                    phone = EXCLUDED.phone,
-                    id_number = EXCLUDED.id_number,
-                    employee_number = EXCLUDED.employee_number,
-                    position = EXCLUDED.position,
-                    is_active = EXCLUDED.is_active,
-                    updated_at = EXCLUDED.updated_at
-            """, r)
+            row = {
+                "id": r.get("id"),
+                "franchise_id": r.get("franchise_user_id"),
+                "first_name": r.get("name"),
+                "surname": r.get("surname"),
+                "email": r.get("email"),
+                "phone": r.get("contact_number"),
+                "id_number": r.get("id_number"),
+                "employee_number": r.get("employee_number"),
+                "position": r.get("employee_role"),
+                "staff_type": "employee",
+                "website_url": None,
+                "is_active": r.get("is_active"),
+                "notes": "Imported from legacy attendance system",
+                "created_by_id": None,
+                "created_at": r.get("created_at"),
+                "updated_at": r.get("updated_at"),
+            }
+            upsert(t, "attendance_staff", row)
 
         s.execute("SELECT * FROM attendance_events ORDER BY id")
         event_rows = s.fetchall()
-
-        copied_events = 0
+        copied = 0
 
         for r in event_rows:
-            staff_id = user_to_staff.get(r["user_id"])
+            staff_id = user_to_staff.get(r.get("user_id"))
             if not staff_id:
                 continue
 
-            t.execute("""
-                INSERT INTO attendance_events (
-                    id, staff_id, franchise_id, office_id, action, event_time,
-                    latitude, longitude, accuracy_meters, distance_from_site_m,
-                    gps_status, work_location_type, source, device_info,
-                    employee_note, manager_note, approval_status, approved_by_id,
-                    approved_at, rejected_reason, created_at, updated_at
-                )
-                VALUES (
-                    %(id)s, %s, NULL, NULL, %(action)s, COALESCE(%(created_at)s, NOW()),
-                    NULLIF(%(latitude)s, '')::double precision,
-                    NULLIF(%(longitude)s, '')::double precision,
-                    NULLIF(%(accuracy_meters)s, '')::double precision,
-                    %(distance_from_site_m)s,
-                    %(gps_status)s, %(work_location_type)s, %(source)s, %(device_info)s,
-                    %(employee_note)s, %(manager_note)s, %(approval_status)s, %(approved_by_user_id)s,
-                    %(approved_at)s, %(rejected_reason)s, %(created_at)s, %(updated_at)s
-                )
-                ON CONFLICT (id) DO UPDATE SET
-                    staff_id = EXCLUDED.staff_id,
-                    action = EXCLUDED.action,
-                    event_time = EXCLUDED.event_time,
-                    latitude = EXCLUDED.latitude,
-                    longitude = EXCLUDED.longitude,
-                    accuracy_meters = EXCLUDED.accuracy_meters,
-                    distance_from_site_m = EXCLUDED.distance_from_site_m,
-                    gps_status = EXCLUDED.gps_status,
-                    work_location_type = EXCLUDED.work_location_type,
-                    source = EXCLUDED.source,
-                    device_info = EXCLUDED.device_info,
-                    employee_note = EXCLUDED.employee_note,
-                    manager_note = EXCLUDED.manager_note,
-                    approval_status = EXCLUDED.approval_status,
-                    approved_by_id = EXCLUDED.approved_by_id,
-                    approved_at = EXCLUDED.approved_at,
-                    rejected_reason = EXCLUDED.rejected_reason,
-                    updated_at = EXCLUDED.updated_at
-            """, (staff_id, *r.values()))
+            def to_float(value):
+                if value in (None, ""):
+                    return None
+                return float(value)
 
-            copied_events += 1
+            row = {
+                "id": r.get("id"),
+                "staff_id": staff_id,
+                "franchise_id": None,
+                "office_id": None,
+                "action": r.get("action"),
+                "event_time": r.get("created_at"),
+                "latitude": to_float(r.get("latitude")),
+                "longitude": to_float(r.get("longitude")),
+                "accuracy_meters": to_float(r.get("accuracy_meters")),
+                "distance_from_site_m": r.get("distance_from_site_m"),
+                "gps_status": r.get("gps_status"),
+                "work_location_type": r.get("work_location_type"),
+                "source": r.get("source"),
+                "device_info": r.get("device_info"),
+                "employee_note": r.get("employee_note"),
+                "manager_note": r.get("manager_note"),
+                "approval_status": r.get("approval_status"),
+                "approved_by_id": r.get("approved_by_user_id"),
+                "approved_at": r.get("approved_at"),
+                "rejected_reason": r.get("rejected_reason"),
+                "created_at": r.get("created_at"),
+                "updated_at": r.get("updated_at"),
+            }
+            upsert(t, "attendance_events", row)
+            copied += 1
 
-    source.close()
     target.commit()
+    source.close()
     print(f"Attendance staff copied: {len(staff_rows)}")
-    print(f"Attendance events copied: {copied_events}")
+    print(f"Attendance events copied: {copied}")
 
 
 def reset_sequences(target):
     with target.cursor() as cur:
         for table in [
             "insurance_claim_cases",
+            "insurance_claim_notes",
+            "insurance_claim_attachments",
             "heatmap_records",
             "attendance_staff",
             "attendance_events",
@@ -234,9 +252,11 @@ def reset_sequences(target):
 
 
 def main():
-    target = conn(TARGET_URL)
+    target = connect(TARGET_URL)
 
     copy_claims(target)
+    copy_claim_notes(target)
+    copy_claim_attachments(target)
     copy_heatmap(target)
     copy_attendance(target)
     reset_sequences(target)
@@ -247,3 +267,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+PY
