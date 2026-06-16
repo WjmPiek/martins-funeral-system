@@ -9,8 +9,18 @@ a { color: #0f4c81; text-decoration: none; }
 
 .app-shell { min-height: 100vh; display: flex; }
 .sidebar { width: 260px; background: #0f172a; color: white; padding: 22px 18px; position: fixed; inset: 0 auto 0 0; }
-.sidebar-logo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding-bottom: 24px; margin-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.12); color: white; text-align: center; }
-.sidebar-logo img { width: 180px; height: 180px; object-fit: contain; border-radius: 12px; }
+.sidebar-logo {
+    flex: 0 0 auto !important;
+    min-height: 240px;
+}
+
+.sidebar-logo img {
+    width: 180px !important;
+    height: auto !important;
+    max-width: 180px !important;
+    display: block !important;
+}
+
 .sidebar-logo span { display: block; font-size: 22px; font-weight: bold; line-height: 1.25; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 8px; }
 .sidebar-nav a { color: #cbd5e1; padding: 13px 14px; border-radius: 10px; font-weight: 600; }
@@ -1059,26 +1069,6 @@ button:disabled, .btn:disabled {
     padding-right: 24px !important;
 }
 
-.sidebar-logo {
-    flex-direction: column !important;
-    justify-content: center;
-    gap: 10px;
-    text-align: center;
-}
-
-.sidebar-logo img {
-    width: 180px !important;
-    height: 180px !important;
-    max-width: 180px !important;
-}
-
-.sidebar-logo span {
-    display: block;
-    font-size: 22px !important;
-    width: 100%;
-    text-align: center;
-    line-height: 1.25;
-}
 
 .sidebar-nav a {
     white-space: normal;
@@ -1368,16 +1358,6 @@ body.app-body {
     animation: none !important;
 }
 
-.sidebar-logo {
-    flex: 0 0 auto !important;
-}
-
-.sidebar-logo img {
-    display: block !important;
-    flex: 0 0 auto !important;
-    aspect-ratio: 1 / 1;
-}
-
 .sidebar-nav {
     flex: 1 1 auto !important;
     min-height: 0 !important;
@@ -1387,6 +1367,33 @@ body.app-body {
 .sidebar-nav a,
 .nav-group-title {
     flex-shrink: 0 !important;
+}
+
+/* Final logo flicker fix: logo is wide, not square */
+.sidebar-logo {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-height: 170px !important;
+    padding-bottom: 24px !important;
+    margin-bottom: 18px !important;
+    overflow: hidden !important;
+}
+
+.sidebar-logo img {
+    display: block !important;
+    width: 180px !important;
+    height: auto !important;
+    min-width: 180px !important;
+    max-width: 180px !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    object-fit: contain !important;
+    border-radius: 12px !important;
+    flex: 0 0 auto !important;
+    aspect-ratio: auto !important;
 }
 
 .main-panel {

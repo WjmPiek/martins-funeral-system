@@ -12,6 +12,20 @@
         .app-shell { min-height: 100vh; display: flex; width: 100%; }
         .sidebar { width: var(--sidebar-width); min-width: var(--sidebar-width); max-width: var(--sidebar-width); height: 100vh; max-height: 100vh; position: fixed; left: 0; top: 0; overflow-y: scroll; overflow-x: hidden; background: #0f172a; color: #fff; z-index: 1000; scrollbar-gutter: stable both-edges; }
         .main-panel { margin-left: var(--sidebar-width); width: calc(100% - var(--sidebar-width)); min-height: 100vh; }
+        .sidebar-logo {
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+        }
+
+        .sidebar-logo img {
+            width: 180px !important;
+            height: auto !important;
+            max-width: 180px !important;
+            display: block !important;
+        }
+        
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v64-sidebar-stable') }}">
 </head>
@@ -20,7 +34,14 @@
         <div class="app-shell">
             <aside class="sidebar">
                 <a class="sidebar-logo" href="{{ url_for('dashboard.index') }}">
-                    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="System Logo">
+                    <img
+                        src="{{ url_for('static', filename='img/logo.png') }}"
+                        alt="System Logo"
+                        width="180"
+                        height="180"
+                        loading="eager"
+                        decoding="sync"
+                        >
                     <span>Martins Funerals System</span>
                 </a>
 
