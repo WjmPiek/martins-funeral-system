@@ -9,19 +9,6 @@ a { color: #0f4c81; text-decoration: none; }
 
 .app-shell { min-height: 100vh; display: flex; }
 .sidebar { width: 260px; background: #0f172a; color: white; padding: 22px 18px; position: fixed; inset: 0 auto 0 0; }
-.sidebar-logo {
-    flex: 0 0 auto !important;
-    min-height: 240px;
-}
-
-.sidebar-logo img {
-    width: 180px !important;
-    height: auto !important;
-    max-width: 180px !important;
-    display: block !important;
-}
-
-.sidebar-logo span { display: block; font-size: 22px; font-weight: bold; line-height: 1.25; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 8px; }
 .sidebar-nav a { color: #cbd5e1; padding: 13px 14px; border-radius: 10px; font-weight: 600; }
 .sidebar-nav a:hover, .sidebar-nav a.active { background: #0f4c81; color: white; }
