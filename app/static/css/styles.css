@@ -1334,3 +1334,76 @@ button:disabled, .btn:disabled {
     .attendance-tabs, .topbar, .sidebar, .form-actions, button { display: none !important; }
     .attendance-id-card { box-shadow: none; border: 1px solid #000; margin: 0 auto; }
 }
+
+/* V64: stable sidebar rendering fix
+   Prevents the fixed sidebar from flashing/jumping during page navigation and CSS reloads. */
+html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+}
+
+body.app-body {
+    min-height: 100vh;
+}
+
+.app-shell {
+    align-items: stretch;
+}
+
+.sidebar {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 var(--sidebar-width) !important;
+    will-change: auto;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    contain: layout paint;
+    overflow-y: scroll !important;
+    scrollbar-gutter: stable both-edges;
+}
+
+.sidebar,
+.sidebar * {
+    transition: none !important;
+    animation: none !important;
+}
+
+.sidebar-logo {
+    flex: 0 0 auto !important;
+}
+
+.sidebar-logo img {
+    display: block !important;
+    flex: 0 0 auto !important;
+    aspect-ratio: 1 / 1;
+}
+
+.sidebar-nav {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    padding-bottom: 24px !important;
+}
+
+.sidebar-nav a,
+.nav-group-title {
+    flex-shrink: 0 !important;
+}
+
+.main-panel {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+}
+
+@media (max-width: 820px) {
+    .sidebar {
+        position: relative !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+        scrollbar-gutter: auto;
+    }
+}
+
