@@ -6,6 +6,8 @@ from app.extensions import db, migrate, login_manager, mail
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    # Cache static assets in the browser so the logo and CSS do not refetch on every page.
+    app.config.setdefault("SEND_FILE_MAX_AGE_DEFAULT", 31536000)
 
     db.init_app(app)
     migrate.init_app(app, db)
