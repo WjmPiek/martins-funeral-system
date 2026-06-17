@@ -1270,10 +1270,7 @@ body.app-body {
     max-width: var(--sidebar-width);
     height: 100vh;
     max-height: 100vh;
-<<<<<<< HEAD
-=======
     box-sizing: border-box;
->>>>>>> development
     background: #0f172a;
     color: white;
     padding: 22px 18px;
@@ -1281,18 +1278,9 @@ body.app-body {
     overflow-x: hidden;
     z-index: 1000;
     scrollbar-gutter: stable both-edges;
-<<<<<<< HEAD
     contain: layout paint style;
     transform: translateZ(0);
-=======
     flex: 0 0 var(--sidebar-width);
->>>>>>> development
-}
-
-.sidebar,
-.sidebar * {
-    transition: none !important;
-    animation: none !important;
 }
 
 .sidebar-logo {
@@ -1319,12 +1307,12 @@ body.app-body {
 .sidebar-logo-img,
 .sidebar-logo img {
     display: block;
-<<<<<<< HEAD
+
     width: 180px;
     height: 81px;
     max-width: 180px;
     object-fit: contain;
-=======
+
     width: var(--sidebar-logo-img-width) !important;
     min-width: var(--sidebar-logo-img-width) !important;
     max-width: var(--sidebar-logo-img-width) !important;
@@ -1334,7 +1322,7 @@ body.app-body {
     object-fit: contain !important;
     object-position: center center !important;
     aspect-ratio: 1705 / 769;
->>>>>>> development
+
     border-radius: 12px;
     flex: 0 0 auto;
 }

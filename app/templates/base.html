@@ -5,13 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Martins Funerals System</title>
 
-<<<<<<< HEAD
+
     <link rel="preload" href="{{ url_for('static', filename='img/logo.png') }}" as="image" fetchpriority="high">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v65-single-style') }}">
-=======
-    <link rel="preload" as="image" href="{{ url_for('static', filename='img/logo.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v65-logo-locked') }}">
->>>>>>> development
+
 </head>
 <body class="app-body">
     {% if current_user.is_authenticated %}
@@ -22,18 +19,11 @@
                         class="sidebar-logo-img"
                         src="{{ url_for('static', filename='img/logo.png') }}"
                         alt="System Logo"
-<<<<<<< HEAD
                         width="180"
                         height="81"
                         loading="eager"
                         decoding="async"
                         fetchpriority="high"
-=======
-                        width="1705"
-                        height="769"
-                        loading="eager"
-                        decoding="sync"
->>>>>>> development
                     >
                     <span>Martins Funerals System</span>
                 </a>
