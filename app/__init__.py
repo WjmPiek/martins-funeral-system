@@ -7,6 +7,9 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    # Cache static assets so the sidebar logo does not refetch/reflash on every page load.
+    app.config.setdefault("SEND_FILE_MAX_AGE_DEFAULT", 31536000)
+
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)

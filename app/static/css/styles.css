@@ -1245,7 +1245,9 @@ html {
 }
 
 body.app-body {
+    margin: 0;
     min-height: 100vh;
+    background: #f4f6f8;
 }
 
 .app-shell {
@@ -1262,12 +1264,16 @@ body.app-body {
     min-width: var(--sidebar-width);
     max-width: var(--sidebar-width);
     height: 100vh;
+    max-height: 100vh;
     background: #0f172a;
     color: white;
     padding: 22px 18px;
     overflow-y: auto;
     overflow-x: hidden;
     z-index: 1000;
+    scrollbar-gutter: stable both-edges;
+    contain: layout paint style;
+    transform: translateZ(0);
 }
 
 .sidebar,
@@ -1295,7 +1301,7 @@ body.app-body {
 .sidebar-logo img {
     display: block;
     width: 180px;
-    height: auto;
+    height: 81px;
     max-width: 180px;
     object-fit: contain;
     border-radius: 12px;
@@ -1377,4 +1383,50 @@ body.app-body {
     .content-area {
         padding: 18px;
     }
+}
+
+/* Users page linked-franchise details - moved from template so styles stay in one place */
+.user-name-link {
+  color: #0b2a4a;
+  text-decoration: none;
+}
+.user-name-link:hover {
+  text-decoration: underline;
+}
+.locked-role-box {
+  background: #f8fafc;
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  padding: 1rem;
+}
+.user-linked-summary {
+  margin-top: 0.35rem;
+  color: #5f738a;
+  font-size: 0.85rem;
+}
+.linked-groups-card {
+  margin-top: 1rem;
+}
+.linked-group-list {
+  display: grid;
+  gap: 0.75rem;
+}
+.linked-group-item, .current-linked-box {
+  background: #f8fafc;
+  border: 1px solid #d9e2ec;
+  border-radius: 10px;
+  padding: 0.85rem;
+}
+.linked-branches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.linked-branch-pill {
+  background: #e8f1fb;
+  border: 1px solid #c8d9ec;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.82rem;
 }
