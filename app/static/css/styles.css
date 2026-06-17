@@ -1234,9 +1234,14 @@ button:disabled, .btn:disabled {
     .attendance-id-card { box-shadow: none; border: 1px solid #000; margin: 0 auto; }
 }
 
-/* FINAL SIDEBAR LAYOUT - single source of truth */
+/* FINAL SIDEBAR LAYOUT - single source of truth
+   Keep all sidebar, logo and app-shell rules here only.
+   Module/page templates must not redefine .sidebar, .sidebar-logo, .sidebar-logo-img, .main-panel or .app-shell. */
 :root {
     --sidebar-width: 280px;
+    --sidebar-logo-box-height: 138px;
+    --sidebar-logo-img-width: 190px;
+    --sidebar-logo-img-height: 86px;
 }
 
 html {
@@ -1265,6 +1270,10 @@ body.app-body {
     max-width: var(--sidebar-width);
     height: 100vh;
     max-height: 100vh;
+<<<<<<< HEAD
+=======
+    box-sizing: border-box;
+>>>>>>> development
     background: #0f172a;
     color: white;
     padding: 22px 18px;
@@ -1272,14 +1281,18 @@ body.app-body {
     overflow-x: hidden;
     z-index: 1000;
     scrollbar-gutter: stable both-edges;
+<<<<<<< HEAD
     contain: layout paint style;
     transform: translateZ(0);
+=======
+    flex: 0 0 var(--sidebar-width);
+>>>>>>> development
 }
 
 .sidebar,
 .sidebar * {
-    transition: none;
-    animation: none;
+    transition: none !important;
+    animation: none !important;
 }
 
 .sidebar-logo {
@@ -1289,30 +1302,51 @@ body.app-body {
     justify-content: center;
     gap: 10px;
     width: 100%;
-    min-height: 150px;
-    padding-bottom: 24px;
-    margin-bottom: 18px;
+    height: var(--sidebar-logo-box-height);
+    min-height: var(--sidebar-logo-box-height);
+    max-height: var(--sidebar-logo-box-height);
+    padding: 0 0 18px 0;
+    margin: 0 0 18px 0;
+    box-sizing: border-box;
     border-bottom: 1px solid rgba(255,255,255,0.12);
     color: white;
     text-align: center;
     text-decoration: none;
+    overflow: hidden;
+    flex-shrink: 0;
 }
 
+.sidebar-logo-img,
 .sidebar-logo img {
     display: block;
+<<<<<<< HEAD
     width: 180px;
     height: 81px;
     max-width: 180px;
     object-fit: contain;
+=======
+    width: var(--sidebar-logo-img-width) !important;
+    min-width: var(--sidebar-logo-img-width) !important;
+    max-width: var(--sidebar-logo-img-width) !important;
+    height: var(--sidebar-logo-img-height) !important;
+    min-height: var(--sidebar-logo-img-height) !important;
+    max-height: var(--sidebar-logo-img-height) !important;
+    object-fit: contain !important;
+    object-position: center center !important;
+    aspect-ratio: 1705 / 769;
+>>>>>>> development
     border-radius: 12px;
+    flex: 0 0 auto;
 }
 
 .sidebar-logo span {
     display: block;
     color: white;
     font-weight: 800;
-    font-size: 1.45rem;
-    line-height: 1.25;
+    font-size: 1.25rem;
+    line-height: 1.15;
+    max-height: 36px;
+    overflow: hidden;
 }
 
 .sidebar-nav {
@@ -1328,6 +1362,7 @@ body.app-body {
     border-radius: 10px;
     font-weight: 600;
     white-space: normal;
+    text-decoration: none;
 }
 
 .sidebar-nav a:hover,
@@ -1353,6 +1388,13 @@ body.app-body {
         min-width: 100%;
         max-width: 100%;
         height: auto;
+        max-height: none;
+    }
+
+    .sidebar-logo {
+        height: auto;
+        min-height: 120px;
+        max-height: none;
     }
 
     .sidebar-nav {

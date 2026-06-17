@@ -157,7 +157,7 @@ def get_or_create_user(name, surname, email, role_name, franchises=None, passwor
     created = False
     if not user:
         user = User(name=name, surname=surname, email=email, is_active=True, is_active_account=True)
-        user.set_password(password or temporary_password())
+        user.password_hash = "",
         db.session.add(user)
         db.session.flush()
         created = True
@@ -414,7 +414,7 @@ def import_franchise_users():
 
             email = f"{slugify_email_part(franchise_name)}@martinsdirect.com"
             password = temporary_password()
-            user, created = get_or_create_user(franchise_name, "User", email, target_role, [], password)
+            user, created = get_or_create_user(franchise_name, "User", email, target_role, [franchise], password)
             if created:
                 users_created += 1
                 generated.append((user.full_name, user.email, password, "Not linked - assign manually", target_role))
