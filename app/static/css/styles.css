@@ -1276,29 +1276,6 @@ body.app-body {
     z-index: 1000;
 }
 
-.sidebar,
-.sidebar * {
-    transition: none !important;
-    animation: none !important;
-}
-
-.sidebar-logo {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
-    height: 178px;
-    min-height: 178px;
-    max-height: 178px;
-    padding-bottom: 24px;
-    margin-bottom: 18px;
-    border-bottom: 1px solid rgba(255,255,255,0.12);
-    color: white;
-    text-align: center;
-    text-decoration: none;
-}
 
 .sidebar-logo img {
     display: block;
@@ -1310,13 +1287,6 @@ body.app-body {
     border-radius: 12px;
 }
 
-.sidebar-logo span {
-    display: block;
-    color: white;
-    font-weight: 800;
-    font-size: 1.45rem;
-    line-height: 1.25;
-}
 
 .sidebar-nav {
     display: flex;
@@ -1350,22 +1320,6 @@ body.app-body {
         display: block;
     }
 
-    .sidebar {
-        position: relative;
-        width: 100%;
-        min-width: 100%;
-        max-width: 100%;
-        height: auto;
-    }
-
-    .sidebar-nav {
-        flex-direction: row;
-        overflow-x: auto;
-    }
-
-    .sidebar-nav a {
-        white-space: nowrap;
-    }
 
     .main-panel {
         margin-left: 0;
