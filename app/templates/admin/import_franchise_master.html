@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="button-row" style="margin-bottom:1rem;"><a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a></div>
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Import Franchise Master Workbook</h1>
+      <p class="muted">Upload the combined Martins Funerals Franchise Master workbook before importing monthly figures.</p>
+    </div>
+  </div>
+
+  {% if import_complete and result %}
+  <div class="form-section-card protected-section">
+    <h2>Import Complete</h2>
+    <div class="monthly-summary-grid">
+      <div><span>Franchise rows</span><strong>{{ result.master.processed }}</strong></div>
+      <div><span>New franchises</span><strong>{{ result.master.created }}</strong></div>
+      <div><span>Updated franchises</span><strong>{{ result.master.updated }}</strong></div>
+      <div><span>Contacts matched</span><strong>{{ result.contacts.matched }}</strong></div>
+      <div><span>Royalty scale rows</span><strong>{{ result.royalty_scales.processed }}</strong></div>
+      <div><span>Royalty scales matched</span><strong>{{ result.royalty_scales.matched }}</strong></div>
+      <div><span>Contracts matched</span><strong>{{ result.contracts.matched }}</strong></div>
+      <div><span>Contract scales updated</span><strong>{{ result.contracts.updated_scales }}</strong></div>
+      <div><span>Group rows</span><strong>{{ result.groups.processed }}</strong></div>
+      <div><span>Groups created/updated</span><strong>{{ result.groups.groups }}</strong></div>
+    </div>
+    {% set unmatched = (result.contacts.unmatched or []) + (result.royalty_scales.unmatched or []) + (result.contracts.unmatched or []) + (result.groups.unmatched or []) %}
+    {% if unmatched %}
+      <h3>Rows needing review</h3>
+      <p class="muted">The first unmatched names are listed below. Fix the workbook spelling or create the franchise, then import again.</p>
+      <ul>
+        {% for name in unmatched[:80] %}<li>{{ name }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+    <div class="form-actions no-print">
+      <a class="btn button-auto" href="{{ url_for('monthly.import_excel') }}">Import Monthly Figures Next</a>
+      <a class="btn secondary button-auto" href="{{ url_for('admin.import_franchise_master') }}">Import Another Master Workbook</a>
+    </div>
+  </div>
+  {% else %}
+  <form method="post" enctype="multipart/form-data" class="professional-form">
+    <div class="form-section-card">
+      <h2>Excel File</h2>
+      <div class="form-grid">
+        <label for="excel_file">Select Franchise Master Workbook</label>
+        <input id="excel_file" name="excel_file" type="file" accept=".xlsx,.xlsm" required>
+      </div>
+      <p class="muted">Required sheets: Franchise Master, Royalty Scales, Franchise Groups and Contacts. The Contracts sheet is also imported when present and is treated as the source of truth for agreement dates and royalty brackets. The import cleans leading * markers, removes (F) from group names, removes leading C from cell numbers, imports all royalty brackets, and recalculates existing monthly royalty values.</p>
+    </div>
+    <div class="form-actions sticky-actions no-print">
+      <button class="button-auto" type="submit">Import Franchise Master</button>
+    </div>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

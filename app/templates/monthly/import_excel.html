@@ -5,7 +5,7 @@
   <div class="section-header">
     <div>
       <h1>Import Monthly Figures Excel Workbook</h1>
-      <p class="muted">Upload the Syfers workbook. The system reads franchise names from C1:FJ1 (with row 2 as fallback for older sheets), uses B6:B17 as headings, allocates each franchise column's data per month, and links the matching franchise user.</p>
+      <p class="muted">Upload the Syfers workbook after the Franchise Master workbook has been imported. The system reads franchise names from C1:FJ1 (with row 2 as fallback), uses B6:B17 as headings, and imports figures only against existing franchises.</p>
     </div>
     <a class="btn secondary button-auto" href="{{ url_for('monthly.index') }}">Back</a>
   </div>
@@ -20,9 +20,13 @@
         <div><span>Periods Imported</span><strong>{{ result.period_count }}</strong></div>
         <div><span>First Period</span><strong>{{ result.first_period or '-' }}</strong></div>
         <div><span>Last Period</span><strong>{{ result.last_period or '-' }}</strong></div>
-        <div><span>New Franchises Created</span><strong>{{ result.franchises_created }}</strong></div>
-        <div><span>New Franchise Users Created</span><strong>{{ result.users_created }}</strong></div>
+        <div><span>Unmatched Franchises</span><strong>{{ result.unmatched_franchise_count or 0 }}</strong></div>
       </div>
+      {% if result.unmatched_franchises %}
+        <h3>Unmatched franchise names</h3>
+        <p class="muted">These names were found in the Syfers workbook but not matched to the Franchise Master data.</p>
+        <ul>{% for name in result.unmatched_franchises %}<li>{{ name }}</li>{% endfor %}</ul>
+      {% endif %}
       <p class="muted">Existing records for the same franchise/month/year are updated, not duplicated.</p>
       <div class="form-actions no-print">
         <a class="btn button-auto" href="{{ url_for('monthly.index') }}">View Monthly Figures</a>
@@ -37,13 +41,8 @@
           <label for="excel_file">Select Excel Workbook</label>
           <input id="excel_file" name="excel_file" type="file" accept=".xlsx,.xlsm" required>
 
-          <label for="allocate_users">Allocate to Franchise Users</label>
-          <select id="allocate_users" name="allocate_users">
-            <option value="yes" selected>Yes - link each franchise to its matching franchise user</option>
-            <option value="no">No - import monthly figures only</option>
-          </select>
         </div>
-        <p class="muted">Expected layout: franchise names in C1:FJ1, headings in B6:B17, monthly values in C6:FJ17, and one sheet per month such as Jan'19, Feb'19, etc. Total and Data columns are ignored.</p>
+        <p class="muted">Expected layout: franchise names in C1:FJ1, headings in B6:B17, monthly values in C6:FJ17, and one sheet per month such as Jan'19, Feb'19, etc. Total and Data columns are ignored. This import does not create franchises or users; unknown franchise names are skipped and listed for review.</p>
       </div>
 
       <div class="form-section-card">
