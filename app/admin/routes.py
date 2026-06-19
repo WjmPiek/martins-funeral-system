@@ -1317,7 +1317,11 @@ def import_master_groups_sheet(workbook, franchise_cache):
 
 def import_franchise_master_workbook(uploaded_file):
     from openpyxl import load_workbook
-    workbook = load_workbook(uploaded_file, read_only=True, data_only=True)
+    # The master workbook is small, but the Contracts sheet needs repeated/random
+    # cell access to group continuation rows and royalty brackets. openpyxl
+    # read_only mode is very slow for that pattern and can make Gunicorn abort
+    # the request before the import commits. Load normally for this importer.
+    workbook = load_workbook(uploaded_file, read_only=False, data_only=True)
     required = {"Franchise Master", "Royalty Scales", "Franchise Groups", "Contacts"}
     missing = sorted(required - set(workbook.sheetnames))
     if missing:
