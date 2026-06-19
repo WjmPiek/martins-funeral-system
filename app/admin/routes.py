@@ -903,14 +903,18 @@ def first_shareholder_name(values):
 
 def split_person_name(full_name):
     text = clean_excel_text(full_name)
-    # The contact sheet sometimes includes a 24H number inside NAME & SURNAME.
-    text = re.sub(r"24\s*h.*$", "", text, flags=re.I).strip()
+    # Remove phone numbers and bracketed numbers before splitting into name/surname.
+    text = re.sub(r"\([^)]*\d[^)]*\)", " ", text)
+    text = re.sub(r"\b24\s*h\b.*$", "", text, flags=re.I).strip()
+    text = re.sub(r"\b0\d[\d\s/+-]{6,}.*$", "", text).strip()
+    text = re.sub(r"[^A-Za-zÀ-ÿ' -]+", " ", text)
+    text = " ".join(text.split())
     if not text:
         return "", ""
     parts = text.split()
     if len(parts) == 1:
         return parts[0].title(), ""
-    return " ".join(parts[:-1]).title(), parts[-1].title()
+    return parts[0].title(), " ".join(parts[1:]).title()
 
 
 def normalize_contact_value(value):
@@ -1153,9 +1157,7 @@ def import_master_contacts_sheet(workbook, franchise_cache):
         cell = clean_master_phone(cell_by_header(worksheet, headers, row_number, "Cell Number"))
         email = normalize_contact_value(cell_by_header(worksheet, headers, row_number, "Email"))
         address = normalize_contact_value(cell_by_header(worksheet, headers, row_number, "Physical Address"))
-        apply_contact_data_to_franchise(franchise, contact, telephone, email, address)
-        if cell:
-            franchise.franchisee_cell = cell
+        apply_contact_data_to_franchise(franchise, contact, telephone, email, address, cell)
     return {"processed": processed, "matched": matched, "unmatched": unmatched[:50]}
 
 
@@ -1250,11 +1252,9 @@ def import_master_contracts_sheet(workbook, franchise_cache):
         franchise.ck_number = unique_join(worksheet.cell(r, 11).value for r in rows)
         franchise.pty_business_name = unique_join(worksheet.cell(r, 12).value for r in rows)
         franchise.pty_number = unique_join(worksheet.cell(r, 13).value for r in rows)
-        franchisee = first_shareholder_name(worksheet.cell(r, 14).value for r in rows)
-        if franchisee:
-            first_name, surname = split_person_name(franchisee)
-            franchise.franchisee_name = first_name
-            franchise.franchisee_surname = surname
+        # Do not overwrite the franchisee contact person from the Franchise Master/Contacts sheets.
+        # Column N in Contracts is a shareholder/legal-owner field and often differs from
+        # the operational contact person shown on the Franchise Details page.
 
         raw_scale_lines = []
         parsed_rows = []
@@ -1622,17 +1622,18 @@ def import_contract_summary():
 
 
 
-def apply_contact_data_to_franchise(franchise, contact_name="", office_number="", email="", address=""):
+def apply_contact_data_to_franchise(franchise, contact_name="", office_number="", email="", address="", cell_number=""):
     """Apply imported/manual contact-list values to one Franchise record."""
     contact_name = normalize_contact_value(contact_name)
-    office_number = normalize_contact_value(office_number)
+    office_number = clean_master_phone(office_number)
+    cell_number = clean_master_phone(cell_number)
     email = normalize_contact_value(email)
     address = normalize_contact_value(address)
 
     # Full sync: every new upload overwrites the old database values.
     franchise.office_number = office_number
     franchise.after_hours_number = office_number
-    franchise.franchisee_cell = office_number
+    franchise.franchisee_cell = cell_number or franchise.franchisee_cell or ""
     franchise.franchisee_email = email
     franchise.public_email = email
     franchise.office_address = address
