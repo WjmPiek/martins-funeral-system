@@ -19,12 +19,12 @@ def upgrade():
         ("performance:view", "Performance", "View performance dashboards, targets and graphs"),
         ("performance:manage_targets", "Performance", "Capture and update performance targets"),
     ]
-    for code, module, description in permissions:
+    for code, module, _description in permissions:
         bind.execute(sa.text("""
-            INSERT INTO permissions (code, module, description)
-            SELECT :code, :module, :description
+            INSERT INTO permissions (code, module)
+            SELECT :code, :module
             WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE code = :code)
-        """), {"code": code, "module": module, "description": description})
+        """), {"code": code, "module": module})
     admin_id = bind.execute(sa.text("SELECT id FROM roles WHERE name = 'Admin' LIMIT 1")).scalar()
     if admin_id:
         for code, _, _ in permissions:
