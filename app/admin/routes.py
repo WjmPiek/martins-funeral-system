@@ -157,7 +157,7 @@ def get_or_create_user(name, surname, email, role_name, franchises=None, passwor
     created = False
     if not user:
         user = User(name=name, surname=surname, email=email, is_active=True, is_active_account=True)
-        user.password_hash = "",
+        user.set_password(password or temporary_password())
         db.session.add(user)
         db.session.flush()
         created = True
@@ -414,7 +414,7 @@ def import_franchise_users():
 
             email = f"{slugify_email_part(franchise_name)}@martinsdirect.com"
             password = temporary_password()
-            user, created = get_or_create_user(franchise_name, "User", email, target_role, [franchise], password)
+            user, created = get_or_create_user(franchise_name, "User", email, target_role, [], password)
             if created:
                 users_created += 1
                 generated.append((user.full_name, user.email, password, "Not linked - assign manually", target_role))
@@ -903,18 +903,14 @@ def first_shareholder_name(values):
 
 def split_person_name(full_name):
     text = clean_excel_text(full_name)
-    # Remove phone numbers and bracketed numbers before splitting into name/surname.
-    text = re.sub(r"\([^)]*\d[^)]*\)", " ", text)
-    text = re.sub(r"\b24\s*h\b.*$", "", text, flags=re.I).strip()
-    text = re.sub(r"\b0\d[\d\s/+-]{6,}.*$", "", text).strip()
-    text = re.sub(r"[^A-Za-zÀ-ÿ' -]+", " ", text)
-    text = " ".join(text.split())
+    # The contact sheet sometimes includes a 24H number inside NAME & SURNAME.
+    text = re.sub(r"24\s*h.*$", "", text, flags=re.I).strip()
     if not text:
         return "", ""
     parts = text.split()
     if len(parts) == 1:
         return parts[0].title(), ""
-    return parts[0].title(), " ".join(parts[1:]).title()
+    return " ".join(parts[:-1]).title(), parts[-1].title()
 
 
 def normalize_contact_value(value):
@@ -988,382 +984,6 @@ def imports_data():
         is_import_admin="Admin" in role_names,
         is_import_finance=bool(role_names & {"Finance Manager", "Finance Assistant"}),
     )
-
-
-
-def clean_master_franchise_name(value):
-    """Clean master-import franchise names consistently across all sheets."""
-    name = clean_franchise_name(value)
-    name = re.sub(r"^\s*\*+\s*", "", name)
-    name = re.sub(r"\s*\(\s*f\s*\)\s*$", "", name, flags=re.I)
-    return " ".join(name.split())
-
-
-def clean_master_phone(value):
-    text = normalize_contact_value(value)
-    # Some source files prefix cell numbers with a literal C, for example C 082...
-    text = re.sub(r"^\s*C\s*(?=\d)", "", text, flags=re.I).strip()
-    return text
-
-
-def first_value(*values):
-    for value in values:
-        text = normalize_contact_value(value)
-        if text:
-            return text
-    return ""
-
-
-def header_map(worksheet):
-    result = {}
-    for col in range(1, worksheet.max_column + 1):
-        header = normalize_excel_header(worksheet.cell(1, col).value)
-        if header:
-            result[header] = col
-    return result
-
-
-def cell_by_header(worksheet, headers, row_number, *names):
-    for name in names:
-        col = headers.get(normalize_excel_header(name))
-        if col:
-            return worksheet.cell(row_number, col).value
-    return None
-
-
-def normalize_excel_header(value):
-    text = str(value or "").strip().lower()
-    text = re.sub(r"[^a-z0-9%]+", " ", text)
-    return " ".join(text.split())
-
-
-def get_or_create_franchise_by_master_name(name, franchise_cache, create=True):
-    cleaned = clean_master_franchise_name(name)
-    key = normalize_franchise_key(cleaned)
-    if not key:
-        return None, False
-    if key in franchise_cache:
-        return franchise_cache[key], False
-    found = find_franchise_by_name(cleaned)
-    if found:
-        franchise_cache[key] = found
-        return found, False
-    if not create:
-        return None, False
-    franchise = Franchise(business_name=cleaned, franchise_code=slugify_email_part(cleaned).upper()[:20])
-    db.session.add(franchise)
-    db.session.flush()
-    franchise_cache[key] = franchise
-    return franchise, True
-
-
-def update_franchise_from_master_row(franchise, row):
-    contact_name = first_value(row.get("contact_person"))
-    first_name, surname = split_person_name(contact_name)
-    if first_name or surname:
-        franchise.franchisee_name = first_name
-        franchise.franchisee_surname = surname
-    franchise.franchisee_cell = clean_master_phone(row.get("cell_number"))
-    franchise.office_number = clean_master_phone(row.get("telephone"))
-    email = normalize_contact_value(row.get("email"))
-    if email:
-        franchise.franchisee_email = email
-        franchise.public_email = email
-    address = normalize_contact_value(row.get("physical_address"))
-    if address:
-        franchise.office_address = address
-
-    start_date = parse_contract_date(row.get("contract_start_date")) or parse_contract_date(row.get("commencement_date"))
-    end_date = parse_contract_date(row.get("contract_end_date")) or parse_contract_date(row.get("latest_contract_expiry"))
-    if start_date:
-        franchise.agreement_start_date = start_date
-    if end_date:
-        franchise.agreement_end_date = end_date
-
-    method_text = normalize_contact_value(row.get("royalty_method")).lower()
-    if method_text in {"new", "gross new", "new gross", "gross = new gross method", "cash payover", "cash - payover", "standard"}:
-        franchise.royalty_gross_method = "new"
-    elif method_text in {"old", "gross old", "old gross", "gross = old", "cash insurance", "cash + insurance"}:
-        franchise.royalty_gross_method = "old"
-    elif start_date:
-        set_auto_gross_method_from_agreement(franchise)
-
-    minimum = parse_money_token(row.get("minimum_royalty"))
-    if minimum is not None:
-        franchise.minimum_royalty_amount = minimum
-    summary = normalize_contact_value(row.get("royalty_summary"))
-    if summary:
-        franchise.imported_royalty_scale_text = summary
-    invoice_pct = parse_money_token(row.get("current_invoice_pct"))
-    if invoice_pct is not None:
-        franchise.imported_royalty_percentage = invoice_pct
-
-
-def import_master_franchise_sheet(workbook, franchise_cache):
-    worksheet = workbook["Franchise Master"]
-    headers = header_map(worksheet)
-    processed = created = updated = 0
-    for row_number in range(2, worksheet.max_row + 1):
-        business_name = cell_by_header(worksheet, headers, row_number, "Business Name", "Franchise")
-        business_name = clean_master_franchise_name(business_name)
-        if not business_name:
-            continue
-        franchise, was_created = get_or_create_franchise_by_master_name(business_name, franchise_cache, create=True)
-        if not franchise:
-            continue
-        processed += 1
-        created += 1 if was_created else 0
-        updated += 0 if was_created else 1
-        franchise.business_name = business_name
-        normalized = normalize_contact_value(cell_by_header(worksheet, headers, row_number, "Normalized Name"))
-        franchise.franchise_code = (normalized or slugify_email_part(business_name).upper())[:80]
-        update_franchise_from_master_row(franchise, {
-            "contact_person": cell_by_header(worksheet, headers, row_number, "Contact Person"),
-            "cell_number": cell_by_header(worksheet, headers, row_number, "Cell Number"),
-            "telephone": cell_by_header(worksheet, headers, row_number, "Telephone"),
-            "email": cell_by_header(worksheet, headers, row_number, "Email"),
-            "physical_address": cell_by_header(worksheet, headers, row_number, "Physical Address"),
-            "commencement_date": cell_by_header(worksheet, headers, row_number, "Commencement Date"),
-            "contract_start_date": cell_by_header(worksheet, headers, row_number, "Contract Start Date"),
-            "contract_end_date": cell_by_header(worksheet, headers, row_number, "Contract End Date"),
-            "latest_contract_expiry": cell_by_header(worksheet, headers, row_number, "Latest Contract Expiry"),
-            "royalty_summary": cell_by_header(worksheet, headers, row_number, "Current Royalty Scale Summary"),
-            "current_invoice_pct": cell_by_header(worksheet, headers, row_number, "Current Invoice %"),
-            "royalty_method": cell_by_header(worksheet, headers, row_number, "Royalty Method"),
-            "minimum_royalty": cell_by_header(worksheet, headers, row_number, "Minimum Royalty"),
-        })
-    return {"processed": processed, "created": created, "updated": updated}
-
-
-def import_master_contacts_sheet(workbook, franchise_cache):
-    if "Contacts" not in workbook.sheetnames:
-        return {"processed": 0, "matched": 0, "unmatched": []}
-    worksheet = workbook["Contacts"]
-    headers = header_map(worksheet)
-    processed = matched = 0
-    unmatched = []
-    for row_number in range(2, worksheet.max_row + 1):
-        franchise_name = clean_master_franchise_name(cell_by_header(worksheet, headers, row_number, "Franchise"))
-        if not franchise_name:
-            continue
-        processed += 1
-        franchise, _created = get_or_create_franchise_by_master_name(franchise_name, franchise_cache, create=False)
-        if not franchise:
-            unmatched.append(franchise_name)
-            continue
-        matched += 1
-        contact = normalize_contact_value(cell_by_header(worksheet, headers, row_number, "Contact Person"))
-        telephone = clean_master_phone(cell_by_header(worksheet, headers, row_number, "Telephone"))
-        cell = clean_master_phone(cell_by_header(worksheet, headers, row_number, "Cell Number"))
-        email = normalize_contact_value(cell_by_header(worksheet, headers, row_number, "Email"))
-        address = normalize_contact_value(cell_by_header(worksheet, headers, row_number, "Physical Address"))
-        apply_contact_data_to_franchise(franchise, contact, telephone, email, address, cell)
-    return {"processed": processed, "matched": matched, "unmatched": unmatched[:50]}
-
-
-def import_master_royalty_scales_sheet(workbook, franchise_cache):
-    if "Royalty Scales" not in workbook.sheetnames:
-        return {"processed": 0, "matched": 0, "unmatched": []}
-    worksheet = workbook["Royalty Scales"]
-    headers = header_map(worksheet)
-    rows_by_franchise = defaultdict(list)
-    raw_by_franchise = defaultdict(list)
-    minimum_by_franchise = {}
-    unmatched = []
-    processed = 0
-    for row_number in range(2, worksheet.max_row + 1):
-        franchise_name = clean_master_franchise_name(cell_by_header(worksheet, headers, row_number, "Franchise"))
-        if not franchise_name:
-            continue
-        processed += 1
-        scale_type = normalize_contact_value(cell_by_header(worksheet, headers, row_number, "Scale Type")).lower()
-        raw = normalize_contact_value(cell_by_header(worksheet, headers, row_number, "Raw Current Royalty Scale", "Raw Royalty Scale"))
-        if raw:
-            raw_by_franchise[franchise_name].append(raw)
-        minimum = parse_money_token(cell_by_header(worksheet, headers, row_number, "Minimum Royalty"))
-        if minimum is not None:
-            minimum_by_franchise[franchise_name] = minimum
-        if scale_type and "minimum" in scale_type:
-            continue
-        percentage = parse_money_token(cell_by_header(worksheet, headers, row_number, "Royalty %", "Percentage"))
-        amount_from = parse_money_token(cell_by_header(worksheet, headers, row_number, "From Amount", "Amount From"))
-        amount_to = parse_money_token(cell_by_header(worksheet, headers, row_number, "To Amount", "Amount To"))
-        if percentage is None:
-            parsed = parse_royalty_scale_line(raw)
-            if parsed and "percentage" in parsed:
-                percentage = parsed.get("percentage")
-                amount_from = parsed.get("amount_from")
-                amount_to = parsed.get("amount_to")
-        if percentage is None:
-            continue
-        rows_by_franchise[franchise_name].append({
-            "amount_from": amount_from if amount_from is not None else 0,
-            "amount_to": amount_to if amount_to is not None else 999999999,
-            "percentage": percentage,
-            "raw": raw,
-        })
-
-    matched = 0
-    for franchise_name, parsed_rows in rows_by_franchise.items():
-        franchise, _created = get_or_create_franchise_by_master_name(franchise_name, franchise_cache, create=False)
-        if not franchise:
-            unmatched.append(franchise_name)
-            continue
-        matched += 1
-        sync_royalty_scales_from_contract_file(
-            franchise,
-            parsed_rows,
-            raw_by_franchise.get(franchise_name, []),
-            minimum_by_franchise.get(franchise_name),
-        )
-    return {"processed": processed, "matched": matched, "unmatched": unmatched[:50]}
-
-
-
-def import_master_contracts_sheet(workbook, franchise_cache):
-    """Import contract dates, company details and full royalty brackets from Contracts.
-
-    The Contracts sheet is treated as the source of truth for the current royalty
-    scale because it preserves continuation rows for every bracket.
-    """
-    if "Contracts" not in workbook.sheetnames:
-        return {"processed": 0, "matched": 0, "unmatched": [], "updated_scales": 0}
-    worksheet = workbook["Contracts"]
-    groups = build_contract_summary_groups(worksheet)
-    processed = matched = updated_scales = 0
-    unmatched = []
-    for group in groups:
-        processed += 1
-        franchise, _created = get_or_create_franchise_by_master_name(group["name"], franchise_cache, create=False)
-        if not franchise:
-            unmatched.append(group["name"])
-            continue
-        matched += 1
-        rows = group["rows"]
-        start_date = newest_contract_date(worksheet.cell(r, 4).value for r in rows)
-        end_date = newest_contract_date(worksheet.cell(r, 5).value for r in rows)
-        if start_date:
-            franchise.agreement_start_date = start_date
-        if end_date:
-            franchise.agreement_end_date = end_date
-        set_auto_gross_method_from_agreement(franchise)
-
-        franchise.ck_business_name = unique_join(worksheet.cell(r, 10).value for r in rows)
-        franchise.ck_number = unique_join(worksheet.cell(r, 11).value for r in rows)
-        franchise.pty_business_name = unique_join(worksheet.cell(r, 12).value for r in rows)
-        franchise.pty_number = unique_join(worksheet.cell(r, 13).value for r in rows)
-        # Do not overwrite the franchisee contact person from the Franchise Master/Contacts sheets.
-        # Column N in Contracts is a shareholder/legal-owner field and often differs from
-        # the operational contact person shown on the Franchise Details page.
-
-        raw_scale_lines = []
-        parsed_rows = []
-        minimum = None
-        for r in rows:
-            parsed = parse_royalty_scale_line(worksheet.cell(r, 18).value)
-            if not parsed:
-                continue
-            raw = parsed.get("raw", "")
-            if raw:
-                raw_scale_lines.append(raw)
-            if parsed.get("minimum") is not None:
-                minimum = parsed["minimum"]
-                continue
-            if "percentage" in parsed:
-                parsed_rows.append(parsed)
-        count = sync_royalty_scales_from_contract_file(franchise, parsed_rows, raw_scale_lines, minimum)
-        if count:
-            updated_scales += 1
-    return {"processed": processed, "matched": matched, "unmatched": unmatched[:80], "updated_scales": updated_scales}
-
-
-def import_master_groups_sheet(workbook, franchise_cache):
-    if "Franchise Groups" not in workbook.sheetnames:
-        return {"processed": 0, "groups": 0, "users_created": 0, "unmatched": []}
-    worksheet = workbook["Franchise Groups"]
-    headers = header_map(worksheet)
-    grouped = defaultdict(list)
-    processed = 0
-    for row_number in range(2, worksheet.max_row + 1):
-        main_name = clean_master_franchise_name(cell_by_header(worksheet, headers, row_number, "Franchise User"))
-        grouped_name = clean_master_franchise_name(cell_by_header(worksheet, headers, row_number, "Grouped Franchise", "Group Franchise"))
-        if not main_name or not grouped_name:
-            continue
-        processed += 1
-        if grouped_name not in grouped[main_name]:
-            grouped[main_name].append(grouped_name)
-
-    unmatched = []
-    users_created = 0
-    for main_name, linked_names in grouped.items():
-        main_franchise, _ = get_or_create_franchise_by_master_name(main_name, franchise_cache, create=False)
-        if not main_franchise:
-            unmatched.append(main_name)
-            continue
-        linked_franchises = []
-        for linked_name in linked_names:
-            franchise, _ = get_or_create_franchise_by_master_name(linked_name, franchise_cache, create=False)
-            if franchise:
-                linked_franchises.append(franchise)
-            else:
-                unmatched.append(linked_name)
-        user, created_user = find_franchise_user_for_main_franchise(main_franchise)
-        if created_user:
-            users_created += 1
-        remove_group_links_from_other_franchise_users(user, [f.id for f in linked_franchises])
-        set_primary_franchise_link(user, main_franchise, linked_franchises)
-    return {"processed": processed, "groups": len(grouped), "users_created": users_created, "unmatched": unmatched[:80]}
-
-
-def import_franchise_master_workbook(uploaded_file):
-    from openpyxl import load_workbook
-    # The master workbook is small, but the Contracts sheet needs repeated/random
-    # cell access to group continuation rows and royalty brackets. openpyxl
-    # read_only mode is very slow for that pattern and can make Gunicorn abort
-    # the request before the import commits. Load normally for this importer.
-    workbook = load_workbook(uploaded_file, read_only=False, data_only=True)
-    required = {"Franchise Master", "Royalty Scales", "Franchise Groups", "Contacts"}
-    missing = sorted(required - set(workbook.sheetnames))
-    if missing:
-        raise ValueError("Missing required sheet(s): " + ", ".join(missing))
-
-    franchise_cache = {normalize_franchise_key(f.business_name): f for f in Franchise.query.all() if normalize_franchise_key(f.business_name)}
-    result = {
-        "master": import_master_franchise_sheet(workbook, franchise_cache),
-        "contacts": import_master_contacts_sheet(workbook, franchise_cache),
-        "royalty_scales": import_master_royalty_scales_sheet(workbook, franchise_cache),
-        "contracts": import_master_contracts_sheet(workbook, franchise_cache),
-        "groups": import_master_groups_sheet(workbook, franchise_cache),
-    }
-
-    touched_ids = [f.id for f in franchise_cache.values() if getattr(f, "id", None)]
-    for figure in MonthlyFigure.query.filter(MonthlyFigure.franchise_id.in_(touched_ids)).all() if touched_ids else []:
-        from app.monthly.routes import recalculate_monthly_figure
-        recalculate_monthly_figure(figure)
-    return result
-
-
-@admin_bp.route("/imports/franchise-master", methods=["GET", "POST"])
-@login_required
-def import_franchise_master():
-    if not is_current_user_admin():
-        abort(403)
-    if request.method == "POST":
-        uploaded_file = request.files.get("excel_file")
-        if not uploaded_file or uploaded_file.filename == "":
-            flash("Please upload the Martins Funerals Franchise Master workbook.", "danger")
-            return redirect(url_for("admin.import_franchise_master"))
-        try:
-            result = import_franchise_master_workbook(uploaded_file)
-            db.session.commit()
-        except Exception as exc:
-            db.session.rollback()
-            flash(f"Could not import Franchise Master workbook: {exc}", "danger")
-            return redirect(url_for("admin.import_franchise_master"))
-        log_action("Imports & Data", "Imported Franchise Master workbook", str(result))
-        flash("Franchise Master import complete. Static data, royalty scales and franchise groups were updated.", "success")
-        return render_template("admin/import_franchise_master.html", import_complete=True, result=result)
-    return render_template("admin/import_franchise_master.html", import_complete=False, result=None)
 
 
 @admin_bp.route("/imports/grouped-franchises", methods=["GET", "POST"])
@@ -1626,18 +1246,17 @@ def import_contract_summary():
 
 
 
-def apply_contact_data_to_franchise(franchise, contact_name="", office_number="", email="", address="", cell_number=""):
+def apply_contact_data_to_franchise(franchise, contact_name="", office_number="", email="", address=""):
     """Apply imported/manual contact-list values to one Franchise record."""
     contact_name = normalize_contact_value(contact_name)
-    office_number = clean_master_phone(office_number)
-    cell_number = clean_master_phone(cell_number)
+    office_number = normalize_contact_value(office_number)
     email = normalize_contact_value(email)
     address = normalize_contact_value(address)
 
     # Full sync: every new upload overwrites the old database values.
     franchise.office_number = office_number
     franchise.after_hours_number = office_number
-    franchise.franchisee_cell = cell_number or franchise.franchisee_cell or ""
+    franchise.franchisee_cell = office_number
     franchise.franchisee_email = email
     franchise.public_email = email
     franchise.office_address = address

@@ -5,6 +5,8 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.franchise_context import set_selected_franchise, exit_franchise_view_mode, is_privileged_user, get_accessible_franchises
 from app.models import MonthlyFigure, User, user_franchises
+from app.leaderboard.routes import build_dashboard_leaderboard_snapshot
+from app.performance.service import dashboard_snapshot as build_performance_dashboard_snapshot
 from types import SimpleNamespace
 
 
@@ -146,6 +148,13 @@ def index():
         selected_franchise = get_selected_franchise()
     except Exception:
         selected_franchise = None
+    leaderboard_snapshot = None
+    performance_snapshot = None
+    if selected_franchise and current_user.has_permission("leaderboard:view"):
+        leaderboard_snapshot = build_dashboard_leaderboard_snapshot(selected_franchise.id)
+    if selected_franchise and current_user.has_permission("performance:view"):
+        performance_snapshot = build_performance_dashboard_snapshot(selected_franchise.id)
+
     return render_template(
         "dashboard/index.html",
         user=current_user,
@@ -153,6 +162,8 @@ def index():
         inactive_franchises=inactive_franchises,
         activity_period_label=activity_period_label,
         linked_franchise_group=find_linked_franchise_group(selected_franchise),
+        leaderboard_snapshot=leaderboard_snapshot,
+        performance_snapshot=performance_snapshot,
     )
 
 

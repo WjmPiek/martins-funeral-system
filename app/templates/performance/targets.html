@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="page-header"><div><h1>Performance Targets</h1><p class="muted">Manual Head Office targets override automatic previous-year targets.</p></div></div>
+<form class="filter-bar" method="get">
+<label>Month<select name="month">{% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+<label>Year<select name="year">{% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+<button class="btn" type="submit">Load</button>
+</form>
+<form method="post">
+<div class="table-responsive">
+<table class="data-table">
+<thead><tr><th>Franchise</th>{% for key, metric in metrics.items() %}<th>{{ metric.label }} Target</th>{% endfor %}</tr></thead>
+<tbody>
+{% for franchise in franchises %}
+<tr>
+<td><strong>{{ franchise.business_name }}</strong></td>
+{% for key, metric in metrics.items() %}
+<td><input type="number" step="0.01" name="target_{{ franchise.id }}_{{ key }}" value="{{ target_values.get(franchise.id, {}).get(key, '') }}" placeholder="Auto: {{ auto_values.get(franchise.id, {}).get(key, 0) }}"></td>
+{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<button class="btn" type="submit">Save Targets</button>
+</form>
+{% endblock %}

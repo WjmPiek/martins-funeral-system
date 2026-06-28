@@ -84,11 +84,7 @@ class User(UserMixin, db.Model):
             self.roles.append(admin_role)
 
     def set_password(self, password):
-        self.password_hash = generate_password_hash(
-            password,
-            method="pbkdf2:sha256",
-            salt_length=8
-        )
+        self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -239,6 +235,23 @@ class MonthlyFigure(db.Model):
     @property
     def period_label(self):
         return f"{self.year}-{self.month:02d}"
+
+
+class FranchiseTarget(db.Model):
+    __tablename__ = "franchise_targets"
+    id = db.Column(db.Integer, primary_key=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
+    metric = db.Column(db.String(80), nullable=False, index=True)
+    year = db.Column(db.Integer, nullable=False, index=True)
+    month = db.Column(db.Integer, nullable=False, index=True)
+    target_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    franchise = db.relationship("Franchise", backref=db.backref("targets", lazy=True, cascade="all, delete-orphan"))
+    __table_args__ = (
+        db.UniqueConstraint("franchise_id", "metric", "year", "month", name="uq_franchise_target_period_metric"),
+    )
 
 
 class HeatmapRecord(db.Model):

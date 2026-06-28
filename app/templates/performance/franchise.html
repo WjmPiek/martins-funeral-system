@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="page-header">
+    <div>
+        <h1>{{ franchise.business_name }} Performance</h1>
+        <p class="muted">{{ selected_period_label }} compared to targets, previous month, previous year and 3-year average.</p>
+    </div>
+    <a class="btn secondary" href="{{ url_for('performance.index', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Back to Leaderboard</a>
+</div>
+
+{% if snapshot %}
+<div class="stats-grid">
+    <div class="stat-card"><span>Leaderboard</span><strong>#{{ snapshot.rank }} of {{ snapshot.total }}</strong><small class="leaderboard-move {{ snapshot.movement }}">{{ snapshot.movement_label }}{% if snapshot.movement_delta %} {{ snapshot.movement_delta|abs }}{% endif %}</small></div>
+    <div class="stat-card"><span>Performance Score</span><strong>{{ '%.2f'|format(snapshot.score) }}%</strong><small>Weighted KPI score</small></div>
+</div>
+{% endif %}
+
+<form class="filter-bar" method="get">
+    <label>Month<select name="month">{% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Year<select name="year">{% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+    <label>Chart KPI<select name="chart_metric">{% for key, metric in metrics.items() %}<option value="{{ key }}" {% if key == chart_metric %}selected{% endif %}>{{ metric.label }}</option>{% endfor %}</select></label>
+    <label>Target Mode<select name="target_mode">{% for key, label in target_modes.items() %}<option value="{{ key }}" {% if key == target_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Growth % <input type="number" step="0.01" name="growth" value="{{ growth }}"></label>
+    <button class="btn" type="submit">Update</button>
+</form>
+
+<div class="chart-card">
+    <h2>{{ metrics[chart_metric].label }}: Actual vs Target</h2>
+    <canvas id="performanceChart" width="1000" height="360" data-series='{{ chart_data|tojson }}'></canvas>
+    <div class="chart-legend"><span>Actual line</span><span>Target line</span></div>
+</div>
+
+<div class="table-responsive">
+<table class="data-table">
+<thead>
+<tr><th>KPI</th><th>Actual</th><th>Target</th><th>Target %</th><th>Difference</th><th>Prev Month</th><th>Same Month Last Year</th><th>3-Year Avg</th></tr>
+</thead>
+<tbody>
+{% for row in metric_rows %}
+<tr>
+    <td><strong>{{ row.label }}</strong></td>
+    <td>{{ '%.2f'|format(row.actual) }}</td>
+    <td>{{ '%.2f'|format(row.target) }}</td>
+    <td>{{ '%.2f'|format(row.target_percent) }}%</td>
+    <td class="{% if row.target_difference >= 0 %}positive{% else %}negative{% endif %}">{{ '%.2f'|format(row.target_difference) }}</td>
+    <td>{{ '%.2f'|format(row.previous_month) }} / {{ '%.2f'|format(row.previous_month_percent) }}%</td>
+    <td>{{ '%.2f'|format(row.same_month_last_year) }} / {{ '%.2f'|format(row.same_month_last_year_percent) }}%</td>
+    <td>{{ '%.2f'|format(row.three_year_average) }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+<script>
+(function(){
+  var canvas = document.getElementById('performanceChart');
+  if (!canvas) return;
+  var series = JSON.parse(canvas.dataset.series || '[]');
+  var ctx = canvas.getContext('2d');
+  var width = canvas.width, height = canvas.height;
+  var pad = 45;
+  ctx.clearRect(0,0,width,height);
+  ctx.font = '13px Arial';
+  ctx.strokeStyle = '#ddd';
+  ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, height-pad); ctx.lineTo(width-pad, height-pad); ctx.stroke();
+  var max = 1;
+  series.forEach(function(p){ max = Math.max(max, Number(p.actual || 0), Number(p.target || 0)); });
+  function x(i){ return pad + (width - pad*2) * (series.length <= 1 ? 0 : i/(series.length-1)); }
+  function y(v){ return height - pad - ((Number(v || 0) / max) * (height - pad*2)); }
+  function drawLine(key, dash){
+    ctx.beginPath();
+    if (dash) ctx.setLineDash([8,6]); else ctx.setLineDash([]);
+    series.forEach(function(p,i){ if(i===0) ctx.moveTo(x(i), y(p[key])); else ctx.lineTo(x(i), y(p[key])); });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  drawLine('target', true);
+  drawLine('actual', false);
+  series.forEach(function(p,i){ ctx.beginPath(); ctx.arc(x(i), y(p.actual), 4, 0, Math.PI*2); ctx.fill(); ctx.fillText(p.label, x(i)-25, height-15); });
+})();
+</script>
+{% endblock %}

@@ -860,33 +860,16 @@ def excel_decimal(value):
         return Decimal("0")
 
 
-def find_or_create_franchise_from_excel(raw_name, franchise_cache=None, create_missing=False):
-    """Resolve a Syfers workbook franchise name without repeatedly loading all franchises.
-
-    Monthly figures must normally be imported only after the Franchise Master
-    workbook has created the franchises, users, groups and royalty scales.
-    Therefore create_missing defaults to False to avoid accidental branch/user
-    creation during a large figures import.
-    """
+def find_or_create_franchise_from_excel(raw_name):
     cleaned_name = clean_excel_franchise_name(raw_name)
     key = normalize_franchise_key(cleaned_name)
     if not key:
         return None, False
 
-    if franchise_cache is not None and key in franchise_cache:
-        return franchise_cache[key], False
-
-    # Small fallback for names that differ slightly from the master workbook.
-    candidates = list(franchise_cache.values()) if franchise_cache is not None else Franchise.query.all()
-    for franchise in candidates:
-        existing_key = normalize_franchise_key(franchise.business_name)
-        if existing_key and (existing_key == key or existing_key in key or key in existing_key):
-            if franchise_cache is not None:
-                franchise_cache[key] = franchise
+    franchises = Franchise.query.all()
+    for franchise in franchises:
+        if normalize_franchise_key(franchise.business_name) == key:
             return franchise, False
-
-    if not create_missing:
-        return None, False
 
     franchise = Franchise(
         business_name=cleaned_name,
@@ -894,8 +877,6 @@ def find_or_create_franchise_from_excel(raw_name, franchise_cache=None, create_m
     )
     db.session.add(franchise)
     db.session.flush()
-    if franchise_cache is not None:
-        franchise_cache[key] = franchise
     return franchise, True
 
 
@@ -1027,7 +1008,7 @@ def iter_xlsx_import_sheets(file_storage):
             yield title, rows
 
 
-def import_monthly_figures_excel_file(file_storage, allocate_users=False):
+def import_monthly_figures_excel_file(file_storage, allocate_users=True):
     suffix = Path(file_storage.filename or "").suffix.lower()
     if suffix not in {".xlsx", ".xlsm"}:
         raise ValueError("Please upload an Excel workbook (.xlsx or .xlsm).")
@@ -1040,14 +1021,6 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=False):
     users_linked = 0
     periods = set()
     franchise_names = set()
-    unmatched_franchise_names = set()
-    create_missing_franchises = False
-    franchise_cache = {
-        normalize_franchise_key(franchise.business_name): franchise
-        for franchise in Franchise.query.all()
-        if normalize_franchise_key(franchise.business_name)
-    }
-    allocated_franchise_ids = set()
 
     for sheet_title, rows in iter_xlsx_import_sheets(file_storage):
         month, year = parse_excel_sheet_period(sheet_title)
@@ -1068,13 +1041,8 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=False):
                 skipped += 1
                 continue
 
-            franchise, created_franchise = find_or_create_franchise_from_excel(
-                franchise_name,
-                franchise_cache=franchise_cache,
-                create_missing=create_missing_franchises,
-            )
+            franchise, created_franchise = find_or_create_franchise_from_excel(franchise_name)
             if not franchise:
-                unmatched_franchise_names.add(franchise_name)
                 skipped += 1
                 continue
             if created_franchise:
@@ -1082,10 +1050,9 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=False):
             franchise_names.add(franchise.business_name)
             period_has_data = True
 
-            if allocate_users and franchise.id not in allocated_franchise_ids:
+            if allocate_users:
                 was_linked = bool(franchise.assigned_users)
                 user, created_user = find_or_create_franchise_user_for_franchise(franchise)
-                allocated_franchise_ids.add(franchise.id)
                 if created_user:
                     users_created += 1
                 if not was_linked and franchise in user.assigned_franchises:
@@ -1136,8 +1103,6 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=False):
         "users_linked": users_linked,
         "period_count": len(periods),
         "franchise_count": len(franchise_names),
-        "unmatched_franchise_count": len(unmatched_franchise_names),
-        "unmatched_franchises": sorted(unmatched_franchise_names)[:80],
         "first_period": sorted(periods)[0] if periods else "",
         "last_period": sorted(periods)[-1] if periods else "",
     }
@@ -1281,7 +1246,7 @@ def import_excel():
         abort(403)
     if request.method == "POST":
         file_storage = request.files.get("excel_file")
-        allocate_users = False
+        allocate_users = request.form.get("allocate_users") == "yes"
         if not file_storage or not file_storage.filename:
             flash("Please select the Excel workbook to import.", "warning")
             return redirect(url_for("monthly.import_excel"))

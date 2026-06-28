@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="section-header">
+  <div>
+    <h1>Leaderboard Targets</h1>
+    <p class="muted">Capture targets for {{ selected_period_label }}. These targets drive the weighted leaderboard score.</p>
+  </div>
+  <div class="button-row">
+    <a class="btn secondary" href="{{ url_for('leaderboard.index', month=selected_month, year=selected_year) }}">Back to Leaderboard</a>
+  </div>
+</div>
+
+<div class="form-section-card leaderboard-filter-card">
+  <form method="get" action="{{ url_for('leaderboard.targets') }}" class="period-filter-form leaderboard-filters">
+    <label for="targetMonth"><strong>Month</strong></label>
+    <select id="targetMonth" name="month">
+      {% for value, label in month_options %}
+        <option value="{{ value }}" {% if selected_month == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <label for="targetYear"><strong>Year</strong></label>
+    <select id="targetYear" name="year">
+      {% for year in year_options %}
+        <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn secondary button-auto" type="submit">Change Period</button>
+  </form>
+</div>
+
+<form method="post" action="{{ url_for('leaderboard.targets', month=selected_month, year=selected_year) }}">
+  <div class="table-responsive">
+    <table class="system-report-table leaderboard-target-table">
+      <thead>
+        <tr>
+          <th>Franchise</th>
+          {% for metric_key, config in metrics.items() %}
+            <th>{{ config.label }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for franchise in franchises %}
+        <tr>
+          <td><strong>{{ franchise.business_name or 'Unnamed Franchise' }}</strong></td>
+          {% for metric_key, config in metrics.items() %}
+            <td>
+              <input class="target-input" type="number" step="0.01" min="0" name="target_{{ franchise.id }}_{{ metric_key }}" value="{{ target_values.get(franchise.id, {}).get(metric_key, 0) }}">
+            </td>
+          {% endfor %}
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="center-cell">No franchises available for target capture.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="button-row form-actions">
+    <button class="btn" type="submit">Save Targets</button>
+  </div>
+</form>
+{% endblock %}

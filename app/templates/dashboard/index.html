@@ -96,6 +96,41 @@
         </div>
       </div>
 
+      
+{% if performance_snapshot %}
+<div class="highlight-card performance-dashboard-card movement-{{ performance_snapshot.movement }}">
+    <div>
+        <div class="muted">Performance Leaderboard</div>
+        <h2>#{{ performance_snapshot.rank }} of {{ performance_snapshot.total }} — {{ performance_snapshot.franchise_name }}</h2>
+        <p>{{ performance_snapshot.period_label }} weighted score: <strong>{{ '%.2f'|format(performance_snapshot.score) }}%</strong></p>
+    </div>
+    <div class="leaderboard-move {{ performance_snapshot.movement }}">{{ performance_snapshot.movement_label }}{% if performance_snapshot.movement_delta %} {{ performance_snapshot.movement_delta|abs }}{% endif %}</div>
+    <div class="performance-mini-grid">
+        {% for metric in performance_snapshot.metrics %}
+            <div><span>{{ metric.label }}</span><strong>{{ '%.0f'|format(metric.target_percent) }}%</strong></div>
+        {% endfor %}
+    </div>
+    <a class="btn secondary" href="{{ url_for('performance.franchise', franchise_id=selected_franchise.id) }}">Open Performance</a>
+</div>
+{% endif %}
+
+{% if leaderboard_snapshot %}
+      <div class="form-section-card dashboard-leaderboard-card">
+        <div>
+          <p class="muted">Leaderboard position - {{ leaderboard_snapshot.period_label }}</p>
+          <h2>#{{ leaderboard_snapshot.rank }} of {{ leaderboard_snapshot.total }}</h2>
+          <p><strong>{{ leaderboard_snapshot.franchise_name }}</strong></p>
+        </div>
+        <div class="dashboard-leaderboard-metrics">
+          <span class="leaderboard-movement {{ leaderboard_snapshot.movement_class }}">
+            {{ leaderboard_snapshot.movement_label }}{% if leaderboard_snapshot.movement_delta %} {{ leaderboard_snapshot.movement_delta|abs }}{% endif %}
+          </span>
+          <span class="badge success">Target {{ '%.1f'|format(leaderboard_snapshot.gross_target_percent) }}%</span>
+          <a class="btn secondary button-auto" href="{{ url_for('leaderboard.index') }}">Open Leaderboard</a>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="dashboard-action-grid">
         {% if current_user.has_permission('franchise_details:view') %}
         <a class="dashboard-action-card" href="{{ url_for('franchise.details') }}">

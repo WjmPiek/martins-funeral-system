@@ -6,8 +6,6 @@ from app.extensions import db, migrate, login_manager, mail
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
-    # Cache static assets in the browser so the logo and CSS do not refetch on every page.
-    app.config.setdefault("SEND_FILE_MAX_AGE_DEFAULT", 31536000)
 
     # Cache static assets so the sidebar logo does not refetch/reflash on every page load.
     app.config.setdefault("SEND_FILE_MAX_AGE_DEFAULT", 31536000)
@@ -30,6 +28,8 @@ def create_app(config_class=Config):
     from app.attendance.routes import attendance_bp
     from app.manuals.routes import manuals_bp
     from app.insurance_claims.routes import insurance_claims_bp
+    from app.leaderboard.routes import leaderboard_bp
+    from app.performance.routes import performance_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -41,6 +41,8 @@ def create_app(config_class=Config):
     app.register_blueprint(attendance_bp)
     app.register_blueprint(manuals_bp)
     app.register_blueprint(insurance_claims_bp)
+    app.register_blueprint(leaderboard_bp)
+    app.register_blueprint(performance_bp)
 
     @app.context_processor
     def inject_franchise_context():

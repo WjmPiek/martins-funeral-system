@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="page-header">
+    <div>
+        <h1>Performance Leaderboard</h1>
+        <p class="muted">Live target comparison for Cash, Sales, Insurance Premiums, Joinings and Funerals.</p>
+    </div>
+    {% if show_manage_targets %}<a class="btn secondary" href="{{ url_for('performance.targets', month=selected_month, year=selected_year) }}">Manage Targets</a>{% endif %}
+</div>
+
+<form class="filter-bar" method="get">
+    <label>Month
+        <select name="month">
+            {% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Year
+        <select name="year">
+            {% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>KPI
+        <select name="metric">
+            <option value="overall" {% if metric_key == 'overall' %}selected{% endif %}>Overall Score</option>
+            {% for key, metric in metrics.items() %}<option value="{{ key }}" {% if key == metric_key %}selected{% endif %}>{{ metric.label }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Target Mode
+        <select name="target_mode">
+            {% for key, label in target_modes.items() %}<option value="{{ key }}" {% if key == target_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Growth % <input type="number" step="0.01" name="growth" value="{{ growth }}"></label>
+    <button class="btn" type="submit">Update</button>
+</form>
+
+{% if my_row %}
+<div class="highlight-card leaderboard-card movement-{{ my_row.movement }}">
+    <div>
+        <div class="muted">Your / selected franchise position</div>
+        <h2>#{{ my_row.rank }} of {{ rows|length }} — {{ my_row.franchise_name }}</h2>
+    </div>
+    <div class="leaderboard-move {{ my_row.movement }}">{{ my_row.movement_label }}{% if my_row.movement_delta %} {{ my_row.movement_delta|abs }}{% endif %}</div>
+</div>
+{% endif %}
+
+<div class="table-responsive">
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Rank</th><th>Franchise</th><th>Movement</th><th>Actual</th><th>Target</th><th>Achievement</th><th>Detail</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+        <tr>
+            <td><strong>#{{ row.rank }}</strong></td>
+            <td>{{ row.franchise_name }}</td>
+            <td><span class="leaderboard-move {{ row.movement }}">{{ row.movement_label }}{% if row.movement_delta %} {{ row.movement_delta|abs }}{% endif %}</span></td>
+            <td>{{ '%.2f'|format(row.actual) }}</td>
+            <td>{{ '%.2f'|format(row.target) }}</td>
+            <td>{{ '%.2f'|format(row.achievement) }}%</td>
+            <td><a href="{{ url_for('performance.franchise', franchise_id=row.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open</a></td>
+        </tr>
+    {% else %}
+        <tr><td colspan="7">No performance data found for this period.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}
