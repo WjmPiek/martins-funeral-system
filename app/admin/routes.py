@@ -359,13 +359,31 @@ def users():
     db.session.commit()
 
     all_users = User.query.order_by(User.name, User.surname).all()
-    admin_side_users = [user for user in all_users if is_admin_side_user(user)]
-    all_franchise_side_users = [user for user in all_users if is_franchise_side_user(user)]
-    franchise_side_users = [user for user in all_franchise_side_users if franchise_user_has_active_data(user)]
-    old_franchise_users = [user for user in all_franchise_side_users if not franchise_user_has_active_data(user) and old_linked_franchises_for_user(user)]
-    other_users = [user for user in all_users if user not in admin_side_users and user not in all_franchise_side_users]
+    mother_company_users = [
+        user for user in all_users
+        if user.has_role("Admin")
+        or user.has_role("Finance Manager")
+        or user.has_role("Finance Assistant")
+        or user.has_role("Regional Manager")
+    ]
+    franchise_owner_users = [
+        user for user in all_users
+        if user.has_role("Franchise User") and not getattr(user, "parent_franchise_user_id", None)
+    ]
+    franchise_employee_users = [
+        user for user in all_users
+        if getattr(user, "parent_franchise_user_id", None)
+        or user.has_role("Franchise Manager")
+        or user.has_role("Franchise Employee")
+        or user.has_role("Franchise Agent")
+    ]
+    admin_side_users = mother_company_users
+    franchise_side_users = franchise_owner_users
+    all_franchise_side_users = franchise_owner_users + franchise_employee_users
+    old_franchise_users = [user for user in franchise_owner_users if not franchise_user_has_active_data(user) and old_linked_franchises_for_user(user)]
+    other_users = [user for user in all_users if user not in mother_company_users and user not in franchise_owner_users and user not in franchise_employee_users]
     linked_franchise_groups = []
-    for user in franchise_side_users:
+    for user in franchise_owner_users:
         linked = ordered_franchises_for_user(user)
         if len(linked) > 1:
             linked_franchise_groups.append({"user": user, "main": linked[0], "franchises": linked})
@@ -375,6 +393,9 @@ def users():
         users=all_users,
         admin_side_users=admin_side_users,
         franchise_side_users=franchise_side_users,
+        mother_company_users=mother_company_users,
+        franchise_owner_users=franchise_owner_users,
+        franchise_employee_users=franchise_employee_users,
         other_users=other_users,
         old_franchise_users=old_franchise_users,
         linked_franchise_groups=linked_franchise_groups,

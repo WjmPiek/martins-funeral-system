@@ -3,31 +3,25 @@
 <section class="page-section">
   <div class="section-header">
     <div>
-      <h1>Users by Franchise</h1>
-      <p>Users are separated between Martins Funerals South Africa/admin users and franchise-level users.</p>
-    </div>
-    <div class="quick-actions">
-      {% if can_assign_franchise_links %}
-      <form method="post" action="{{ url_for('admin.clean_finance_admin_users') }}">
-        <button type="submit" class="btn secondary button-auto">Clean Admin/Finance Users</button>
-      </form>
-      <form method="post" action="{{ url_for('admin.clear_franchise_user_links') }}" onsubmit="return confirm('Clear all linked franchises from Franchise User, Franchise Manager and Regional Manager users? Finance/Admin users will not be changed.');">
-        <button type="submit" class="btn secondary button-auto">Clear Franchise User Links</button>
-      </form>
-      {% endif %}
-      <form method="post" action="{{ url_for('admin.cleanup_inactive_users') }}">
-        <button type="submit" class="btn secondary button-auto">Deactivate Users Inactive 2+ Months</button>
-      </form>
+      <h1>Users</h1>
+      <p class="muted">Create and manage Martins Funerals South Africa users here. Franchise employees are created by franchise users from Franchise Details > Employees.</p>
     </div>
   </div>
 
-
   {% if can_create_admin_user %}
-  <div class="form-section-card">
-    <h2>Create Martins / Franchise User</h2>
-    <p class="muted">Admin creates Finance Manager, Finance Assistant, Regional Manager and Franchise User accounts here. Franchise users create their own Manager, Employee or Agent users from their Employee Users tab.</p>
+  <div class="form-section-card mother-company-create-card">
+    <h2>Create Martins User</h2>
+    <p class="muted">Use this form only for Mother Company users and registered franchise owner accounts.</p>
     <form method="post" action="{{ url_for('admin.create_admin_user') }}" class="professional-form">
       <div class="form-grid">
+        <label for="new_user_role">Role</label>
+        <select id="new_user_role" name="role_id" required>
+          <option value="">Select role...</option>
+          {% for role in admin_creatable_roles %}
+            <option value="{{ role.id }}" data-role-name="{{ role.name }}">{{ role.name }}</option>
+          {% endfor %}
+        </select>
+
         <label for="new_user_name">Name</label>
         <input id="new_user_name" name="name" required>
 
@@ -37,290 +31,121 @@
         <label for="new_user_email">Email</label>
         <input id="new_user_email" type="email" name="email" required>
 
-        <label for="new_user_password">Password</label>
-        <input id="new_user_password" type="password" name="password" required>
-
-        <label for="new_user_role">Role</label>
-        <select id="new_user_role" name="role_id" required>
-          <option value="">Select role...</option>
-          {% for role in admin_creatable_roles %}
-            <option value="{{ role.id }}" data-role-name="{{ role.name }}">{{ role.name }}</option>
-          {% endfor %}
-        </select>
+        <label for="new_user_password">Temporary Password</label>
+        <input id="new_user_password" type="text" name="password" required minlength="8">
 
         <label for="new_user_franchises" class="new-user-scope-field">Linked Franchise(s)</label>
-        <select id="new_user_franchises" class="new-user-scope-field" name="franchise_ids" multiple size="6">
+        <select id="new_user_franchises" class="new-user-scope-field" name="franchise_ids" multiple size="7">
           {% for franchise in franchises %}
             <option value="{{ franchise.id }}">{{ franchise.business_name or 'Unnamed Franchise' }}</option>
           {% endfor %}
         </select>
       </div>
-      <p class="muted" id="new-user-role-help">Choose the user role first. Franchise User and Regional Manager accounts need franchise scope. Finance Manager and Finance Assistant accounts are Martins admin-side users and will not be linked to any franchise.</p>
+      <div class="role-help-box" id="new-user-role-help">
+        Select a role first. Finance Manager and Finance Assistant do not link to franchises. Regional Manager links to one or more franchises. Franchise User links to the franchise account they own.
+      </div>
       <button type="submit" class="btn button-auto">Create User</button>
     </form>
   </div>
   {% endif %}
 
-  <div class="franchise-user-layout">
-    <div class="franchise-list-card franchise-selector-card">
-      <div class="franchise-tabs">
-        <button type="button" class="franchise-tab is-active" data-target="active-franchises">Active Franchises</button>
-        <button type="button" class="franchise-tab" data-target="old-franchises">Old Franchises <span class="badge warning">{{ old_franchises|length }}</span></button>
-      </div>
-
-      <input class="franchise-search-input" id="franchise-search" type="search" placeholder="Search franchise..." autocomplete="off">
-
-      <div class="franchise-tab-panel is-active" id="active-franchises">
-        <h2>Franchise Details</h2>
-        <p class="muted">Only active franchises appear here. Select a franchise to open its details page instantly.</p>
-        <select class="franchise-jump-select" id="franchise-jump-select">
-          <option value="">Select franchise...</option>
-          {% for franchise in franchises %}
-            <option value="{{ url_for('admin.users', franchise_id=franchise.id) }}">{{ franchise.business_name or 'Unnamed Franchise' }}</option>
-          {% endfor %}
-        </select>
-        <div class="franchise-list-scroll">
-        {% for franchise in franchises %}
-          <a class="franchise-list-item franchise-search-item" data-name="{{ (franchise.business_name or '')|lower }}" href="{{ url_for('admin.users', franchise_id=franchise.id) }}">
-            <strong>{{ franchise.business_name or 'Unnamed Franchise' }}</strong>
-            <span>Click to open franchise details</span>
-          </a>
-        {% else %}
-          <p class="muted">No active franchises captured yet.</p>
-        {% endfor %}
-        </div>
-      </div>
-
-      <div class="franchise-tab-panel" id="old-franchises">
-        <h2>Old Franchises</h2>
-        <p class="muted">These branches have no Cash, Sales, Insurance, Joinings or Funerals data in the last 3 months. They are hidden from targets, graphs and calculations until activated again.</p>
-        <h3>Hidden branches</h3>
-        <div class="franchise-list-scroll">
-        {% for row in old_franchises %}
-          {% set franchise = row.franchise %}
-          <div class="franchise-list-item old-franchise-row franchise-search-item" data-name="{{ (franchise.business_name or '')|lower }}">
-            <strong>{{ franchise.business_name or 'Unnamed Franchise' }}</strong>
-            <span>{{ row.reason }}</span>
-            <div class="old-franchise-actions">
-              <a class="btn secondary button-auto" href="{{ url_for('admin.users', franchise_id=franchise.id) }}">Open details</a>
-              {% if can_manage_old_franchises %}
-              <form method="post" action="{{ url_for('admin.reactivate_old_franchise', franchise_id=franchise.id) }}">
-                <button type="submit" class="btn button-auto">Activate</button>
-              </form>
-              {% endif %}
-            </div>
-          </div>
-        {% else %}
-          <p class="muted">No old franchises found.</p>
-        {% endfor %}
-        </div>
-
-        <h3>Franchise users linked only to old branches</h3>
-        <p class="muted">These users are separated from active franchise users because their linked branches are hidden from performance calculations.</p>
-        <div class="franchise-list-scroll">
-        {% for user in old_franchise_users %}
-          <div class="franchise-list-item old-franchise-row franchise-search-item" data-name="{{ ((user.full_name or '') ~ ' ' ~ (user.email or ''))|lower }}">
-            <strong>{{ user.full_name or user.email }}</strong>
-            <span>{{ user.email }}</span>
-            <div class="linked-branches">
-              {% for franchise in user.assigned_franchises %}
-                {% if not franchise.is_performance_active %}<span class="linked-branch-pill">{{ franchise.business_name or 'Unnamed Franchise' }}</span>{% endif %}
-              {% endfor %}
-            </div>
-          </div>
-        {% else %}
-          <p class="muted">No franchise users are linked only to old franchises.</p>
-        {% endfor %}
-        </div>
-      </div>
-    </div>
-
-    <div class="franchise-users-card">
-      <div class="form-section-card">
-        <h2>Active Registered Users</h2>
-        <p class="muted">Franchise users linked only to old/no-data branches are moved to the Old Franchises tab. Admin-side users are not franchise users and do not receive franchise links on this page.</p>
-      </div>
-
-      <div class="form-section-card linked-groups-card">
-        <h2>Linked Franchise Groups</h2>
-        {% if linked_franchise_groups %}
-          <p class="muted">These are the grouped franchise links used for grouped dashboard and royalty calculations.</p>
-          <div class="linked-group-list">
-            {% for group in linked_franchise_groups %}
-              <div class="linked-group-item">
-                <strong>{{ group.user.full_name }}</strong>
-                <span class="muted">{{ group.user.email }}</span>
-                <div><span class="badge success">Main: {{ group.main.business_name }}</span></div>
-                <div class="linked-branches">
-                  {% for franchise in group.franchises %}
-                    <span class="linked-branch-pill">{{ franchise.business_name or 'Unnamed Franchise' }}</span>
-                  {% endfor %}
-                </div>
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <p class="muted">No grouped franchise links yet. Link two or more franchises to the same franchise user to create a group, for example Dobsonville + Soweto.</p>
-        {% endif %}
-      </div>
-
-      {% macro user_rows(user_list, show_franchise_links=True) %}
-        {% for user in user_list %}
-        <tr class="{% if not user.is_active %}inactive-row{% endif %}">
-          <td>
-            <a href="#" class="user-name-link" onclick="openRoleModal('role-modal-{{ user.id }}'); return false;">
-              <strong>{{ user.full_name }}</strong>
-            </a>
-            {% if show_franchise_links and user.assigned_franchises %}
-              <div class="user-linked-summary">
-                Linked: {{ user.assigned_franchises|map(attribute='business_name')|join(' + ') }}
-              </div>
-            {% endif %}
-            <div class="modal-backdrop" id="role-modal-{{ user.id }}" aria-hidden="true">
-              <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="role-modal-title-{{ user.id }}">
-                <div class="modal-header">
-                  <div><h2 id="role-modal-title-{{ user.id }}">Manage User</h2><p>{{ user.full_name }} - {{ user.email }}</p></div>
-                  <button type="button" class="modal-close" onclick="closeRoleModal('role-modal-{{ user.id }}')">x</button>
-                </div>
-                {% if can_change_user_roles and not (user.email and user.email.lower() == 'wjm@martinsdirect.com') %}
-                <form method="post" action="{{ url_for('admin.update_user_roles', user_id=user.id) }}">
-                  <h3>Assign Roles</h3>
-                  <div class="modal-role-grid">
-                    {% for role in roles %}
-                    <label class="modal-role-option">
-                      <input type="checkbox" name="role_ids" value="{{ role.id }}" {% if role in user.roles %}checked{% endif %}>
-                      <span>{{ role.name }}</span>
-                    </label>
-                    {% endfor %}
-                  </div>
-                  <div class="modal-actions"><button type="submit" class="btn button-auto">Save Roles</button></div>
-                </form>
-                {% else %}
-                <div class="locked-role-box">
-                  <h3>Assigned Roles</h3>
-                  <p class="muted">Role changes are locked. Only Admin and Finance Assistant users with Users Edit permission may change user roles.</p>
-                  <p><strong>{{ user.roles|map(attribute='name')|join(', ') or 'No Role' }}</strong></p>
-                </div>
-                {% endif %}
-
-                {% if can_assign_franchise_links and show_franchise_links %}
-                <hr>
-                <form method="post" action="{{ url_for('admin.assign_user_franchises', user_id=user.id) }}">
-                  <h3>Link Franchises</h3>
-                  <p class="muted">Only linked franchises will show under this franchise user. If more than one franchise is selected, they form one grouped royalty calculation.</p>
-                  {% if user.assigned_franchises %}
-                    <div class="current-linked-box">
-                      <strong>Currently linked:</strong>
-                      {{ user.assigned_franchises|map(attribute='business_name')|join(' + ') }}
+  <div class="form-section-card">
+    <h2>Mother Company Users</h2>
+    <p class="muted">Admin, Finance Manager, Finance Assistant and Regional Manager users created under Martins Funerals South Africa.</p>
+    <div class="table-responsive">
+      <table class="system-report-table users-table">
+        <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Franchise Scope</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for user in mother_company_users %}
+          <tr class="{% if not user.is_active %}inactive-row{% endif %}">
+            <td><strong>{{ user.full_name }}</strong></td>
+            <td>{{ user.email }}</td>
+            <td>{{ user.roles|map(attribute='name')|join(', ') or 'No role' }}</td>
+            <td>{{ user.assigned_franchises|map(attribute='business_name')|join(' + ') or 'Not franchise-linked' }}</td>
+            <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
+            <td>
+              <button type="button" class="btn secondary small" onclick="openRoleModal('role-modal-{{ user.id }}')">Edit</button>
+              <div class="modal-backdrop" id="role-modal-{{ user.id }}" aria-hidden="true">
+                <div class="modal-card" role="dialog" aria-modal="true">
+                  <div class="modal-header"><div><h2>Edit User</h2><p>{{ user.email }}</p></div><button type="button" class="modal-close" onclick="closeRoleModal('role-modal-{{ user.id }}')">x</button></div>
+                  <form method="post" action="{{ url_for('admin.update_user_roles', user_id=user.id) }}">
+                    <div class="form-grid">
+                      <label>Roles</label>
+                      <div class="modal-role-grid">
+                        {% for role in roles %}
+                          {% if role.name in ['Admin','Finance Manager','Finance Assistant','Regional Manager','Franchise User'] %}
+                          <label class="modal-role-option"><input type="checkbox" name="role_ids" value="{{ role.id }}" {% if role in user.roles %}checked{% endif %}><span>{{ role.name }}</span></label>
+                          {% endif %}
+                        {% endfor %}
+                      </div>
+                      <label>Linked Franchise(s)</label>
+                      <div class="modal-role-grid">
+                        {% for franchise in franchises %}
+                        <label class="modal-role-option"><input type="checkbox" name="franchise_ids" value="{{ franchise.id }}" {% if franchise in user.assigned_franchises %}checked{% endif %}><span>{{ franchise.business_name or 'Unnamed Franchise' }}</span></label>
+                        {% endfor %}
+                      </div>
                     </div>
-                  {% endif %}
-                  <div class="modal-role-grid">
-                    {% for franchise in franchises %}
-                    <label class="modal-role-option">
-                      <input type="checkbox" name="franchise_ids" value="{{ franchise.id }}" {% if franchise in user.assigned_franchises %}checked{% endif %}>
-                      <span>{{ franchise.business_name or 'Unnamed Franchise' }}</span>
-                    </label>
-                    {% endfor %}
-                  </div>
-                  <div class="modal-actions">
-                    <button type="button" class="btn secondary button-auto" onclick="closeRoleModal('role-modal-{{ user.id }}')">Cancel</button>
-                    <button type="submit" class="btn button-auto">Save Franchise Links</button>
-                  </div>
-                </form>
-                {% elif not show_franchise_links %}
-                <hr><p class="muted">This user belongs under Martins Funerals South Africa/admin access, not under franchise users.</p>
-                {% else %}
-                <hr><p class="muted">Franchise linking is locked. Your role needs Franchise Management Manage and Users Edit.</p>
-                {% endif %}
+                    <div class="modal-actions"><button type="submit" class="btn button-auto">Save</button></div>
+                  </form>
+                </div>
               </div>
-            </div>
-          </td>
-          <td>{{ user.email }}</td>
-          <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
-          <td>{{ user.roles|map(attribute='name')|join(', ') or 'No Role' }}</td>
-        </tr>
-        {% endfor %}
-      {% endmacro %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="center-cell">No mother company users found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-      <div class="table-responsive">
-        <table class="system-report-table users-table">
-          <thead>
-            <tr><th>Name</th><th>Email</th><th>Status</th><th>Current Roles</th></tr>
-          </thead>
-          <tbody>
-            <tr class="table-divider"><td colspan="4"><strong>Martin's Funerals South Africa</strong> <span class="muted">Admin, Finance Manager, Finance Assistant, Regional Manager</span></td></tr>
-            {{ user_rows(admin_side_users, False) }}
-            {% if not admin_side_users %}<tr><td colspan="4" class="center-cell">No admin-side users found.</td></tr>{% endif %}
-
-            <tr class="table-divider"><td colspan="4"><strong>Franchise User</strong> <span class="muted">Franchise User, Franchise Manager, Read Only User</span></td></tr>
-            {{ user_rows(franchise_side_users, True) }}
-            {% if not franchise_side_users %}<tr><td colspan="4" class="center-cell">No franchise users found.</td></tr>{% endif %}
-
-            {% if other_users %}
-            <tr class="table-divider"><td colspan="4"><strong>Other / Unassigned Users</strong></td></tr>
-            {{ user_rows(other_users, False) }}
-            {% endif %}
-          </tbody>
-        </table>
-      </div>
+  <div class="form-section-card">
+    <h2>Franchise User Accounts</h2>
+    <p class="muted">These are the registered franchise owner/user accounts. Their employees are managed from the Employees sub tab.</p>
+    <div class="table-responsive">
+      <table class="system-report-table users-table">
+        <thead><tr><th>Franchise User</th><th>Email</th><th>Linked Franchise</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for user in franchise_owner_users %}
+          <tr class="{% if not user.is_active %}inactive-row{% endif %}">
+            <td><strong>{{ user.full_name }}</strong></td>
+            <td>{{ user.email }}</td>
+            <td>{{ user.assigned_franchises|map(attribute='business_name')|join(' + ') or 'Not linked' }}</td>
+            <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
+            <td><a class="btn secondary small" href="{{ url_for('admin.franchise_employees') }}">View Employees</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="center-cell">No franchise user accounts found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </section>
-
-
 <script>
-function openRoleModal(id) { const modal = document.getElementById(id); if (modal) { modal.classList.add("is-open"); modal.setAttribute("aria-hidden", "false"); } }
-function closeRoleModal(id) { const modal = document.getElementById(id); if (modal) { modal.classList.remove("is-open"); modal.setAttribute("aria-hidden", "true"); } }
-document.addEventListener("keydown", function(event) { if (event.key === "Escape") { document.querySelectorAll(".modal-backdrop.is-open").forEach(function(modal) { modal.classList.remove("is-open"); modal.setAttribute("aria-hidden", "true"); }); } });
-document.addEventListener("click", function(event) { if (event.target.classList.contains("modal-backdrop")) { event.target.classList.remove("is-open"); event.target.setAttribute("aria-hidden", "true"); } });
-</script>
-
-<style>
-.franchise-selector-card{position:sticky;top:1rem;align-self:start}.franchise-tabs{display:flex;gap:.4rem;margin-bottom:.75rem}.franchise-tab{border:1px solid #d8dee9;background:#f8fafc;border-radius:999px;padding:.55rem .75rem;font-weight:700;cursor:pointer}.franchise-tab.is-active{background:#17304f;color:#fff;border-color:#17304f}.franchise-search-input,.franchise-jump-select{width:100%;padding:.65rem .75rem;border:1px solid #cbd5e1;border-radius:10px;margin-bottom:.75rem}.franchise-tab-panel{display:none}.franchise-tab-panel.is-active{display:block}.franchise-list-scroll{max-height:66vh;overflow:auto;padding-right:.25rem}.old-franchise-row{background:#fff8e1;border-color:#f4c542}.old-franchise-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}.old-franchise-actions form{margin:0}
-</style>
-<script>
-(function(){
-  const tabs = document.querySelectorAll('.franchise-tab');
-  const panels = document.querySelectorAll('.franchise-tab-panel');
-  const search = document.getElementById('franchise-search');
-  const jump = document.getElementById('franchise-jump-select');
-  function showPanel(id){tabs.forEach(t=>t.classList.toggle('is-active', t.dataset.target===id)); panels.forEach(p=>p.classList.toggle('is-active', p.id===id)); filterItems();}
-  function filterItems(){const q=(search&&search.value||'').toLowerCase().trim(); document.querySelectorAll('.franchise-tab-panel.is-active .franchise-search-item').forEach(item=>{item.style.display=!q || (item.dataset.name||'').includes(q) ? '' : 'none';});}
-  tabs.forEach(tab=>tab.addEventListener('click',()=>showPanel(tab.dataset.target)));
-  if(search){search.addEventListener('input', filterItems);}
-  if(jump){jump.addEventListener('change', function(){ if(this.value){ window.location.href=this.value; } });}
-})();
-</script>
-
-<script>
+function openRoleModal(id){const modal=document.getElementById(id); if(modal){modal.classList.add('is-open'); modal.setAttribute('aria-hidden','false');}}
+function closeRoleModal(id){const modal=document.getElementById(id); if(modal){modal.classList.remove('is-open'); modal.setAttribute('aria-hidden','true');}}
+document.addEventListener('click', function(event){ if(event.target.classList && event.target.classList.contains('modal-backdrop')) closeRoleModal(event.target.id); });
 (function(){
   const roleSelect = document.getElementById('new_user_role');
-  const scopeFields = Array.from(document.querySelectorAll('.new-user-scope-field'));
-  const franchiseSelect = document.getElementById('new_user_franchises');
+  const scopeFields = document.querySelectorAll('.new-user-scope-field');
   const help = document.getElementById('new-user-role-help');
-  const rolesNeedingScope = new Set(['Regional Manager', 'Franchise User']);
-
-  function updateCreateUserScope(){
-    if(!roleSelect){ return; }
-    const selected = roleSelect.options[roleSelect.selectedIndex];
-    const roleName = selected ? selected.getAttribute('data-role-name') : '';
-    const needsScope = rolesNeedingScope.has(roleName);
-    scopeFields.forEach(function(el){ el.style.display = needsScope ? '' : 'none'; });
-    if(franchiseSelect){
-      franchiseSelect.required = needsScope;
-      if(!needsScope){ Array.from(franchiseSelect.options).forEach(function(option){ option.selected = false; }); }
-    }
+  function updateScope(){
+    if(!roleSelect) return;
+    const option = roleSelect.options[roleSelect.selectedIndex];
+    const role = option ? option.getAttribute('data-role-name') : '';
+    const needsScope = role === 'Regional Manager' || role === 'Franchise User';
+    scopeFields.forEach(el => { el.style.display = needsScope ? '' : 'none'; });
+    const scopeSelect = document.getElementById('new_user_franchises');
+    if(scopeSelect){ scopeSelect.required = needsScope; if(!needsScope){ Array.from(scopeSelect.options).forEach(o => o.selected = false); }}
     if(help){
-      help.textContent = needsScope
-        ? 'This role must be linked to one or more active franchises. Only that scoped data will be visible.'
-        : 'This is a Martins admin-side role. It will not be placed under any franchise user or linked to franchise data.';
+      if(role === 'Finance Manager' || role === 'Finance Assistant') help.textContent = role + ' is a Martins Funerals South Africa user and is not linked to a franchise.';
+      else if(role === 'Regional Manager') help.textContent = 'Regional Manager must be linked to one or more franchises they manage.';
+      else if(role === 'Franchise User') help.textContent = 'Franchise User must be linked to the franchise account they own.';
+      else help.textContent = 'Select a role first.';
     }
   }
-
-  if(roleSelect){
-    roleSelect.addEventListener('change', updateCreateUserScope);
-    updateCreateUserScope();
-  }
+  if(roleSelect){ roleSelect.addEventListener('change', updateScope); updateScope(); }
 })();
 </script>
 {% endblock %}

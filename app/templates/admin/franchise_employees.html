@@ -3,42 +3,35 @@
 <section class="page-section">
   <div class="section-header">
     <div>
-      <h1>Employees</h1>
-      <p class="muted">Admin view of all employee users created under franchise users. Admin can view, edit, deactivate and relink them.</p>
+      <h1>Franchise Employees</h1>
+      <p class="muted">Master list of employees created by franchise users. Admin can view, edit, deactivate, relink or reset passwords here. New employees are normally created by the franchise owner from Franchise Details > Employees.</p>
     </div>
   </div>
 
   <div class="table-responsive">
     <table class="system-report-table users-table">
-      <thead>
-        <tr><th>Employee</th><th>Email</th><th>Created Under</th><th>Franchise</th><th>Status</th><th>Actions</th></tr>
-      </thead>
+      <thead><tr><th>Employee</th><th>Email</th><th>Employee Type</th><th>Created Under</th><th>Franchise</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
         {% for user in employees %}
         <tr class="{% if not user.is_active %}inactive-row{% endif %}">
           <td><strong>{{ user.full_name }}</strong></td>
           <td>{{ user.email }}</td>
+          <td>{{ user.primary_role_name.replace('Franchise ', '') }}</td>
           <td>{% set owner = owners.get(user.parent_franchise_user_id) %}{{ owner.full_name if owner else 'No owner linked' }}</td>
           <td>{{ user.assigned_franchises|map(attribute='business_name')|join(' + ') or 'Not linked' }}</td>
           <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
           <td>
             <button type="button" class="btn secondary small" onclick="openAdminEmployeeModal('admin-employee-modal-{{ user.id }}')">Edit</button>
-            <form method="post" action="{{ url_for('admin.delete_franchise_employee', user_id=user.id) }}" class="inline-form" onsubmit="return confirm('Deactivate this employee user?');">
-              <button type="submit" class="danger-btn small">Delete</button>
-            </form>
+            <form method="post" action="{{ url_for('admin.delete_franchise_employee', user_id=user.id) }}" class="inline-form" onsubmit="return confirm('Deactivate this franchise employee user?');"><button type="submit" class="danger-btn small">Delete</button></form>
             <div class="modal-backdrop" id="admin-employee-modal-{{ user.id }}" aria-hidden="true">
               <div class="modal-card" role="dialog" aria-modal="true">
-                <div class="modal-header">
-                  <div><h2>Edit Employee</h2><p>{{ user.email }}</p></div>
-                  <button type="button" class="modal-close" onclick="closeAdminEmployeeModal('admin-employee-modal-{{ user.id }}')">x</button>
-                </div>
+                <div class="modal-header"><div><h2>Edit Franchise Employee</h2><p>{{ user.email }}</p></div><button type="button" class="modal-close" onclick="closeAdminEmployeeModal('admin-employee-modal-{{ user.id }}')">x</button></div>
                 <form method="post" action="{{ url_for('admin.update_franchise_employee', user_id=user.id) }}">
                   <div class="form-grid">
                     <label>Name</label><input name="name" value="{{ user.name }}" required>
                     <label>Surname</label><input name="surname" value="{{ user.surname }}" required>
                     <label>New Password</label><input name="password" type="text" placeholder="Leave blank to keep current password">
-                    <label>Status</label>
-                    <select name="is_active"><option value="1" {% if user.is_active %}selected{% endif %}>Active</option><option value="0" {% if not user.is_active %}selected{% endif %}>Inactive</option></select>
+                    <label>Status</label><select name="is_active"><option value="1" {% if user.is_active %}selected{% endif %}>Active</option><option value="0" {% if not user.is_active %}selected{% endif %}>Inactive</option></select>
                     <label>Franchise Links</label>
                     <div class="modal-role-grid">
                       {% for franchise in franchises %}
@@ -52,9 +45,7 @@
             </div>
           </td>
         </tr>
-        {% else %}
-        <tr><td colspan="6" class="center-cell">No employees found.</td></tr>
-        {% endfor %}
+        {% else %}<tr><td colspan="7" class="center-cell">No franchise employees found.</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>

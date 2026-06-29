@@ -3,14 +3,14 @@
 <section class="page-section">
   <div class="section-header">
     <div>
-      <h1>My Franchise Users</h1>
-      <p class="muted">Create Manager, Employee or Agent users under your own franchise. They only see data for the franchise they are linked to and never see the Admin system.</p>
+      <h1>Employees</h1>
+      <p class="muted">Create Manager, Employee or Agent users under your own franchise. These users only see your franchise data.</p>
     </div>
   </div>
 
   {% if franchises %}
   <div class="form-section-card">
-    <h2>Create Franchise User</h2>
+    <h2>Add Employee</h2>
     <form method="post" class="professional-form compact-form">
       <div class="form-grid">
         <label for="franchise_id">Franchise</label>
@@ -20,9 +20,9 @@
           {% endfor %}
         </select>
 
-        <label for="role_id">User Type</label>
+        <label for="role_id">Employee Type</label>
         <select id="role_id" name="role_id" required>
-          <option value="">Select user type...</option>
+          <option value="">Select employee type...</option>
           {% for role in creatable_roles %}
             <option value="{{ role.id }}">{{ role.name.replace('Franchise ', '') }}</option>
           {% endfor %}
@@ -40,18 +40,18 @@
         <label for="password">Temporary Password</label>
         <input id="password" name="password" type="text" required minlength="8">
       </div>
-      <div class="form-actions"><button type="submit" class="button-auto">Create User</button></div>
+      <div class="form-actions"><button type="submit" class="button-auto">Add Employee</button></div>
     </form>
   </div>
+  {% else %}
+  <div class="alert warning">Your franchise user account is not linked to a franchise yet. Ask Admin to link your Franchise User account before creating employees.</div>
   {% endif %}
 
   <div class="form-section-card">
-    <h2>Users Created By Me</h2>
+    <h2>My Employees</h2>
     <div class="table-responsive">
       <table class="system-report-table users-table">
-        <thead>
-          <tr><th>Name</th><th>Email</th><th>User Type</th><th>Franchise</th><th>Status</th><th>Actions</th></tr>
-        </thead>
+        <thead><tr><th>Name</th><th>Email</th><th>Employee Type</th><th>Franchise</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
           {% for user in employees %}
           <tr class="{% if not user.is_active %}inactive-row{% endif %}">
@@ -67,23 +67,19 @@
               </form>
               <div class="modal-backdrop" id="employee-modal-{{ user.id }}" aria-hidden="true">
                 <div class="modal-card" role="dialog" aria-modal="true">
-                  <div class="modal-header">
-                    <div><h2>Edit Employee</h2><p>{{ user.email }}</p></div>
-                    <button type="button" class="modal-close" onclick="closeEmployeeModal('employee-modal-{{ user.id }}')">x</button>
-                  </div>
+                  <div class="modal-header"><div><h2>Edit Employee</h2><p>{{ user.email }}</p></div><button type="button" class="modal-close" onclick="closeEmployeeModal('employee-modal-{{ user.id }}')">x</button></div>
                   <form method="post" action="{{ url_for('franchise.update_employee', user_id=user.id) }}">
                     <div class="form-grid">
                       <label>Name</label><input name="name" value="{{ user.name }}" required>
                       <label>Surname</label><input name="surname" value="{{ user.surname }}" required>
-                      <label>User Type</label>
+                      <label>Employee Type</label>
                       <select name="role_id" required>
                         {% for role in creatable_roles %}
                           <option value="{{ role.id }}" {% if role in user.roles %}selected{% endif %}>{{ role.name.replace('Franchise ', '') }}</option>
                         {% endfor %}
                       </select>
                       <label>New Password</label><input name="password" type="text" placeholder="Leave blank to keep current password">
-                      <label>Status</label>
-                      <select name="is_active"><option value="1" {% if user.is_active %}selected{% endif %}>Active</option><option value="0" {% if not user.is_active %}selected{% endif %}>Inactive</option></select>
+                      <label>Status</label><select name="is_active"><option value="1" {% if user.is_active %}selected{% endif %}>Active</option><option value="0" {% if not user.is_active %}selected{% endif %}>Inactive</option></select>
                     </div>
                     <div class="modal-actions"><button type="submit" class="btn button-auto">Save</button></div>
                   </form>
@@ -92,7 +88,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="6" class="center-cell">No franchise users created yet.</td></tr>
+          <tr><td colspan="6" class="center-cell">No employees created yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
