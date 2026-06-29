@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
+from flask import g, has_request_context
 from sqlalchemy import func
 
 from app.extensions import db
@@ -47,11 +48,7 @@ PERFORMANCE_METRICS = {
     },
     "funerals": {
         "label": "Funerals",
-        # Imported monthly PDF/Excel files store the operational funeral count as MF Files.
-        # Some older/manual records may use number_of_funerals, so metric_field_expression()
-        # below adds both fields when available.
-        "source_field": "mf_files",
-        "fallback_fields": ["number_of_funerals"],
+        "source_field": "number_of_funerals",
         "format": "number",
         "weight": Decimal("0.10"),
         "higher_is_better": True,
@@ -71,6 +68,40 @@ DEFAULT_GROWTH_PERCENT = Decimal("10")
 SCORE_CAP_PERCENT = Decimal("150")
 
 
+def _performance_cache():
+    """Small per-request cache for expensive analytics queries.
+
+    Performance pages often call the same monthly aggregate repeatedly while
+    building KPI cards, graphs, leaderboards and target explanations. Keeping
+    the cache on Flask's request context avoids stale data across requests while
+    removing dozens/hundreds of duplicate SQL queries from a single page load.
+    """
+    if not has_request_context():
+        return None
+    cache = getattr(g, "performance_cache", None)
+    if cache is None:
+        cache = {}
+        g.performance_cache = cache
+    return cache
+
+
+def _cached_value(key, factory):
+    cache = _performance_cache()
+    if cache is None:
+        return factory()
+    if key not in cache:
+        cache[key] = factory()
+    return cache[key]
+
+
+def _ids_key(franchise_ids):
+    return tuple(sorted(int(fid) for fid in franchise_ids or []))
+
+
+def _metrics_key(metric_keys):
+    return tuple(metric_keys or PERFORMANCE_METRICS.keys())
+
+
 def to_decimal(value):
     if value is None:
         return Decimal("0")
@@ -85,6 +116,65 @@ def growth_rate(value, baseline):
         return Decimal("0")
     return ((value - baseline) / baseline * Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
+
+
+
+def growth_status(growth_percent):
+    """Traffic-light status for franchise growth.
+
+    Green = growing greater than 10%, yellow = stable 0-10%, red = declining below 0%.
+    """
+    growth = to_decimal(growth_percent)
+    if growth > Decimal("10"):
+        return {"label": "Growing", "colour": "green", "class": "success"}
+    if growth >= Decimal("0"):
+        return {"label": "Stable", "colour": "yellow", "class": "warning"}
+    return {"label": "Declining", "colour": "red", "class": "danger"}
+
+
+def ytd_actual(franchise_id, metric_key, month, year):
+    total = Decimal("0")
+    for m in range(1, month + 1):
+        total += period_actuals(m, year, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+    return round_money(total)
+
+
+def monthly_growth_percent(franchise_id, metric_key, month, year):
+    actual = period_actuals(month, year, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+    prev_m, prev_y = previous_month(month, year)
+    previous = period_actuals(prev_m, prev_y, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+    return growth_rate(actual, previous)
+
+
+def year_to_date_growth_percent(franchise_id, metric_key, month, year):
+    current_ytd = ytd_actual(franchise_id, metric_key, month, year)
+    previous_ytd = ytd_actual(franchise_id, metric_key, month, year - 1)
+    return growth_rate(current_ytd, previous_ytd)
+
+
+def annual_growth_percent_formula(franchise_id, metric_key, year):
+    current_year = annual_actual(franchise_id, metric_key, year)
+    previous_year = annual_actual(franchise_id, metric_key, year - 1)
+    return growth_rate(current_year, previous_year)
+
+
+def average_monthly_growth_percent(franchise_id, metric_key, end_month, end_year, periods=12):
+    growth_values = []
+    m, y = end_month, end_year
+    for _ in range(periods):
+        actual = period_actuals(m, y, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+        prev_m, prev_y = previous_month(m, y)
+        previous = period_actuals(prev_m, prev_y, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+        if previous > 0:
+            growth_values.append(growth_rate(actual, previous))
+        m, y = prev_m, prev_y
+    return safe_average(growth_values).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP) if growth_values else Decimal("0")
+
+
+def three_year_growth_percent(franchise_id, metric_key, month, year):
+    current = period_actuals(month, year, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+    base = period_actuals(month, year - 3, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+    return growth_rate(current, base)
 
 def safe_average(values):
     values = [to_decimal(value) for value in values if to_decimal(value) > 0]
@@ -116,12 +206,7 @@ def historical_basis_value(franchise_id, metric_key, month, year):
 def bracket_growth_percent(franchise_id, metric_key, month, year):
     basis_metric = default_basis_metric(metric_key)
     basis_value = historical_basis_value(franchise_id, basis_metric, month, year)
-    brackets = (
-        PerformanceGrowthBracket.query
-        .filter_by(metric=metric_key, is_active=True)
-        .order_by(PerformanceGrowthBracket.amount_from.asc())
-        .all()
-    )
+    brackets = active_growth_brackets(metric_key)
     if not brackets:
         # Fallback keeps Phase 1 safe before Head Office edits brackets.
         if metric_key in ("joinings", "funerals"):
@@ -147,6 +232,22 @@ def bracket_growth_percent(franchise_id, metric_key, month, year):
 
 
 
+
+
+def active_growth_brackets(metric_key):
+    cache_key = ("active_growth_brackets", metric_key)
+
+    def load():
+        return (
+            PerformanceGrowthBracket.query
+            .filter_by(metric=metric_key, is_active=True)
+            .order_by(PerformanceGrowthBracket.amount_from.asc())
+            .all()
+        )
+
+    return _cached_value(cache_key, load)
+
+
 def growth_bracket_label(bracket):
     if not bracket:
         return "Default bracket"
@@ -165,12 +266,7 @@ def selected_growth_bracket(franchise_id, metric_key, month, year):
     """
     basis_metric = default_basis_metric(metric_key)
     basis_value = historical_basis_value(franchise_id, basis_metric, month, year)
-    brackets = (
-        PerformanceGrowthBracket.query
-        .filter_by(metric=metric_key, is_active=True)
-        .order_by(PerformanceGrowthBracket.amount_from.asc())
-        .all()
-    )
+    brackets = active_growth_brackets(metric_key)
     for bracket in brackets:
         low = to_decimal(bracket.amount_from)
         high = to_decimal(bracket.amount_to) if bracket.amount_to is not None else None
@@ -193,6 +289,9 @@ def bracket_target_details(franchise_id, metric_key, month, year):
         "target_value": target_value,
         "bracket_id": bracket.id if bracket else None,
         "bracket_label": growth_bracket_label(bracket),
+        "formula": "Target = Previous comparable value x (1 + bracket growth %)",
+        "growth_formula": "Growth % = (Current Period - Previous Period) / Previous Period x 100",
+        "growth_status": growth_status(growth_percent),
     }
 
 
@@ -252,12 +351,6 @@ def previous_month(month, year):
     return (12, year - 1) if month == 1 else (month - 1, year)
 
 
-def default_graph_period():
-    """Graphs open on the last completed month by default."""
-    now = datetime.now()
-    return previous_month(now.month, now.year)
-
-
 def same_month_last_year(month, year):
     return month, year - 1
 
@@ -302,7 +395,7 @@ def has_recent_performance_data(franchise_id, month, year, periods=3):
     conditions = []
     for m, y in period_pairs:
         conditions.append((MonthlyFigure.month == m) & (MonthlyFigure.year == y))
-    total_columns = [func.coalesce(func.sum(metric_field_expression(metric_key)), 0) for metric_key in PERFORMANCE_METRICS]
+    total_columns = [func.coalesce(func.sum(metric_field(metric_key)), 0) for metric_key in PERFORMANCE_METRICS]
     row = (
         db.session.query(*total_columns)
         .filter(MonthlyFigure.franchise_id == franchise_id)
@@ -362,89 +455,84 @@ def reactivate_franchise_performance(franchise_id, user_id=None):
 
 def selected_period_from_request(args):
     now = datetime.now()
+    default_month, default_year = previous_month(now.month, now.year)
     try:
-        month = int(args.get("month", now.month))
+        month = int(args.get("month", default_month))
     except Exception:
-        month = now.month
+        month = default_month
     try:
-        year = int(args.get("year", now.year))
+        year = int(args.get("year", default_year))
     except Exception:
-        year = now.year
+        year = default_year
     if month < 1 or month > 12:
-        month = now.month
+        month = default_month
     if year < 2000 or year > 2100:
-        year = now.year
+        year = default_year
     return month, year
 
 
 def reporting_years():
-    current_year = datetime.now().year
-    years = [row[0] for row in db.session.query(MonthlyFigure.year).distinct().order_by(MonthlyFigure.year.desc()).all()]
-    if current_year not in years:
-        years.insert(0, current_year)
-    return years
+    def load():
+        current_year = datetime.now().year
+        years = [row[0] for row in db.session.query(MonthlyFigure.year).distinct().order_by(MonthlyFigure.year.desc()).all()]
+        if current_year not in years:
+            years.insert(0, current_year)
+        return years
+    return _cached_value(("reporting_years",), load)
 
 
 def metric_field(metric_key):
     return getattr(MonthlyFigure, PERFORMANCE_METRICS[metric_key]["source_field"])
 
 
-def metric_field_expression(metric_key):
-    """Return the SQL expression used for KPI actuals.
-
-    Funerals must not disappear from graphs: current imports capture funerals as
-    MF Files, while older/manual records may use number_of_funerals.  Add both
-    fields when they exist so the graph, leaderboard and inactivity scan all use
-    the same live value.
-    """
-    config = PERFORMANCE_METRICS[metric_key]
-    fields = [config["source_field"]] + list(config.get("fallback_fields", []))
-    expression = None
-    for field_name in fields:
-        if not hasattr(MonthlyFigure, field_name):
-            continue
-        column = func.coalesce(getattr(MonthlyFigure, field_name), 0)
-        expression = column if expression is None else expression + column
-    if expression is None:
-        expression = func.coalesce(metric_field(metric_key), 0)
-    return expression
-
-
 def period_actuals(month, year, franchise_ids, metric_keys=None):
     franchise_ids = filter_active_franchise_ids(franchise_ids)
-    metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
+    metric_keys = list(metric_keys or PERFORMANCE_METRICS.keys())
     if not franchise_ids:
         return {}
-    columns = [MonthlyFigure.franchise_id]
-    for metric_key in metric_keys:
-        columns.append(func.coalesce(func.sum(metric_field_expression(metric_key)), 0).label(metric_key))
-    rows = (
-        db.session.query(*columns)
-        .filter(MonthlyFigure.franchise_id.in_(franchise_ids))
-        .filter(MonthlyFigure.month == month, MonthlyFigure.year == year)
-        .group_by(MonthlyFigure.franchise_id)
-        .all()
-    )
-    return {
-        row.franchise_id: {metric_key: to_decimal(getattr(row, metric_key)) for metric_key in metric_keys}
-        for row in rows
-    }
+
+    cache_key = ("period_actuals", int(month), int(year), _ids_key(franchise_ids), _metrics_key(metric_keys))
+
+    def load():
+        columns = [MonthlyFigure.franchise_id]
+        for metric_key in metric_keys:
+            columns.append(func.coalesce(func.sum(metric_field(metric_key)), 0).label(metric_key))
+        rows = (
+            db.session.query(*columns)
+            .filter(MonthlyFigure.franchise_id.in_(franchise_ids))
+            .filter(MonthlyFigure.month == month, MonthlyFigure.year == year)
+            .group_by(MonthlyFigure.franchise_id)
+            .all()
+        )
+        return {
+            row.franchise_id: {metric_key: to_decimal(getattr(row, metric_key)) for metric_key in metric_keys}
+            for row in rows
+        }
+
+    return _cached_value(cache_key, load)
 
 
 def stored_targets(month, year, franchise_ids, metric_keys=None):
-    metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
+    metric_keys = list(metric_keys or PERFORMANCE_METRICS.keys())
+    franchise_ids = list(franchise_ids or [])
     if not franchise_ids:
         return {}
-    rows = FranchiseTarget.query.filter(
-        FranchiseTarget.franchise_id.in_(franchise_ids),
-        FranchiseTarget.year == year,
-        FranchiseTarget.month == month,
-        FranchiseTarget.metric.in_(metric_keys),
-    ).all()
-    targets = {}
-    for row in rows:
-        targets.setdefault(row.franchise_id, {})[row.metric] = to_decimal(row.target_value)
-    return targets
+
+    cache_key = ("stored_targets", int(month), int(year), _ids_key(franchise_ids), _metrics_key(metric_keys))
+
+    def load():
+        rows = FranchiseTarget.query.filter(
+            FranchiseTarget.franchise_id.in_(franchise_ids),
+            FranchiseTarget.year == year,
+            FranchiseTarget.month == month,
+            FranchiseTarget.metric.in_(metric_keys),
+        ).all()
+        targets = {}
+        for row in rows:
+            targets.setdefault(row.franchise_id, {})[row.metric] = to_decimal(row.target_value)
+        return targets
+
+    return _cached_value(cache_key, load)
 
 
 def auto_target_for(franchise_id, metric_key, month, year, mode="previous_year_growth", growth_percent=DEFAULT_GROWTH_PERCENT):
@@ -518,6 +606,12 @@ def franchise_metric_summary(franchise_id, month, year, mode="manual", growth_pe
         last_year = comparison_value(franchise_id, metric_key, month, year, "same_month_last_year")
         three_year = comparison_value(franchise_id, metric_key, month, year, "three_year_average")
         bracket_details = bracket_target_details(franchise_id, metric_key, month, year)
+        mom_growth = growth_rate(actual, previous)
+        yoy_growth = growth_rate(actual, last_year)
+        ytd_growth = year_to_date_growth_percent(franchise_id, metric_key, month, year)
+        annual_growth = annual_growth_percent_formula(franchise_id, metric_key, year)
+        average_growth = average_monthly_growth_percent(franchise_id, metric_key, month, year, 12)
+        three_year_growth = three_year_growth_percent(franchise_id, metric_key, month, year)
         rows.append({
             "key": metric_key,
             "label": config["label"],
@@ -529,9 +623,21 @@ def franchise_metric_summary(franchise_id, month, year, mode="manual", growth_pe
             "previous_month": previous,
             "previous_month_difference": actual - previous,
             "previous_month_percent": percent(actual, previous),
+            "monthly_growth_percent": mom_growth,
+            "monthly_growth_status": growth_status(mom_growth),
             "same_month_last_year": last_year,
             "same_month_last_year_difference": actual - last_year,
             "same_month_last_year_percent": percent(actual, last_year),
+            "same_month_last_year_growth_percent": yoy_growth,
+            "same_month_last_year_growth_status": growth_status(yoy_growth),
+            "ytd_growth_percent": ytd_growth,
+            "ytd_growth_status": growth_status(ytd_growth),
+            "annual_growth_percent": annual_growth,
+            "annual_growth_status": growth_status(annual_growth),
+            "average_monthly_growth_percent": average_growth,
+            "average_monthly_growth_status": growth_status(average_growth),
+            "three_year_growth_percent": three_year_growth,
+            "three_year_growth_status": growth_status(three_year_growth),
             "three_year_average": three_year,
             "three_year_average_difference": actual - three_year,
             "three_year_average_percent": percent(actual, three_year),
@@ -565,7 +671,9 @@ def performance_score(actuals, targets):
 
 def ranked_performance(month, year, franchise_ids, mode="manual", growth_percent=DEFAULT_GROWTH_PERCENT, metric_key="overall"):
     franchise_ids = filter_active_franchise_ids(franchise_ids)
-    franchises = Franchise.query.filter(Franchise.id.in_(franchise_ids)).order_by(Franchise.business_name.asc()).all() if franchise_ids else []
+    def load_franchises():
+        return Franchise.query.filter(Franchise.id.in_(franchise_ids)).order_by(Franchise.business_name.asc()).all() if franchise_ids else []
+    franchises = _cached_value(("franchises", _ids_key(franchise_ids)), load_franchises)
     actuals_by = period_actuals(month, year, franchise_ids)
     targets_by = targets_for_period(month, year, franchise_ids, mode, growth_percent)
     rows = []
@@ -694,10 +802,21 @@ def rebuild_performance_results(month, year, franchise_ids=None, mode="growth_br
             if not result:
                 result = PerformanceResult(franchise_id=franchise_id, metric=metric_key, year=year, month=month)
                 db.session.add(result)
+            # Automatically persist generated targets per franchise/user when Head Office
+            # has not captured a manual target for this month yet.  This keeps the
+            # target history stable after each PDF/monthly import or recalculation.
+            existing_target = FranchiseTarget.query.filter_by(
+                franchise_id=franchise_id, metric=metric_key, year=year, month=month
+            ).first()
+            if not existing_target and target > 0:
+                db.session.add(FranchiseTarget(
+                    franchise_id=franchise_id, metric=metric_key, year=year, month=month, target_value=round_money(target)
+                ))
+
             result.actual_value = round_money(actual)
             result.target_value = round_money(target)
             result.achievement_percent = percent(actual, target)
-            result.growth_percent = growth_rate(actual, last_year or previous)
+            result.growth_percent = growth_rate(actual, previous)
             result.previous_month_value = round_money(previous)
             result.same_month_last_year_value = round_money(last_year)
             result.three_year_average_value = round_money(three_year)
@@ -1596,101 +1715,4 @@ def user_access_summary(user):
         "visible_modules": visible_modules,
         "franchises": franchises,
         "scope_label": "All franchises" if user.has_permission("franchise_management:view") or user.has_permission("franchise_management:manage") else f"{len(franchises)} assigned franchise(s)",
-    }
-
-# Phase 13: graph-only performance dashboard helpers
-
-def active_franchises_for_ids(franchise_ids):
-    ids = filter_active_franchise_ids(franchise_ids)
-    if not ids:
-        return []
-    return Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all()
-
-
-def group_period_actual(month, year, franchise_ids, metric_key):
-    ids = filter_active_franchise_ids(franchise_ids)
-    if not ids:
-        return Decimal("0")
-    total = Decimal("0")
-    rows = period_actuals(month, year, ids, [metric_key])
-    for franchise_id in ids:
-        total += rows.get(franchise_id, {}).get(metric_key, Decimal("0"))
-    return round_money(total)
-
-
-def group_period_target(month, year, franchise_ids, metric_key, mode="growth_bracket", growth_percent=DEFAULT_GROWTH_PERCENT):
-    ids = filter_active_franchise_ids(franchise_ids)
-    if not ids:
-        return Decimal("0")
-    total = Decimal("0")
-    rows = targets_for_period(month, year, ids, mode, growth_percent, [metric_key])
-    for franchise_id in ids:
-        total += rows.get(franchise_id, {}).get(metric_key, Decimal("0"))
-    return round_money(total)
-
-
-def graph_periods_ending(month, year, periods=12):
-    items = []
-    m, y = month, year
-    for _ in range(periods):
-        items.append((m, y))
-        m, y = previous_month(m, y)
-    items.reverse()
-    return items
-
-
-def graph_payload_for_scope(metric_key, month, year, franchise_ids=None, franchise_id=None, periods=12, mode="growth_bracket", growth_percent=DEFAULT_GROWTH_PERCENT):
-    """Return physical graph payload for either one franchise or the whole active group."""
-    if metric_key not in PERFORMANCE_METRICS:
-        metric_key = "cash"
-    config = PERFORMANCE_METRICS[metric_key]
-    is_money = config.get("format") == "money"
-    prefix = "R" if is_money else ""
-    suffix = "" if is_money else ""
-    periods_list = graph_periods_ending(month, year, periods)
-    scope_ids = filter_active_franchise_ids(franchise_ids or [])
-    points = []
-    for m, y in periods_list:
-        if franchise_id:
-            actual = period_actuals(m, y, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
-            target = targets_for_period(m, y, [franchise_id], mode, growth_percent, [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
-            previous_year = period_actuals(m, y - 1, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
-        else:
-            actual = group_period_actual(m, y, scope_ids, metric_key)
-            target = group_period_target(m, y, scope_ids, metric_key, mode, growth_percent)
-            previous_year = group_period_actual(m, y - 1, scope_ids, metric_key)
-        forecast = actual
-        prev_m, prev_y = previous_month(m, y)
-        previous_month_value = period_actuals(prev_m, prev_y, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0")) if franchise_id else group_period_actual(prev_m, prev_y, scope_ids, metric_key)
-        points.append({
-            "label": f"{MONTH_NAME.get(m, m)[:3]} {y}",
-            "actual": float(actual),
-            "target": float(target),
-            "previous_year": float(previous_year),
-            "forecast": float(forecast),
-            "growth_percent": float(growth_rate(actual, previous_month_value)),
-        })
-    return {
-        "metric": metric_key,
-        "metric_label": config["label"],
-        "value_prefix": prefix,
-        "value_suffix": suffix,
-        "actual_vs_target": {
-            "points": points,
-            "series": [{"key": "actual", "label": "Actual"}, {"key": "target", "label": "Target"}],
-        },
-        "previous_year": {
-            "points": points,
-            "series": [{"key": "actual", "label": "Actual"}, {"key": "previous_year", "label": "Same Month Last Year"}],
-        },
-        "forecast": {
-            "points": points,
-            "series": [{"key": "forecast", "label": "Forecast"}, {"key": "target", "label": "Target"}],
-        },
-        "growth": {
-            "points": points,
-            "series": [{"key": "growth_percent", "label": "Growth %"}],
-            "value_prefix": "",
-            "value_suffix": "%",
-        },
     }

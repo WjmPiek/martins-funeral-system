@@ -70,17 +70,17 @@ def admin_creatable_roles():
 
 def can_create_admin_user():
     # Admin must always be able to create Martins mother-company users.
-    # Finance Manager can create the allowed lower-level roles when the Users Add permission is ticked.
+    # Finance Manager may create allowed roles when Users Add permission is ticked.
     return is_current_user_admin() or (current_user.has_role("Finance Manager") and current_user.has_permission("users:add"))
+
 
 
 def current_user_role_names():
     """Return role names robustly, including legacy/display role fields.
 
-    Some older users show Admin in the UI but do not always have a populated
-    role relationship in the current request.  This helper treats the protected
-    Martins admin account as Admin and also reads legacy single-role fields if
-    they exist.
+    Some older users show Admin in the UI but may not always have a populated
+    role relationship in the current request. Treat the protected Martins admin
+    account as Admin and read legacy single-role fields when present.
     """
     names = {role.name for role in getattr(current_user, "roles", []) or [] if getattr(role, "name", None)}
 
@@ -103,9 +103,7 @@ def current_user_role_names():
 
 
 def is_current_user_admin():
-    names = current_user_role_names()
-    return bool(names & {"Admin", "Super Admin"})
-
+    return bool(current_user_role_names() & {"Admin", "Super Admin"})
 
 def is_current_user_finance_import_user():
     return bool(current_user_role_names() & {"Finance Manager", "Finance Assistant"})
@@ -193,7 +191,7 @@ def can_create_regional_manager():
 
 def can_assign_franchise_links():
     # Admin must always be able to link Regional Manager and Franchise User accounts.
-    if is_current_user_admin():
+    if is_current_user_admin() or current_user.has_role("Super Admin"):
         return True
     return current_user.has_permission("franchise_management:manage") and current_user.has_permission("users:edit")
 
@@ -309,7 +307,7 @@ def permission_required(code):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # Admin/Super Admin must never be blocked from Admin screens by
-            # missing seeded permission rows or a legacy user-role mismatch.
+            # missing seeded permission rows or legacy user-role mismatches.
             if is_current_user_admin():
                 return func(*args, **kwargs)
             if not current_user.has_permission(code):
@@ -317,6 +315,7 @@ def permission_required(code):
             return func(*args, **kwargs)
         return wrapper
     return decorator
+
 
 
 def seed_permissions_and_roles():

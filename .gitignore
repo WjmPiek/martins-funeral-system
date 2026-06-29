@@ -1,6 +1,31 @@
+# Secrets and local config
 .env
-instance/
+.env.*
+!.env.example
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
 .venv/
 venv/
+
+# Local databases and generated data
+instance/
+*.db
+*.sqlite
+*.sqlite3
+*.backup
+*.bak
+
+# Logs and temporary files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Generated exports/import scratch
+exports/
+uploads/tmp/
