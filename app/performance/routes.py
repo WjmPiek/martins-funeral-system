@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 from app.audit import log_action
 from app.extensions import db
 from app.franchise_context import get_accessible_franchises, get_selected_franchise, is_privileged_user
-from app.models import Franchise, FranchiseTarget, PerformanceGrowthBracket
+from app.models import Franchise, FranchiseTarget, PerformanceGrowthBracket, User
 from app.performance.service import (
     DEFAULT_GROWTH_PERCENT,
     MONTHS,
@@ -40,6 +40,10 @@ from app.performance.service import (
     executive_insights,
     franchise_insights,
     decision_centre,
+    capture_performance_history,
+    performance_history,
+    performance_history_periods,
+    user_access_summary,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -487,3 +491,56 @@ def recalculate():
     log_action("Performance", "Recalculated performance results", f"Rows saved: {saved}; Period: {month_label(month, year)}")
     flash(f"Performance results recalculated for {month_label(month, year)}.", "success")
     return redirect(url_for("performance.index", month=month, year=year, target_mode="growth_bracket"))
+
+
+@performance_bp.route("/history")
+@login_required
+@permission_required("performance:view")
+def history():
+    month, year = selected_period_from_request(request.args)
+    ids = accessible_franchise_ids()
+    selected = get_selected_franchise()
+    franchise_id = request.args.get("franchise_id", type=int)
+    if franchise_id and franchise_id not in ids:
+        abort(403)
+    if not franchise_id:
+        franchise_id = selected.id if selected and selected.id in ids else (ids[0] if ids else None)
+    if not franchise_id:
+        flash("No franchise history is available for your user access.", "warning")
+        return redirect(url_for("performance.index"))
+    franchise = Franchise.query.get_or_404(franchise_id)
+    rows = performance_history(franchise_id, month, year)
+    franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all() if ids else []
+    return render_template(
+        "performance/history.html",
+        franchise=franchise,
+        history_rows=rows,
+        franchises=franchises,
+        periods=performance_history_periods(ids),
+        metrics=PERFORMANCE_METRICS,
+        month_options=MONTHS,
+        year_options=reporting_years(),
+        selected_month=month,
+        selected_year=year,
+        selected_period_label=month_label(month, year),
+    )
+
+
+@performance_bp.route("/history/capture", methods=["POST"])
+@login_required
+@permission_required("performance:manage_targets")
+def capture_history():
+    month, year = selected_period_from_request(request.form)
+    saved = capture_performance_history(month, year, accessible_franchise_ids(), "growth_bracket", DEFAULT_GROWTH_PERCENT, current_user.id)
+    log_action("Performance", "Captured performance history", f"Snapshots saved: {saved}; Period: {month_label(month, year)}")
+    flash(f"Captured {saved} performance history snapshots for {month_label(month, year)}.", "success")
+    return redirect(url_for("performance.history", month=month, year=year))
+
+
+@performance_bp.route("/access-overview")
+@login_required
+@permission_required("users:manage")
+def access_overview():
+    users = User.query.order_by(User.name.asc(), User.surname.asc()).all()
+    summaries = [user_access_summary(user) for user in users]
+    return render_template("performance/access_overview.html", summaries=summaries)

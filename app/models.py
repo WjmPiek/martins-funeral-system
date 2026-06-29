@@ -668,3 +668,54 @@ class InsuranceClaimDocumentRule(db.Model):
     rule_value = db.Column(db.Text, default="")
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     document_type = db.relationship("InsuranceClaimDocumentType", backref=db.backref("rules", lazy=True, cascade="all, delete-orphan"))
+
+
+class PerformanceSnapshot(db.Model):
+    """Frozen monthly performance history for audit/history views.
+
+    Unlike live dashboards, snapshot rows preserve the KPI/target/score values that
+    existed when Head Office captured the month.  This prevents old business
+    history from changing when brackets or formulas are adjusted later.
+    """
+    __tablename__ = "performance_snapshots"
+    id = db.Column(db.Integer, primary_key=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
+    year = db.Column(db.Integer, nullable=False, index=True)
+    month = db.Column(db.Integer, nullable=False, index=True)
+    metric = db.Column(db.String(80), nullable=False, index=True)
+    actual_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    target_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    achievement_percent = db.Column(db.Numeric(8, 2), nullable=False, default=0)
+    growth_percent = db.Column(db.Numeric(8, 2), nullable=False, default=0)
+    forecast_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    rank = db.Column(db.Integer, nullable=False, default=0)
+    previous_rank = db.Column(db.Integer, nullable=False, default=0)
+    movement = db.Column(db.Integer, nullable=False, default=0)
+    health_score = db.Column(db.Numeric(8, 2), nullable=False, default=0)
+    source = db.Column(db.String(80), nullable=False, default="performance_results")
+    captured_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    captured_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+
+    franchise = db.relationship("Franchise", backref=db.backref("performance_snapshots", lazy=True, cascade="all, delete-orphan"))
+    captured_by = db.relationship("User", backref=db.backref("performance_snapshots_captured", lazy=True))
+
+    __table_args__ = (
+        db.UniqueConstraint("franchise_id", "metric", "year", "month", name="uq_perf_snapshot_period_metric"),
+    )
+
+
+class UserDashboardPreference(db.Model):
+    """Optional per-user dashboard preferences for a cleaner home screen."""
+    __tablename__ = "user_dashboard_preferences"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    default_module = db.Column(db.String(80), nullable=False, default="dashboard")
+    default_metric = db.Column(db.String(80), nullable=False, default="cash")
+    default_date_range = db.Column(db.String(40), nullable=False, default="current_month")
+    show_graphs = db.Column(db.Boolean, nullable=False, default=True)
+    show_leaderboard = db.Column(db.Boolean, nullable=False, default=True)
+    show_insights = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    user = db.relationship("User", backref=db.backref("dashboard_preference", uselist=False, lazy=True, cascade="all, delete-orphan"))

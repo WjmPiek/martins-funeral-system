@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Performance History{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h3 mb-1">Performance History</h1>
+      <p class="text-muted mb-0">Frozen monthly snapshots for {{ franchise.business_name }}.</p>
+    </div>
+    {% if current_user.has_permission('performance:manage_targets') %}
+    <form method="post" action="{{ url_for('performance.capture_history') }}" class="d-flex gap-2">
+      <input type="hidden" name="month" value="{{ selected_month }}">
+      <input type="hidden" name="year" value="{{ selected_year }}">
+      <button class="btn btn-primary">Capture This Month</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <form method="get" class="card card-body mb-4">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label">Franchise</label>
+        <select name="franchise_id" class="form-select">
+          {% for item in franchises %}
+          <option value="{{ item.id }}" {% if item.id == franchise.id %}selected{% endif %}>{{ item.business_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Month</label>
+        <select name="month" class="form-select">
+          {% for value, label in month_options %}
+          <option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Year</label>
+        <select name="year" class="form-select">
+          {% for value in year_options %}
+          <option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-outline-primary w-100">View</button>
+      </div>
+    </div>
+  </form>
+
+  {% if not history_rows %}
+  <div class="alert alert-info">No captured history exists for this period yet. Admin can capture the month after imports and recalculation are complete.</div>
+  {% endif %}
+
+  {% for period in history_rows %}
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>{{ period.label }}</strong>
+      <span class="badge bg-secondary">Captured {{ period.captured_at.strftime('%Y-%m-%d %H:%M') if period.captured_at else '' }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>KPI</th>
+            <th>Actual</th>
+            <th>Target</th>
+            <th>Target %</th>
+            <th>Growth %</th>
+            <th>Rank</th>
+            <th>Movement</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in period.metrics %}
+          <tr>
+            <td>{{ row.label }}</td>
+            <td>{{ row.actual }}</td>
+            <td>{{ row.target }}</td>
+            <td>{{ row.achievement }}%</td>
+            <td>{{ row.growth }}%</td>
+            <td>#{{ row.rank }}</td>
+            <td>
+              {% if row.movement > 0 %}<span class="badge bg-success">Up by {{ row.movement }}</span>
+              {% elif row.movement < 0 %}<span class="badge bg-danger">Down by {{ row.movement|abs }}</span>
+              {% else %}<span class="badge bg-warning text-dark">Same</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

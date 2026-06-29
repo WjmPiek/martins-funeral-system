@@ -5,7 +5,7 @@ from sqlalchemy import func
 
 from app.extensions import db
 from app.franchise_context import get_accessible_franchises, get_selected_franchise, is_franchise_view_mode
-from app.models import Franchise, FranchiseTarget, MonthlyFigure, PerformanceGrowthBracket, PerformanceResult
+from app.models import Franchise, FranchiseTarget, MonthlyFigure, PerformanceGrowthBracket, PerformanceResult, PerformanceSnapshot
 
 MONTHS = [
     (1, "January"), (2, "February"), (3, "March"), (4, "April"),
@@ -1350,4 +1350,129 @@ def decision_centre(month, year, franchise_ids, mode='growth_bracket', growth_pe
             'wins': len(wins),
             'franchises': executive.get('total_franchises', 0),
         },
+    }
+
+
+def capture_performance_history(month, year, franchise_ids, mode="growth_bracket", growth=DEFAULT_GROWTH_PERCENT, captured_by_id=None):
+    """Freeze the current period into performance_snapshots.
+
+    Snapshots are created from the same calculation engine used by the live
+    dashboard, but once saved they become the historical record.  Re-running the
+    capture updates the same period/metric rows rather than duplicating them.
+    """
+    rows_by_metric = {}
+    overall_rows = attach_movement(
+        ranked_performance(month, year, franchise_ids, mode, growth, "overall"),
+        ranked_performance(*previous_month(month, year), franchise_ids, mode, growth, "overall"),
+    )
+    overall_lookup = {row["franchise_id"]: row for row in overall_rows}
+
+    for metric_key in PERFORMANCE_METRICS:
+        rows_by_metric[metric_key] = attach_movement(
+            ranked_performance(month, year, franchise_ids, mode, growth, metric_key),
+            ranked_performance(*previous_month(month, year), franchise_ids, mode, growth, metric_key),
+        )
+
+    saved = 0
+    for metric_key, rows in rows_by_metric.items():
+        for row in rows:
+            franchise_id = row["franchise_id"]
+            snapshot = PerformanceSnapshot.query.filter_by(
+                franchise_id=franchise_id,
+                metric=metric_key,
+                year=year,
+                month=month,
+            ).first()
+            if not snapshot:
+                snapshot = PerformanceSnapshot(franchise_id=franchise_id, metric=metric_key, year=year, month=month)
+                db.session.add(snapshot)
+            overall = overall_lookup.get(franchise_id, {})
+            snapshot.actual_value = row.get("actual", 0) or 0
+            snapshot.target_value = row.get("target", 0) or 0
+            snapshot.achievement_percent = row.get("achievement", 0) or 0
+            snapshot.growth_percent = row.get("growth", 0) or 0
+            snapshot.forecast_value = row.get("forecast", 0) or 0
+            snapshot.rank = row.get("rank", 0) or 0
+            snapshot.previous_rank = row.get("previous_rank", 0) or 0
+            snapshot.movement = row.get("movement", 0) or 0
+            snapshot.health_score = overall.get("score", row.get("score", 0)) or 0
+            snapshot.source = "performance_results"
+            snapshot.captured_by_id = captured_by_id
+            saved += 1
+    db.session.commit()
+    return saved
+
+
+def performance_history_periods(franchise_ids):
+    if not franchise_ids:
+        return []
+    rows = (
+        db.session.query(PerformanceSnapshot.year, PerformanceSnapshot.month)
+        .filter(PerformanceSnapshot.franchise_id.in_(franchise_ids))
+        .group_by(PerformanceSnapshot.year, PerformanceSnapshot.month)
+        .order_by(PerformanceSnapshot.year.desc(), PerformanceSnapshot.month.desc())
+        .all()
+    )
+    return [{"year": year, "month": month, "label": month_label(month, year)} for year, month in rows]
+
+
+def performance_history(franchise_id, month=None, year=None):
+    query = PerformanceSnapshot.query.filter_by(franchise_id=franchise_id)
+    if month and year:
+        query = query.filter_by(month=month, year=year)
+    rows = query.order_by(
+        PerformanceSnapshot.year.desc(),
+        PerformanceSnapshot.month.desc(),
+        PerformanceSnapshot.metric.asc(),
+    ).all()
+    grouped = {}
+    for row in rows:
+        key = (row.year, row.month)
+        grouped.setdefault(key, {
+            "year": row.year,
+            "month": row.month,
+            "label": month_label(row.month, row.year),
+            "metrics": [],
+            "health_score": row.health_score,
+            "rank": row.rank,
+            "movement": row.movement,
+            "captured_at": row.captured_at,
+        })
+        grouped[key]["metrics"].append({
+            "metric": row.metric,
+            "label": PERFORMANCE_METRICS.get(row.metric, {}).get("label", row.metric),
+            "actual": row.actual_value,
+            "target": row.target_value,
+            "achievement": row.achievement_percent,
+            "growth": row.growth_percent,
+            "forecast": row.forecast_value,
+            "rank": row.rank,
+            "previous_rank": row.previous_rank,
+            "movement": row.movement,
+        })
+    return list(grouped.values())
+
+
+def user_access_summary(user):
+    """Return the user's visible modules and franchise scope for admin review."""
+    modules = [
+        ("Dashboard", "dashboard:view"),
+        ("Performance", "performance:view"),
+        ("Manage Targets", "performance:manage_targets"),
+        ("Monthly Figures", "monthly:view"),
+        ("Royalties", "royalties:view"),
+        ("Claims", "claims:view"),
+        ("Attendance", "attendance:view"),
+        ("Heat Map", "heatmap:view"),
+        ("Manuals", "manuals:view"),
+        ("Users", "users:manage"),
+        ("Franchise Management", "franchise_management:view"),
+    ]
+    visible_modules = [label for label, code in modules if user.has_permission(code)]
+    franchises = user.accessible_franchises()
+    return {
+        "user": user,
+        "visible_modules": visible_modules,
+        "franchises": franchises,
+        "scope_label": "All franchises" if user.has_permission("franchise_management:view") or user.has_permission("franchise_management:manage") else f"{len(franchises)} assigned franchise(s)",
     }
