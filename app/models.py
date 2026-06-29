@@ -59,10 +59,24 @@ class User(UserMixin, db.Model):
     last_login_at = db.Column(db.DateTime)
     deactivated_at = db.Column(db.DateTime)
     deactivation_reason = db.Column(db.String(255), default="")
+    parent_franchise_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     roles = db.relationship("Role", secondary=user_roles, lazy="subquery", backref=db.backref("users", lazy=True))
     assigned_franchises = db.relationship("Franchise", secondary=user_franchises, lazy="subquery", backref=db.backref("assigned_users", lazy=True))
+    franchise_employees = db.relationship(
+        "User",
+        foreign_keys="User.parent_franchise_user_id",
+        backref=db.backref("parent_franchise_user", remote_side=[id]),
+        lazy=True,
+    )
+    created_users = db.relationship(
+        "User",
+        foreign_keys="User.created_by_user_id",
+        backref=db.backref("created_by_user", remote_side=[id]),
+        lazy=True,
+    )
 
     @property
     def full_name(self):

@@ -1569,3 +1569,74 @@ def clear_franchise_user_links():
     db.session.commit()
     flash(f"Cleared linked franchises from {cleared} franchise user(s). Finance and admin users were not changed.", "success")
     return redirect(url_for("admin.users"))
+
+# ---------------------------------------------------------------------------
+# Admin oversight for employee users created by franchise users
+# ---------------------------------------------------------------------------
+
+def is_franchise_employee_user(user):
+    return user.has_role("Franchise Employee") or bool(getattr(user, "parent_franchise_user_id", None))
+
+
+@admin_bp.route("/franchise-employees")
+@login_required
+@permission_required("users:view")
+def franchise_employees():
+    employees = [user for user in User.query.order_by(User.name, User.surname).all() if is_franchise_employee_user(user)]
+    owners = {user.id: user for user in User.query.filter(User.id.in_([employee.parent_franchise_user_id for employee in employees if employee.parent_franchise_user_id])).all()} if employees else {}
+    franchises = Franchise.query.order_by(Franchise.business_name).all()
+    return render_template(
+        "admin/franchise_employees.html",
+        employees=employees,
+        owners=owners,
+        franchises=franchises,
+    )
+
+
+@admin_bp.route("/franchise-employees/<int:user_id>/update", methods=["POST"])
+@login_required
+@permission_required("users:edit")
+def update_franchise_employee(user_id):
+    user = User.query.get_or_404(user_id)
+    if not is_franchise_employee_user(user):
+        flash("This user is not a franchise employee user.", "danger")
+        return redirect(url_for("admin.franchise_employees"))
+
+    user.name = request.form.get("name", user.name).strip() or user.name
+    user.surname = request.form.get("surname", user.surname).strip() or user.surname
+    password = request.form.get("password", "").strip()
+    if password:
+        user.set_password(password)
+    user.is_active = request.form.get("is_active") == "1"
+
+    franchise_ids = [int(item) for item in request.form.getlist("franchise_ids")]
+    user.assigned_franchises = Franchise.query.filter(Franchise.id.in_(franchise_ids)).all() if franchise_ids else []
+
+    owner_id = request.form.get("parent_franchise_user_id", type=int)
+    if owner_id:
+        owner = User.query.get(owner_id)
+        if owner and owner != user:
+            user.parent_franchise_user_id = owner.id
+
+    log_action("Franchise Employees", "Admin updated franchise employee user", f"Employee: {user.email}")
+    db.session.commit()
+    flash(f"Employee user {user.full_name} was updated.", "success")
+    return redirect(url_for("admin.franchise_employees"))
+
+
+@admin_bp.route("/franchise-employees/<int:user_id>/delete", methods=["POST"])
+@login_required
+@permission_required("users:delete")
+def delete_franchise_employee(user_id):
+    user = User.query.get_or_404(user_id)
+    if not is_franchise_employee_user(user):
+        flash("This user is not a franchise employee user.", "danger")
+        return redirect(url_for("admin.franchise_employees"))
+    user.is_active = False
+    user.is_active_account = False
+    user.deactivated_at = datetime.utcnow()
+    user.deactivation_reason = "Deactivated by Admin"
+    log_action("Franchise Employees", "Admin deactivated franchise employee user", f"Employee: {user.email}")
+    db.session.commit()
+    flash(f"Employee user {user.full_name} was deactivated.", "success")
+    return redirect(url_for("admin.franchise_employees"))

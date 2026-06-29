@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Franchise Employee Users</h1>
+      <p class="muted">Create and manage employee users under your own linked franchise. These users only see data for the franchise they are linked to.</p>
+    </div>
+  </div>
+
+  {% if franchises %}
+  <div class="form-section-card">
+    <h2>Create Employee User</h2>
+    <form method="post" class="professional-form compact-form">
+      <div class="form-grid">
+        <label for="franchise_id">Franchise</label>
+        <select id="franchise_id" name="franchise_id" required>
+          {% for franchise in franchises %}
+            <option value="{{ franchise.id }}">{{ franchise.business_name or 'Unnamed Franchise' }}</option>
+          {% endfor %}
+        </select>
+
+        <label for="name">Name</label>
+        <input id="name" name="name" required>
+
+        <label for="surname">Surname</label>
+        <input id="surname" name="surname" required>
+
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required>
+
+        <label for="password">Temporary Password</label>
+        <input id="password" name="password" type="text" required minlength="8">
+      </div>
+      <div class="form-actions"><button type="submit" class="button-auto">Create Employee</button></div>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="form-section-card">
+    <h2>Employees Created By Me</h2>
+    <div class="table-responsive">
+      <table class="system-report-table users-table">
+        <thead>
+          <tr><th>Name</th><th>Email</th><th>Franchise</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for user in employees %}
+          <tr class="{% if not user.is_active %}inactive-row{% endif %}">
+            <td><strong>{{ user.full_name }}</strong></td>
+            <td>{{ user.email }}</td>
+            <td>{{ user.assigned_franchises|map(attribute='business_name')|join(' + ') or 'Not linked' }}</td>
+            <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
+            <td>
+              <button type="button" class="btn secondary small" onclick="openEmployeeModal('employee-modal-{{ user.id }}')">Edit</button>
+              <form method="post" action="{{ url_for('franchise.delete_employee', user_id=user.id) }}" class="inline-form" onsubmit="return confirm('Deactivate this employee user?');">
+                <button type="submit" class="danger-btn small">Delete</button>
+              </form>
+              <div class="modal-backdrop" id="employee-modal-{{ user.id }}" aria-hidden="true">
+                <div class="modal-card" role="dialog" aria-modal="true">
+                  <div class="modal-header">
+                    <div><h2>Edit Employee</h2><p>{{ user.email }}</p></div>
+                    <button type="button" class="modal-close" onclick="closeEmployeeModal('employee-modal-{{ user.id }}')">x</button>
+                  </div>
+                  <form method="post" action="{{ url_for('franchise.update_employee', user_id=user.id) }}">
+                    <div class="form-grid">
+                      <label>Name</label><input name="name" value="{{ user.name }}" required>
+                      <label>Surname</label><input name="surname" value="{{ user.surname }}" required>
+                      <label>New Password</label><input name="password" type="text" placeholder="Leave blank to keep current password">
+                      <label>Status</label>
+                      <select name="is_active"><option value="1" {% if user.is_active %}selected{% endif %}>Active</option><option value="0" {% if not user.is_active %}selected{% endif %}>Inactive</option></select>
+                    </div>
+                    <div class="modal-actions"><button type="submit" class="btn button-auto">Save</button></div>
+                  </form>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="center-cell">No employee users created yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+<script>
+function openEmployeeModal(id){const modal=document.getElementById(id); if(modal){modal.classList.add('is-open'); modal.setAttribute('aria-hidden','false');}}
+function closeEmployeeModal(id){const modal=document.getElementById(id); if(modal){modal.classList.remove('is-open'); modal.setAttribute('aria-hidden','true');}}
+document.addEventListener('click', function(event){ if(event.target.classList && event.target.classList.contains('modal-backdrop')) closeEmployeeModal(event.target.id); });
+</script>
+{% endblock %}

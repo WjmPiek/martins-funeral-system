@@ -307,3 +307,132 @@ def export_details_pdf():
     log_action("Franchise Details", "Exported PDF", f"Franchise: {franchise.business_name}")
     db.session.commit()
     return send_file(pdf_path, as_attachment=True, download_name="franchise-details.pdf")
+
+# ---------------------------------------------------------------------------
+# Franchise employee user management
+# ---------------------------------------------------------------------------
+
+def can_manage_own_franchise_employees():
+    return current_user.has_permission("franchise_employees:manage") or current_user.has_permission("franchise_employees:add")
+
+
+def employee_role():
+    role = Role.query.filter_by(name="Franchise Employee").first()
+    if not role:
+        role = Role(name="Franchise Employee", description="Employee created under a franchise user", is_system_role=True)
+        db.session.add(role)
+        db.session.flush()
+    return role
+
+
+def franchises_available_for_employee_creation():
+    # Franchise users may only create employees under franchises linked to their own user.
+    franchises = list(current_user.assigned_franchises or [])
+    return sorted(franchises, key=lambda item: item.business_name or "")
+
+
+def user_is_my_franchise_employee(user):
+    if not user:
+        return False
+    if user.parent_franchise_user_id == current_user.id:
+        return True
+    # Safe fallback for older records: employee must be linked only to franchises the owner can access.
+    my_franchise_ids = {franchise.id for franchise in franchises_available_for_employee_creation()}
+    employee_franchise_ids = {franchise.id for franchise in (user.assigned_franchises or [])}
+    return bool(employee_franchise_ids) and employee_franchise_ids.issubset(my_franchise_ids) and user.has_role("Franchise Employee")
+
+
+@franchise_bp.route("/employees", methods=["GET", "POST"])
+@login_required
+def employees():
+    if not can_manage_own_franchise_employees() and not current_user.has_permission("franchise_employees:view"):
+        abort(403)
+
+    franchises = franchises_available_for_employee_creation()
+    if not franchises:
+        flash("Your user is not linked to any franchise yet. Ask Admin to link your franchise before creating employee users.", "warning")
+        return render_template("franchise/employees.html", franchises=[], employees=[])
+
+    if request.method == "POST":
+        if not can_manage_own_franchise_employees():
+            abort(403)
+
+        name = request.form.get("name", "").strip()
+        surname = request.form.get("surname", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "").strip()
+        franchise_id = request.form.get("franchise_id", type=int)
+
+        if not name or not surname or not email or not password:
+            flash("Name, surname, email and password are required.", "danger")
+            return redirect(url_for("franchise.employees"))
+
+        selected_franchise = next((item for item in franchises if item.id == franchise_id), None)
+        if not selected_franchise:
+            flash("You may only create employees under your own linked franchise.", "danger")
+            return redirect(url_for("franchise.employees"))
+
+        existing = User.query.filter(db.func.lower(User.email) == email).first()
+        if existing:
+            flash("A user with that email address already exists.", "danger")
+            return redirect(url_for("franchise.employees"))
+
+        user = User(
+            name=name,
+            surname=surname,
+            email=email,
+            is_active=True,
+            is_active_account=True,
+            parent_franchise_user_id=current_user.id,
+            created_by_user_id=current_user.id,
+        )
+        user.set_password(password)
+        user.roles.append(employee_role())
+        user.assigned_franchises.append(selected_franchise)
+        db.session.add(user)
+        log_action("Franchise Employees", "Created franchise employee user", f"Employee: {email}; Franchise: {selected_franchise.business_name}")
+        db.session.commit()
+        flash(f"Employee user {user.full_name} was created under {selected_franchise.business_name}.", "success")
+        return redirect(url_for("franchise.employees"))
+
+    employees = User.query.filter_by(parent_franchise_user_id=current_user.id).order_by(User.name, User.surname).all()
+    return render_template("franchise/employees.html", franchises=franchises, employees=employees)
+
+
+@franchise_bp.route("/employees/<int:user_id>/update", methods=["POST"])
+@login_required
+def update_employee(user_id):
+    if not can_manage_own_franchise_employees():
+        abort(403)
+    user = User.query.get_or_404(user_id)
+    if not user_is_my_franchise_employee(user):
+        abort(403)
+
+    user.name = request.form.get("name", user.name).strip() or user.name
+    user.surname = request.form.get("surname", user.surname).strip() or user.surname
+    password = request.form.get("password", "").strip()
+    if password:
+        user.set_password(password)
+    user.is_active = request.form.get("is_active") == "1"
+    log_action("Franchise Employees", "Updated franchise employee user", f"Employee: {user.email}")
+    db.session.commit()
+    flash(f"Employee user {user.full_name} was updated.", "success")
+    return redirect(url_for("franchise.employees"))
+
+
+@franchise_bp.route("/employees/<int:user_id>/delete", methods=["POST"])
+@login_required
+def delete_employee(user_id):
+    if not current_user.has_permission("franchise_employees:delete") and not current_user.has_permission("franchise_employees:manage"):
+        abort(403)
+    user = User.query.get_or_404(user_id)
+    if not user_is_my_franchise_employee(user):
+        abort(403)
+    user.is_active = False
+    user.is_active_account = False
+    user.deactivated_at = datetime.utcnow()
+    user.deactivation_reason = "Deactivated by franchise user"
+    log_action("Franchise Employees", "Deactivated franchise employee user", f"Employee: {user.email}")
+    db.session.commit()
+    flash(f"Employee user {user.full_name} was deactivated. History was kept.", "success")
+    return redirect(url_for("franchise.employees"))
