@@ -263,16 +263,39 @@ def format_currency(value):
     return f"{Decimal(value or 0):,.2f}"
 
 
+def normalize_gross_method(value):
+    """Return canonical royalty gross method: ``new`` or ``old``.
+
+    Older imports/databases may store display text such as ``Gross = Old``,
+    ``Gross Old`` or ``Gross = New Gross Method`` instead of only ``old``/``new``.
+    Treat those labels as valid before falling back to agreement date.
+    """
+    text = (value or "").strip().lower()
+    if not text:
+        return ""
+    text = text.replace("_", " ").replace("-", " ")
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if text in {"new", "gross new", "new gross", "gross new gross method", "new gross method"}:
+        return "new"
+    if text in {"old", "gross old", "old gross"}:
+        return "old"
+    if "new" in text:
+        return "new"
+    if "old" in text:
+        return "old"
+    return ""
+
+
 def get_franchise_gross_method(franchise):
     """Return the franchise's gross method.
 
-    The method is stored on the Franchise Details page during contract import/update.
-    Old Gross must always use SALES + INSURANCE RECEIPTS. If Insurance Receipts is blank or zero, Old Gross still calculates as SALES + 0.
-    New Gross must always use SALES + ADMIN FEE.
+    Old Gross = SALES + INSURANCE RECEIPTS.
+    New Gross = SALES + ADMIN FEE.
     If an older record has no stored method, fall back to the agreement start date:
     2018 or newer = New; before 2018 or missing = Old.
     """
-    stored_method = (getattr(franchise, "royalty_gross_method", "") or "").strip().lower()
+    stored_method = normalize_gross_method(getattr(franchise, "royalty_gross_method", ""))
     if stored_method in {"new", "old"}:
         return stored_method
 
@@ -531,6 +554,7 @@ def recalculate_monthly_figure(monthly_figure):
     monthly_figure.cash = sales + Decimal(monthly_figure.insurance_receipts or 0)
     royalty_base, gross_method = calculate_royalty_base(monthly_figure, franchise)
     monthly_figure.gross_turnover = royalty_base
+    monthly_figure.gross_method = gross_method
     franchise.royalty_gross_method = gross_method
 
     # Backward compatibility fields.

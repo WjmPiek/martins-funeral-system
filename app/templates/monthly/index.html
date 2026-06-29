@@ -179,7 +179,7 @@
                 <td>{{ item.insurance_joinings }}</td>
                 <td>{{ item.mf_files }}</td>
                 <td>{{ '%.2f'|format(item.gross_revenue|float) }}</td>
-                <td>{% if item.franchise and item.franchise.royalty_gross_method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
+                <td>{% set method = item.gross_method if item.gross_method is defined else (item.franchise.royalty_gross_method if item.franchise else 'old') %}{% if method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
                 <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
                 <td>{{ '%.2f'|format(item.royalty_amount|float) }}</td>
                 <td>{% if item.minimum_royalty_applied %}<span class="badge warning">Yes</span>{% else %}No{% endif %}</td>
@@ -251,7 +251,7 @@
           <td>{{ item.insurance_joinings }}</td>
           <td>{{ item.mf_files }}</td>
           <td>{{ '%.2f'|format(item.gross_revenue|float) }}</td>
-          <td>{% if item.franchise and item.franchise.royalty_gross_method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
+          <td>{% set method = item.gross_method if item.gross_method is defined else (item.franchise.royalty_gross_method if item.franchise else 'old') %}{% if method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
           <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
           <td>{{ '%.2f'|format(item.royalty_amount|float) }}</td>
           <td>{% if item.minimum_royalty_applied %}<span class="badge warning">Yes</span>{% else %}No{% endif %}</td>

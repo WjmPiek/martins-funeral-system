@@ -140,7 +140,7 @@
             <tbody>
               <tr>
                 <td><strong>{{ source.period_label }}</strong></td>
-                <td>{% if source.franchise and source.franchise.royalty_gross_method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
+                <td>{% set method = source.gross_method if source.gross_method is defined else (source.franchise.royalty_gross_method if source.franchise else 'old') %}{% if method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
                 <td>{{ '%.2f'|format(source.gross_revenue|float) }}</td>
                 <td>{{ '%.2f'|format(source.royalty_percentage|float) }}%</td>
                 <td><strong>{{ '%.2f'|format(source.royalty_amount|float) }}</strong></td>
@@ -189,7 +189,7 @@
           <td><strong>{{ item.period_label }}</strong></td>
           <td>{{ item.franchise.business_name if item.franchise else '' }}{% if item.is_grouped|default(false) %}<br><small class="muted">Combined linked branches: {{ item.source_branch_names|join(', ') }}</small>{% endif %}</td>
           <td><span class="badge {% if item.status == 'Royalty Locked' %}success{% elif item.status == 'Royalty Approved' %}warning{% endif %}">{{ 'Calc' if item.status == 'Calculated' else item.status }}</span></td>
-          <td>{% if item.franchise and item.franchise.royalty_gross_method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
+          <td>{% set method = item.gross_method if item.gross_method is defined else (item.franchise.royalty_gross_method if item.franchise else 'old') %}{% if method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
           <td>{{ '%.2f'|format(item.gross_revenue|float) }}</td>
           <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
           <td><strong>{{ '%.2f'|format(item.royalty_amount|float) }}</strong></td>
