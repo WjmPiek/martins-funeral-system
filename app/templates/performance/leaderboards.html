@@ -6,6 +6,7 @@
         <p class="muted">Phase 7: clean ranking for Overall, Cash, Sales, Insurance, Joinings and Funerals. Display shows rank, franchise and movement only.</p>
     </div>
     <div class="button-row">
+        <a class="btn secondary" href="{{ url_for('performance.executive', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Executive Dashboard</a>
         <a class="btn secondary" href="{{ url_for('performance.index', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Simple Leaderboard</a>
     </div>
 </div>

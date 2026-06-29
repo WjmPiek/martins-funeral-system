@@ -7,6 +7,7 @@
     </div>
     {% if show_manage_targets %}
     <div class="button-row">
+        <a class="btn secondary" href="{{ url_for('performance.executive', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Executive Dashboard</a>
         <a class="btn secondary" href="{{ url_for('performance.targets', month=selected_month, year=selected_year) }}">Manual Targets</a>
         <a class="btn secondary" href="{{ url_for('performance.growth_brackets') }}">Growth Brackets</a>
     </div>

@@ -964,3 +964,87 @@ def leaderboard_decision_centre(month, year, franchise_ids, mode='growth_bracket
             'biggest_droppers': droppers[:5],
         })
     return boards
+
+
+# Phase 8: Executive dashboard helpers
+
+def executive_dashboard(month, year, franchise_ids, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    """Head Office executive view across all accessible franchises.
+
+    This keeps figures available for internal calculations, but presents decision
+    items clearly: top performers, lowest performers, growth, decline, forecast
+    risk and branch health.
+    """
+    overall_rows = leaderboard_rows('overall', month, year, franchise_ids, mode, growth_percent)
+    kpi_summaries = []
+    for metric_key, metric in PERFORMANCE_METRICS.items():
+        summary = metric_page_summary(metric_key, month, year, franchise_ids, mode, growth_percent)
+        kpi_summaries.append({
+            'key': metric_key,
+            'label': metric['label'],
+            'format': metric['format'],
+            'total_actual': summary['total_actual'],
+            'total_target': summary['total_target'],
+            'target_percent': summary['target_percent'],
+            'previous_month_growth': summary['previous_month_growth'],
+            'last_year_growth': summary['last_year_growth'],
+            'status': summary['status'],
+            'top_rows': summary['top_rows'][:5],
+            'bottom_rows': summary['bottom_rows'][:5],
+        })
+
+    branch_health = []
+    for row in overall_rows:
+        metrics = franchise_metric_summary(row['franchise_id'], month, year, mode, growth_percent)
+        health = health_score_from_metrics(metrics)
+        below_target = [item for item in metrics if to_decimal(item.get('target_percent')) < Decimal('90')]
+        branch_health.append({
+            'franchise_id': row['franchise_id'],
+            'franchise_name': row['franchise_name'],
+            'rank': row['rank'],
+            'movement': row.get('movement'),
+            'movement_text': row.get('movement_text') or movement_text(row),
+            'health_score': health,
+            'health_label': health_label(health),
+            'below_target_count': len(below_target),
+            'below_target_labels': ', '.join(item['label'] for item in below_target[:3]),
+            'score': row.get('score'),
+        })
+
+    branch_health.sort(key=lambda item: item['health_score'], reverse=True)
+    needs_attention = sorted(branch_health, key=lambda item: (item['health_score'], -item['below_target_count']))[:10]
+
+    biggest_climbers = [row for row in overall_rows if row.get('movement') == 'up']
+    biggest_climbers.sort(key=lambda row: abs(row.get('movement_delta') or 0), reverse=True)
+    biggest_droppers = [row for row in overall_rows if row.get('movement') == 'down']
+    biggest_droppers.sort(key=lambda row: abs(row.get('movement_delta') or 0), reverse=True)
+
+    forecast_risk = []
+    for metric in kpi_summaries:
+        for row in metric['bottom_rows']:
+            if to_decimal(row.get('achievement')) < Decimal('90'):
+                forecast_risk.append({
+                    'metric_key': metric['key'],
+                    'metric_label': metric['label'],
+                    'franchise_id': row['franchise_id'],
+                    'franchise_name': row['franchise_name'],
+                    'rank': row['rank'],
+                    'achievement': row.get('achievement'),
+                    'movement': row.get('movement'),
+                    'movement_text': row.get('movement_text') or movement_text(row),
+                })
+    forecast_risk.sort(key=lambda item: to_decimal(item['achievement']))
+
+    return {
+        'period_label': month_label(month, year),
+        'overall_rows': overall_rows,
+        'top_performers': overall_rows[:10],
+        'lowest_performers': overall_rows[-10:] if len(overall_rows) > 10 else overall_rows[-5:],
+        'biggest_climbers': biggest_climbers[:10],
+        'biggest_droppers': biggest_droppers[:10],
+        'kpi_summaries': kpi_summaries,
+        'branch_health': branch_health[:10],
+        'needs_attention': needs_attention,
+        'forecast_risk': forecast_risk[:15],
+        'total_franchises': len(overall_rows),
+    }

@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block app_content %}
+<style>
+.exec-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin:1rem 0}.exec-card,.decision-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}.exec-percent{font-size:2rem;font-weight:800}.status-good{border-left:6px solid #198754}.status-warning{border-left:6px solid #f59f00}.status-danger{border-left:6px solid #dc3545}.decision-list{display:grid;gap:.65rem}.decision-row{display:grid;grid-template-columns:70px 1fr auto;gap:.75rem;align-items:center;padding:.7rem;border:1px solid #edf0f3;border-radius:10px}.rank-pill{font-weight:800}.leaderboard-move{padding:.25rem .55rem;border-radius:999px;font-weight:700;display:inline-block}.leaderboard-move.up{background:#d1e7dd;color:#0f5132}.leaderboard-move.down{background:#f8d7da;color:#842029}.leaderboard-move.same{background:#fff3cd;color:#664d03}.muted{color:#6c757d}.button-row{display:flex;gap:.5rem;flex-wrap:wrap}.section-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1rem}.progress-track{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:.5rem 0}.progress-fill{height:100%;background:#198754}.status-warning .progress-fill{background:#f59f00}.status-danger .progress-fill{background:#dc3545}@media(max-width:700px){.decision-row{grid-template-columns:1fr}.decision-row>*{text-align:left}}
+</style>
+
+<div class="page-header">
+    <div>
+        <h1>Executive Performance Dashboard</h1>
+        <p class="muted">Phase 8: Head Office decision centre for {{ selected_period_label }}. Shows where to praise, where to support, and which franchises are at risk.</p>
+    </div>
+    <div class="button-row">
+        <a class="btn secondary" href="{{ url_for('performance.leaderboards', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Leaderboards</a>
+        <a class="btn secondary" href="{{ url_for('performance.dashboard', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Franchise Dashboard</a>
+    </div>
+</div>
+
+<form class="filter-bar" method="get">
+    <label>Month
+        <select name="month">
+            {% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Year
+        <select name="year">
+            {% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Target Mode
+        <select name="target_mode">
+            {% for key, label in target_modes.items() %}<option value="{{ key }}" {% if key == target_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Growth % <input type="number" step="0.01" name="growth" value="{{ growth }}"></label>
+    <button class="btn" type="submit">Update</button>
+</form>
+
+<div class="exec-grid">
+    <div class="exec-card">
+        <div class="muted">Franchises measured</div>
+        <div class="exec-percent">{{ executive.total_franchises }}</div>
+        <div class="muted">Using {{ target_modes[target_mode] }}</div>
+    </div>
+    {% for item in executive.kpi_summaries %}
+    <div class="exec-card status-{{ item.status }}">
+        <div class="muted">{{ item.label }}</div>
+        <div class="exec-percent">{{ item.target_percent }}%</div>
+        <div class="progress-track"><div class="progress-fill" style="width: {{ [item.target_percent, 120]|min }}%"></div></div>
+        <div class="muted">vs target · Last year {{ item.last_year_growth }}%</div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="section-split">
+    <section class="decision-card">
+        <h2>Top Performers</h2>
+        <p class="muted">Highest overall performance score.</p>
+        <div class="decision-list">
+        {% for row in executive.top_performers %}
+            <div class="decision-row">
+                <div class="rank-pill">#{{ row.rank }}</div>
+                <div><strong>{{ row.franchise_name }}</strong><br><span class="muted">Overall score {{ row.score }}%</span></div>
+                <a href="{{ url_for('performance.franchise', franchise_id=row.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open</a>
+            </div>
+        {% else %}<p>No performance data yet.</p>{% endfor %}
+        </div>
+    </section>
+
+    <section class="decision-card">
+        <h2>Needs Attention</h2>
+        <p class="muted">Lowest health score and KPI risk.</p>
+        <div class="decision-list">
+        {% for row in executive.needs_attention %}
+            <div class="decision-row">
+                <div class="rank-pill">#{{ row.rank }}</div>
+                <div><strong>{{ row.franchise_name }}</strong><br><span class="muted">Health {{ row.health_score }}% · {{ row.below_target_count }} KPI(s) below 90%</span></div>
+                <a href="{{ url_for('performance.franchise', franchise_id=row.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open</a>
+            </div>
+        {% else %}<p>No urgent attention items.</p>{% endfor %}
+        </div>
+    </section>
+</div>
+
+<div class="section-split" style="margin-top:1rem;">
+    <section class="decision-card">
+        <h2>Biggest Climbers</h2>
+        <p class="muted">Franchises moving up the ranking.</p>
+        <div class="decision-list">
+        {% for row in executive.biggest_climbers %}
+            <div class="decision-row">
+                <div class="rank-pill">#{{ row.rank }}</div>
+                <div><strong>{{ row.franchise_name }}</strong></div>
+                <span class="leaderboard-move up">{{ row.movement_text }}</span>
+            </div>
+        {% else %}<p>No climbers this month.</p>{% endfor %}
+        </div>
+    </section>
+
+    <section class="decision-card">
+        <h2>Biggest Droppers</h2>
+        <p class="muted">Franchises dropping in the ranking.</p>
+        <div class="decision-list">
+        {% for row in executive.biggest_droppers %}
+            <div class="decision-row">
+                <div class="rank-pill">#{{ row.rank }}</div>
+                <div><strong>{{ row.franchise_name }}</strong></div>
+                <span class="leaderboard-move down">{{ row.movement_text }}</span>
+            </div>
+        {% else %}<p>No major drops this month.</p>{% endfor %}
+        </div>
+    </section>
+</div>
+
+<section class="decision-card" style="margin-top:1rem;">
+    <h2>Forecast / Target Risk</h2>
+    <p class="muted">Branches below 90% achievement on Cash, Sales, Insurance, Joinings or Funerals.</p>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr><th>Franchise</th><th>KPI</th><th>Rank</th><th>Achievement</th><th>Movement</th><th>Open</th></tr></thead>
+            <tbody>
+            {% for item in executive.forecast_risk %}
+                <tr>
+                    <td>{{ item.franchise_name }}</td>
+                    <td>{{ item.metric_label }}</td>
+                    <td>#{{ item.rank }}</td>
+                    <td>{{ item.achievement }}%</td>
+                    <td><span class="leaderboard-move {{ item.movement }}">{{ item.movement_text }}</span></td>
+                    <td><a href="{{ url_for('performance.franchise', franchise_id=item.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open</a></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6">No KPI target risks under 90% for this period.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="decision-card" style="margin-top:1rem;">
+    <h2>KPI Decision Summary</h2>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr><th>KPI</th><th>Target %</th><th>Previous Month Growth</th><th>Same Month Last Year Growth</th><th>Top Franchise</th><th>Needs Attention</th></tr></thead>
+            <tbody>
+            {% for item in executive.kpi_summaries %}
+                <tr>
+                    <td><a href="{{ url_for('performance.kpi', metric_key=item.key, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">{{ item.label }}</a></td>
+                    <td>{{ item.target_percent }}%</td>
+                    <td>{{ item.previous_month_growth }}%</td>
+                    <td>{{ item.last_year_growth }}%</td>
+                    <td>{% if item.top_rows %}#{{ item.top_rows[0].rank }} {{ item.top_rows[0].franchise_name }}{% else %}-{% endif %}</td>
+                    <td>{% if item.bottom_rows %}#{{ item.bottom_rows[0].rank }} {{ item.bottom_rows[0].franchise_name }}{% else %}-{% endif %}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
