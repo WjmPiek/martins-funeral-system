@@ -34,6 +34,7 @@ from app.performance.service import (
     franchise_dashboard,
     metric_page_summary,
     metric_trend_summary,
+    graph_engine_payload,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -152,15 +153,19 @@ def kpi(metric_key):
     if selected and selected.id in ids:
         my_row = next((row for row in summary["rows"] if row["franchise_id"] == selected.id), None)
         chart_data = trend_series(selected.id, metric_key, month, year, 12, mode, growth)
+        graph_data = graph_engine_payload(selected.id, metric_key, month, year, 12, mode, growth)
     elif not is_privileged_user() and ids:
         first_id = ids[0]
         my_row = next((row for row in summary["rows"] if row["franchise_id"] == first_id), None)
         chart_data = trend_series(first_id, metric_key, month, year, 12, mode, growth)
+        graph_data = graph_engine_payload(first_id, metric_key, month, year, 12, mode, growth)
+    graph_data = locals().get("graph_data")
     return render_template(
         "performance/kpi.html",
         summary=summary,
         my_row=my_row,
         chart_data=chart_data or [],
+        graph_data=graph_data,
         metrics=PERFORMANCE_METRICS,
         metric_key=metric_key,
         target_modes=TARGET_MODES,
@@ -189,6 +194,7 @@ def franchise(franchise_id):
     if chart_metric not in PERFORMANCE_METRICS:
         chart_metric = "cash"
     chart_data = trend_series(franchise_id, chart_metric, month, year, 12, mode, growth)
+    graph_data = graph_engine_payload(franchise_id, chart_metric, month, year, 12, mode, growth)
     snapshot = dashboard_snapshot(franchise_id, month, year, mode, growth)
     return render_template(
         "performance/franchise.html",
@@ -196,6 +202,7 @@ def franchise(franchise_id):
         metric_rows=metric_rows,
         chart_metric=chart_metric,
         chart_data=chart_data,
+        graph_data=graph_data,
         metrics=PERFORMANCE_METRICS,
         snapshot=snapshot,
         target_modes=TARGET_MODES,

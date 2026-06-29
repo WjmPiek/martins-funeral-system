@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% block head_extra %}
+<style>.graph-grid{margin-top:1rem}.graph-engine-card{border-left:6px solid #0d6efd}.simple-chart{display:grid;gap:.75rem}.chart-row{display:grid;grid-template-columns:110px 1fr 70px;gap:.75rem;align-items:center}.chart-label{font-weight:700}.chart-bars{position:relative;background:#eef2f7;border-radius:999px;min-height:30px;overflow:hidden}.target-line{position:absolute;left:.75rem;top:.2rem;font-size:.75rem;color:#6c757d;z-index:2}.bar.actual{min-width:4%;height:30px;border-radius:999px;background:#198754;color:#fff;padding:.4rem .75rem;white-space:nowrap}.chart-percent{text-align:right;font-weight:700}@media(max-width:700px){.chart-row{grid-template-columns:1fr}.chart-percent{text-align:left}} </style>
+{% endblock %}
 {% block app_content %}
 <div class="page-header">
     <div>
@@ -80,6 +83,96 @@
         {% endfor %}
     </div>
 </div>
+
+
+{% if graph_data %}
+<div class="panel-card graph-engine-card">
+    <h2>Phase 6 Graph Engine — {{ graph_data.metric_label }}</h2>
+    <p class="muted">These decision graphs use imported monthly/PDF data and the saved or bracket-generated targets.</p>
+</div>
+
+<div class="grid-two graph-grid">
+    <div class="panel-card">
+        <h3>Actual vs Target</h3>
+        <div class="simple-chart">
+        {% for point in graph_data.actual_vs_target %}
+            {% set pct = point.achievement if point.achievement else 0 %}
+            <div class="chart-row">
+                <div class="chart-label">{{ point.label }}</div>
+                <div class="chart-bars">
+                    <div class="target-line">Target {{ '%.2f'|format(point.target) }}</div>
+                    <div class="bar actual" style="width: {{ [pct, 120]|min }}%;">Actual {{ '%.2f'|format(point.actual) }}</div>
+                </div>
+                <div class="chart-percent">{{ '%.0f'|format(pct) }}%</div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+
+    <div class="panel-card">
+        <h3>Same Month Previous Year</h3>
+        <div class="simple-chart">
+        {% for point in graph_data.previous_year %}
+            {% set pct = point.growth_percent + 100 %}
+            <div class="chart-row">
+                <div class="chart-label">{{ point.label }}</div>
+                <div class="chart-bars">
+                    <div class="target-line">Last year {{ '%.2f'|format(point.previous_year) }}</div>
+                    <div class="bar actual" style="width: {{ [pct if pct > 0 else 0, 120]|min }}%;">This year {{ '%.2f'|format(point.actual) }}</div>
+                </div>
+                <div class="chart-percent">{{ '%.0f'|format(point.growth_percent) }}%</div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+
+    <div class="panel-card">
+        <h3>Rolling 12-Month Total</h3>
+        <div class="simple-chart">
+        {% for point in graph_data.rolling_12 %}
+            <div class="chart-row">
+                <div class="chart-label">{{ point.label }}</div>
+                <div class="chart-bars">
+                    <div class="bar actual" style="width: {{ 100 if point.rolling_total > 0 else 4 }}%;">{{ '%.2f'|format(point.rolling_total) }}</div>
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+
+    <div class="panel-card">
+        <h3>Forecast vs Target</h3>
+        <div class="simple-chart">
+        {% for point in graph_data.forecast %}
+            {% set pct = point.forecast_percent if point.forecast_percent else 0 %}
+            <div class="chart-row">
+                <div class="chart-label">{{ point.label }}</div>
+                <div class="chart-bars">
+                    <div class="target-line">Target {{ '%.2f'|format(point.target) }}</div>
+                    <div class="bar actual" style="width: {{ [pct, 120]|min }}%;">Forecast {{ '%.2f'|format(point.forecast) }}</div>
+                </div>
+                <div class="chart-percent">{{ '%.0f'|format(pct) }}%</div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="panel-card">
+    <h3>Growth Trend</h3>
+    <div class="simple-chart">
+    {% for point in graph_data.growth_trend %}
+        {% set width = point.growth_percent + 50 %}
+        <div class="chart-row">
+            <div class="chart-label">{{ point.label }}</div>
+            <div class="chart-bars">
+                <div class="bar actual" style="width: {{ [width if width > 0 else 4, 120]|min }}%;">{{ '%.2f'|format(point.growth_percent) }}%</div>
+            </div>
+        </div>
+    {% endfor %}
+    </div>
+</div>
+{% endif %}
 
 <div class="grid-two">
     <div class="panel-card">

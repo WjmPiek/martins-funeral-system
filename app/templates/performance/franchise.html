@@ -2,7 +2,7 @@
 
 {% block head_extra %}
 <style>
-.performance-grid,.kpi-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1rem 0}.kpi-card,.panel-card,.highlight-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}.kpi-title{font-weight:700;margin-bottom:.35rem}.kpi-percent{font-size:2rem;font-weight:800}.progress-track{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:.5rem 0}.progress-fill{height:100%;background:#198754}.status-warning .progress-fill{background:#f59f00}.status-danger .progress-fill{background:#dc3545}.status-good{border-left:6px solid #198754}.status-warning{border-left:6px solid #f59f00}.status-danger{border-left:6px solid #dc3545}.insight-list{display:grid;gap:.5rem}.insight{padding:.75rem;border-radius:10px;border-left:5px solid #6c757d;background:#f8f9fa}.insight-good{border-color:#198754}.insight-warning{border-color:#f59f00}.insight-danger{border-color:#dc3545}.small{font-size:.85rem}.button-row{display:flex;gap:.5rem;flex-wrap:wrap}
+.performance-grid,.kpi-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1rem 0}.kpi-card,.panel-card,.highlight-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}.kpi-title{font-weight:700;margin-bottom:.35rem}.kpi-percent{font-size:2rem;font-weight:800}.progress-track{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:.5rem 0}.progress-fill{height:100%;background:#198754}.status-warning .progress-fill{background:#f59f00}.status-danger .progress-fill{background:#dc3545}.status-good{border-left:6px solid #198754}.status-warning{border-left:6px solid #f59f00}.status-danger{border-left:6px solid #dc3545}.insight-list{display:grid;gap:.5rem}.insight{padding:.75rem;border-radius:10px;border-left:5px solid #6c757d;background:#f8f9fa}.insight-good{border-color:#198754}.insight-warning{border-color:#f59f00}.insight-danger{border-color:#dc3545}.small{font-size:.85rem}.button-row{display:flex;gap:.5rem;flex-wrap:wrap}.graph-grid{margin-top:1rem}.simple-chart{display:grid;gap:.75rem}.chart-row{display:grid;grid-template-columns:110px 1fr 70px;gap:.75rem;align-items:center}.chart-label{font-weight:700}.chart-bars{position:relative;background:#eef2f7;border-radius:999px;min-height:30px;overflow:hidden}.target-line{position:absolute;left:.75rem;top:.2rem;font-size:.75rem;color:#6c757d;z-index:2}.bar.actual{min-width:4%;height:30px;border-radius:999px;background:#198754;color:#fff;padding:.4rem .75rem;white-space:nowrap}.chart-percent{text-align:right;font-weight:700}@media(max-width:700px){.chart-row{grid-template-columns:1fr}.chart-percent{text-align:left}}
 </style>
 {% endblock %}
 
@@ -82,6 +82,75 @@
     {% endfor %}
     </div>
 </div>
+
+
+<div class="panel-card">
+    <h2>Graph Engine</h2>
+    <form class="filter-bar" method="get">
+        <input type="hidden" name="month" value="{{ selected_month }}">
+        <input type="hidden" name="year" value="{{ selected_year }}">
+        <input type="hidden" name="target_mode" value="{{ target_mode }}">
+        <input type="hidden" name="growth" value="{{ growth }}">
+        <label>Graph KPI
+            <select name="chart_metric">
+                {% for key, metric in metrics.items() %}<option value="{{ key }}" {% if key == chart_metric %}selected{% endif %}>{{ metric.label }}</option>{% endfor %}
+            </select>
+        </label>
+        <button class="btn" type="submit">Update Graph</button>
+    </form>
+</div>
+
+{% if graph_data %}
+<div class="grid-two graph-grid">
+    <div class="panel-card">
+        <h3>{{ graph_data.metric_label }} Actual vs Target</h3>
+        <div class="simple-chart">
+        {% for point in graph_data.actual_vs_target %}
+            {% set pct = point.achievement if point.achievement else 0 %}
+            <div class="chart-row">
+                <div class="chart-label">{{ point.label }}</div>
+                <div class="chart-bars"><div class="target-line">Target {{ '%.2f'|format(point.target) }}</div><div class="bar actual" style="width: {{ [pct, 120]|min }}%;">Actual {{ '%.2f'|format(point.actual) }}</div></div>
+                <div class="chart-percent">{{ '%.0f'|format(pct) }}%</div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+    <div class="panel-card">
+        <h3>Previous Year Comparison</h3>
+        <div class="simple-chart">
+        {% for point in graph_data.previous_year %}
+            {% set pct = point.growth_percent + 100 %}
+            <div class="chart-row">
+                <div class="chart-label">{{ point.label }}</div>
+                <div class="chart-bars"><div class="target-line">Last year {{ '%.2f'|format(point.previous_year) }}</div><div class="bar actual" style="width: {{ [pct if pct > 0 else 0, 120]|min }}%;">This year {{ '%.2f'|format(point.actual) }}</div></div>
+                <div class="chart-percent">{{ '%.0f'|format(point.growth_percent) }}%</div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+    <div class="panel-card">
+        <h3>Forecast vs Target</h3>
+        <div class="simple-chart">
+        {% for point in graph_data.forecast %}
+            {% set pct = point.forecast_percent if point.forecast_percent else 0 %}
+            <div class="chart-row">
+                <div class="chart-label">{{ point.label }}</div>
+                <div class="chart-bars"><div class="target-line">Target {{ '%.2f'|format(point.target) }}</div><div class="bar actual" style="width: {{ [pct, 120]|min }}%;">Forecast {{ '%.2f'|format(point.forecast) }}</div></div>
+                <div class="chart-percent">{{ '%.0f'|format(pct) }}%</div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+    <div class="panel-card">
+        <h3>Rolling 12-Month Total</h3>
+        <div class="simple-chart">
+        {% for point in graph_data.rolling_12 %}
+            <div class="chart-row"><div class="chart-label">{{ point.label }}</div><div class="chart-bars"><div class="bar actual" style="width: {{ 100 if point.rolling_total > 0 else 4 }}%;">{{ '%.2f'|format(point.rolling_total) }}</div></div></div>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <div class="table-responsive">
 <table class="data-table">
