@@ -1074,6 +1074,8 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True):
     users_created = 0
     users_linked = 0
     periods = set()
+    period_tuples = set()
+    franchise_ids_touched = set()
     franchise_names = set()
 
     for sheet_title, rows in iter_xlsx_import_sheets(file_storage):
@@ -1102,6 +1104,7 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True):
             if created_franchise:
                 franchises_created += 1
             franchise_names.add(franchise.business_name)
+            franchise_ids_touched.add(franchise.id)
             period_has_data = True
 
             if allocate_users:
@@ -1146,8 +1149,22 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True):
 
         if period_has_data:
             periods.add(f"{year}-{month:02d}")
+            period_tuples.add((month, year))
 
     db.session.commit()
+
+    # Performance speed phase: after an Excel import, calculate dashboard and
+    # decision-centre rows once so normal page loads only read saved results.
+    performance_rows = 0
+    try:
+        from app.performance.service import rebuild_performance_results
+        for perf_month, perf_year in sorted(period_tuples, key=lambda item: (item[1], item[0])):
+            performance_rows += rebuild_performance_results(
+                perf_month, perf_year, list(franchise_ids_touched), "growth_bracket"
+            )
+    except Exception as exc:
+        current_app.logger.exception("Performance pre-calculation failed after monthly Excel import: %s", exc)
+
     return {
         "imported": imported,
         "updated": updated,
@@ -1159,6 +1176,7 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True):
         "franchise_count": len(franchise_names),
         "first_period": sorted(periods)[0] if periods else "",
         "last_period": sorted(periods)[-1] if periods else "",
+        "performance_rows": performance_rows,
     }
 
 
@@ -1319,7 +1337,8 @@ def import_excel():
         db.session.commit()
         flash(
             f"Excel import complete. {result['imported']} new records created, {result['updated']} records updated, "
-            f"{result['franchise_count']} franchises allocated across {result['period_count']} period(s).",
+            f"{result['franchise_count']} franchises allocated across {result['period_count']} period(s). "
+            f"Performance cache rows prepared: {result.get('performance_rows', 0)}.",
             "success",
         )
         return render_template("monthly/import_excel.html", result=result)

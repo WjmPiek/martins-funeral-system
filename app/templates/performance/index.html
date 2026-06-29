@@ -51,8 +51,14 @@
 <form method="post" action="{{ url_for('performance.recalculate') }}" class="filter-bar">
     <input type="hidden" name="month" value="{{ selected_month }}">
     <input type="hidden" name="year" value="{{ selected_year }}">
-    <button class="btn secondary" type="submit">Recalculate Phase 1 Results</button>
-    <span class="muted">Uses PDF/monthly import data and fair growth brackets.</span>
+    <button class="btn secondary" type="submit">Recalculate Current Month</button>
+    <span class="muted">Pre-calculates this month so dashboards load fast.</span>
+</form>
+<form method="post" action="{{ url_for('performance.recalculate_all') }}" class="filter-bar">
+    <input type="hidden" name="month" value="{{ selected_month }}">
+    <input type="hidden" name="year" value="{{ selected_year }}">
+    <button class="btn secondary" type="submit">Rebuild All Performance Cache</button>
+    <span class="muted">Run after deploying this speed update or after a big historic import.</span>
 </form>
 {% endif %}
 

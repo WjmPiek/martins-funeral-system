@@ -512,6 +512,60 @@ def period_actuals(month, year, franchise_ids, metric_keys=None):
     return _cached_value(cache_key, load)
 
 
+
+def stored_results_for_period(month, year, franchise_ids, metric_keys=None):
+    """Return pre-calculated performance rows from performance_results.
+
+    This is the fast path used by dashboards and graphs.  Heavy calculations are
+    done once by rebuild_performance_results() after import/recalculate; page
+    requests should mainly read these rows.
+    """
+    franchise_ids = filter_active_franchise_ids(franchise_ids)
+    metric_keys = list(metric_keys or PERFORMANCE_METRICS.keys())
+    if not franchise_ids:
+        return {}
+    cache_key = ("stored_results_for_period", int(month), int(year), _ids_key(franchise_ids), _metrics_key(metric_keys))
+
+    def load():
+        rows = PerformanceResult.query.filter(
+            PerformanceResult.franchise_id.in_(franchise_ids),
+            PerformanceResult.year == year,
+            PerformanceResult.month == month,
+            PerformanceResult.metric.in_(metric_keys),
+        ).all()
+        data = {}
+        for row in rows:
+            data.setdefault(row.franchise_id, {})[row.metric] = row
+        return data
+
+    return _cached_value(cache_key, load)
+
+
+def period_has_stored_results(month, year, franchise_ids, metric_keys=None):
+    metric_keys = list(metric_keys or PERFORMANCE_METRICS.keys())
+    franchise_ids = filter_active_franchise_ids(franchise_ids)
+    if not franchise_ids:
+        return False
+    stored = stored_results_for_period(month, year, franchise_ids, metric_keys)
+    expected = len(franchise_ids) * len(metric_keys)
+    found = sum(1 for fid in franchise_ids for metric in metric_keys if stored.get(fid, {}).get(metric))
+    return found >= expected
+
+
+def ensure_performance_results(month, year, franchise_ids=None, mode="growth_bracket"):
+    """Create missing cache rows for a period, but never block on repeated reads.
+
+    For normal page loads this function is intentionally conservative: if there
+    are already rows for the period it returns immediately.  Imports and the
+    recalculate button call rebuild_performance_results() for a full refresh.
+    """
+    franchise_ids = filter_active_franchise_ids(franchise_ids or accessible_franchise_ids())
+    if not franchise_ids:
+        return 0
+    if period_has_stored_results(month, year, franchise_ids):
+        return 0
+    return rebuild_performance_results(month, year, franchise_ids, mode)
+
 def stored_targets(month, year, franchise_ids, metric_keys=None):
     metric_keys = list(metric_keys or PERFORMANCE_METRICS.keys())
     franchise_ids = list(franchise_ids or [])
@@ -596,22 +650,39 @@ def comparison_value(franchise_id, metric_key, month, year, comparison):
 
 
 def franchise_metric_summary(franchise_id, month, year, mode="manual", growth_percent=DEFAULT_GROWTH_PERCENT):
-    actuals = period_actuals(month, year, [franchise_id]).get(franchise_id, {})
-    targets = targets_for_period(month, year, [franchise_id], mode, growth_percent).get(franchise_id, {})
+    stored_rows = stored_results_for_period(month, year, [franchise_id]).get(franchise_id, {})
+    use_stored = bool(stored_rows)
+    if not use_stored:
+        actuals = period_actuals(month, year, [franchise_id]).get(franchise_id, {})
+        targets = targets_for_period(month, year, [franchise_id], mode, growth_percent).get(franchise_id, {})
     rows = []
     for metric_key, config in PERFORMANCE_METRICS.items():
-        actual = actuals.get(metric_key, Decimal("0"))
-        target = targets.get(metric_key, Decimal("0"))
-        previous = comparison_value(franchise_id, metric_key, month, year, "previous_month")
-        last_year = comparison_value(franchise_id, metric_key, month, year, "same_month_last_year")
-        three_year = comparison_value(franchise_id, metric_key, month, year, "three_year_average")
         bracket_details = bracket_target_details(franchise_id, metric_key, month, year)
-        mom_growth = growth_rate(actual, previous)
-        yoy_growth = growth_rate(actual, last_year)
-        ytd_growth = year_to_date_growth_percent(franchise_id, metric_key, month, year)
-        annual_growth = annual_growth_percent_formula(franchise_id, metric_key, year)
-        average_growth = average_monthly_growth_percent(franchise_id, metric_key, month, year, 12)
-        three_year_growth = three_year_growth_percent(franchise_id, metric_key, month, year)
+        if use_stored and metric_key in stored_rows:
+            result = stored_rows[metric_key]
+            actual = to_decimal(result.actual_value)
+            target = to_decimal(result.target_value)
+            previous = to_decimal(result.previous_month_value)
+            last_year = to_decimal(result.same_month_last_year_value)
+            three_year = to_decimal(result.three_year_average_value)
+            mom_growth = growth_rate(actual, previous)
+            yoy_growth = growth_rate(actual, last_year)
+            ytd_growth = Decimal("0")
+            annual_growth = Decimal("0")
+            average_growth = Decimal("0")
+            three_year_growth = growth_rate(actual, three_year)
+        else:
+            actual = actuals.get(metric_key, Decimal("0"))
+            target = targets.get(metric_key, Decimal("0"))
+            previous = comparison_value(franchise_id, metric_key, month, year, "previous_month")
+            last_year = comparison_value(franchise_id, metric_key, month, year, "same_month_last_year")
+            three_year = comparison_value(franchise_id, metric_key, month, year, "three_year_average")
+            mom_growth = growth_rate(actual, previous)
+            yoy_growth = growth_rate(actual, last_year)
+            ytd_growth = year_to_date_growth_percent(franchise_id, metric_key, month, year)
+            annual_growth = annual_growth_percent_formula(franchise_id, metric_key, year)
+            average_growth = average_monthly_growth_percent(franchise_id, metric_key, month, year, 12)
+            three_year_growth = three_year_growth_percent(franchise_id, metric_key, month, year)
         rows.append({
             "key": metric_key,
             "label": config["label"],
@@ -674,22 +745,43 @@ def ranked_performance(month, year, franchise_ids, mode="manual", growth_percent
     def load_franchises():
         return Franchise.query.filter(Franchise.id.in_(franchise_ids)).order_by(Franchise.business_name.asc()).all() if franchise_ids else []
     franchises = _cached_value(("franchises", _ids_key(franchise_ids)), load_franchises)
-    actuals_by = period_actuals(month, year, franchise_ids)
-    targets_by = targets_for_period(month, year, franchise_ids, mode, growth_percent)
+
+    stored_by = stored_results_for_period(month, year, franchise_ids)
+    use_stored = any(stored_by.get(franchise.id) for franchise in franchises)
+    if not use_stored:
+        actuals_by = period_actuals(month, year, franchise_ids)
+        targets_by = targets_for_period(month, year, franchise_ids, mode, growth_percent)
+
     rows = []
     for franchise in franchises:
-        actuals = actuals_by.get(franchise.id, {})
-        targets = targets_by.get(franchise.id, {})
-        if metric_key == "overall":
-            score = performance_score(actuals, targets)
-            actual = sum(actuals.values(), Decimal("0"))
-            target = sum(targets.values(), Decimal("0"))
-            achievement = score
+        if use_stored:
+            result_rows = stored_by.get(franchise.id, {})
+            if metric_key == "overall":
+                actuals = {key: to_decimal(result_rows.get(key).actual_value) for key in PERFORMANCE_METRICS if result_rows.get(key)}
+                targets = {key: to_decimal(result_rows.get(key).target_value) for key in PERFORMANCE_METRICS if result_rows.get(key)}
+                score = performance_score(actuals, targets)
+                actual = sum(actuals.values(), Decimal("0"))
+                target = sum(targets.values(), Decimal("0"))
+                achievement = score
+            else:
+                result = result_rows.get(metric_key)
+                actual = to_decimal(result.actual_value) if result else Decimal("0")
+                target = to_decimal(result.target_value) if result else Decimal("0")
+                achievement = to_decimal(result.achievement_percent) if result else Decimal("0")
+                score = achievement
         else:
-            actual = actuals.get(metric_key, Decimal("0"))
-            target = targets.get(metric_key, Decimal("0"))
-            achievement = percent(actual, target)
-            score = achievement
+            actuals = actuals_by.get(franchise.id, {})
+            targets = targets_by.get(franchise.id, {})
+            if metric_key == "overall":
+                score = performance_score(actuals, targets)
+                actual = sum(actuals.values(), Decimal("0"))
+                target = sum(targets.values(), Decimal("0"))
+                achievement = score
+            else:
+                actual = actuals.get(metric_key, Decimal("0"))
+                target = targets.get(metric_key, Decimal("0"))
+                achievement = percent(actual, target)
+                score = achievement
         rows.append({
             "franchise_id": franchise.id,
             "franchise_name": franchise.business_name or "Unnamed Franchise",
@@ -738,13 +830,20 @@ def trend_series(franchise_id, metric_key, end_month, end_year, periods=12, mode
     periods_list.reverse()
     series = []
     for m, y in periods_list:
-        actual = period_actuals(m, y, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
-        target = targets_for_period(m, y, [franchise_id], mode, growth_percent, [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+        stored = stored_results_for_period(m, y, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key)
+        if stored:
+            actual = to_decimal(stored.actual_value)
+            target = to_decimal(stored.target_value)
+            achievement = to_decimal(stored.achievement_percent)
+        else:
+            actual = period_actuals(m, y, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+            target = targets_for_period(m, y, [franchise_id], mode, growth_percent, [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+            achievement = percent(actual, target)
         series.append({
             "label": f"{MONTH_NAME.get(m, m)[:3]} {y}",
             "actual": float(actual),
             "target": float(target),
-            "achievement": float(percent(actual, target)),
+            "achievement": float(achievement),
         })
     return series
 
@@ -1012,24 +1111,32 @@ def metric_page_summary(metric_key, month, year, franchise_ids, mode="growth_bra
     """Build one KPI decision page for Cash, Sales, Insurance, Joinings or Funerals."""
     if metric_key not in PERFORMANCE_METRICS:
         metric_key = "cash"
-    actuals_by = period_actuals(month, year, franchise_ids, [metric_key])
-    targets_by = targets_for_period(month, year, franchise_ids, mode, growth_percent, [metric_key])
     rows = ranked_performance(month, year, franchise_ids, mode, growth_percent, metric_key)
     previous_m, previous_y = previous_month(month, year)
     rows = attach_movement(
         rows,
         ranked_performance(previous_m, previous_y, franchise_ids, mode, growth_percent, metric_key),
     )
-    total_actual = sum((actuals_by.get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
-    total_target = sum((targets_by.get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
-    previous_total = sum((period_actuals(previous_m, previous_y, [fid], [metric_key]).get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
-    last_year_total = sum((period_actuals(month, year - 1, [fid], [metric_key]).get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
-    three_year_values = []
-    for m, y in previous_years(month, year, 3):
-        total = sum((period_actuals(m, y, [fid], [metric_key]).get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
-        if total > 0:
-            three_year_values.append(total)
-    three_year_avg = safe_average(three_year_values)
+    stored = stored_results_for_period(month, year, franchise_ids, [metric_key])
+    if any(stored.get(fid, {}).get(metric_key) for fid in franchise_ids):
+        total_actual = sum((to_decimal(stored.get(fid, {}).get(metric_key).actual_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)), Decimal("0"))
+        total_target = sum((to_decimal(stored.get(fid, {}).get(metric_key).target_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)), Decimal("0"))
+        previous_total = sum((to_decimal(stored.get(fid, {}).get(metric_key).previous_month_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)), Decimal("0"))
+        last_year_total = sum((to_decimal(stored.get(fid, {}).get(metric_key).same_month_last_year_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)), Decimal("0"))
+        three_year_avg = safe_average([to_decimal(stored.get(fid, {}).get(metric_key).three_year_average_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)])
+    else:
+        actuals_by = period_actuals(month, year, franchise_ids, [metric_key])
+        targets_by = targets_for_period(month, year, franchise_ids, mode, growth_percent, [metric_key])
+        total_actual = sum((actuals_by.get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
+        total_target = sum((targets_by.get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
+        previous_total = sum((period_actuals(previous_m, previous_y, [fid], [metric_key]).get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
+        last_year_total = sum((period_actuals(month, year - 1, [fid], [metric_key]).get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
+        three_year_values = []
+        for m, y in previous_years(month, year, 3):
+            total = sum((period_actuals(m, y, [fid], [metric_key]).get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
+            if total > 0:
+                three_year_values.append(total)
+        three_year_avg = safe_average(three_year_values)
     top_rows = rows[:10]
     bottom_rows = list(reversed(rows[-10:])) if len(rows) > 10 else rows[-5:]
     return {

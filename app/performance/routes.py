@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 from app.audit import log_action
 from app.extensions import db
 from app.franchise_context import get_accessible_franchises, get_selected_franchise, is_privileged_user
-from app.models import Franchise, FranchiseTarget, PerformanceGrowthBracket, User
+from app.models import Franchise, FranchiseTarget, MonthlyFigure, PerformanceGrowthBracket, User
 from app.performance.service import (
     DEFAULT_GROWTH_PERCENT,
     MONTHS,
@@ -27,6 +27,7 @@ from app.performance.service import (
     to_decimal,
     trend_series,
     rebuild_performance_results,
+    ensure_performance_results,
     target_plan_for_period,
     save_growth_bracket_targets,
     annual_budget_plan_for_period,
@@ -83,6 +84,7 @@ def dashboard():
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
+    ensure_performance_results(month, year, ids, "growth_bracket")
     selected = get_selected_franchise()
     franchise_id = selected.id if selected else (ids[0] if ids else None)
     if not franchise_id:
@@ -119,7 +121,9 @@ def index():
     if metric_key != "overall" and metric_key not in PERFORMANCE_METRICS:
         metric_key = "overall"
     ids = accessible_franchise_ids()
+    ensure_performance_results(month, year, ids, "growth_bracket")
     previous_m, previous_y = previous_month(month, year)
+    ensure_performance_results(previous_m, previous_y, ids, "growth_bracket")
     rows = attach_movement(
         ranked_performance(month, year, ids, mode, growth, metric_key),
         ranked_performance(previous_m, previous_y, ids, mode, growth, metric_key),
@@ -158,6 +162,7 @@ def kpi(metric_key):
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
+    ensure_performance_results(month, year, ids, "growth_bracket")
     summary = metric_page_summary(metric_key, month, year, ids, mode, growth)
     selected = get_selected_franchise()
     my_row = None
@@ -200,6 +205,7 @@ def franchise(franchise_id):
     month, year = selected_period_from_request(request.args)
     mode = request_mode()
     growth = request_growth()
+    ensure_performance_results(month, year, [franchise_id], "growth_bracket")
     franchise = Franchise.query.get_or_404(franchise_id)
     metric_rows = franchise_metric_summary(franchise_id, month, year, mode, growth)
     chart_metric = request.args.get("chart_metric", "cash")
@@ -240,6 +246,7 @@ def decision_centre_view():
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
+    ensure_performance_results(month, year, ids, "growth_bracket")
     centre = decision_centre(month, year, ids, mode, growth)
     return render_template(
         "performance/decision_centre.html",
@@ -264,6 +271,7 @@ def executive():
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
+    ensure_performance_results(month, year, ids, "growth_bracket")
     dashboard = executive_dashboard(month, year, ids, mode, growth)
     return render_template(
         "performance/executive.html",
@@ -288,6 +296,7 @@ def leaderboards():
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
+    ensure_performance_results(month, year, ids, "growth_bracket")
     boards = leaderboard_decision_centre(month, year, ids, mode, growth)
     return render_template(
         "performance/leaderboards.html",
@@ -312,6 +321,7 @@ def insights():
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
+    ensure_performance_results(month, year, ids, "growth_bracket")
     selected = get_selected_franchise()
     franchise_id = request.args.get("franchise_id", type=int)
     if franchise_id and franchise_id not in ids:
@@ -494,6 +504,29 @@ def recalculate():
     saved = rebuild_performance_results(month, year, accessible_franchise_ids(), "growth_bracket")
     log_action("Performance", "Recalculated performance results", f"Rows saved: {saved}; Hidden inactive: {hidden}; Period: {month_label(month, year)}")
     flash(f"Performance results recalculated for {month_label(month, year)}. Hidden inactive franchises: {hidden}.", "success")
+    return redirect(url_for("performance.index", month=month, year=year, target_mode="growth_bracket"))
+
+
+@performance_bp.route("/recalculate-all", methods=["POST"])
+@login_required
+@permission_required("performance:manage_targets")
+def recalculate_all():
+    periods = db.session.query(MonthlyFigure.month, MonthlyFigure.year).distinct().order_by(
+        MonthlyFigure.year.asc(), MonthlyFigure.month.asc()
+    ).all()
+    total_saved = 0
+    for period_month, period_year in periods:
+        franchise_ids = [
+            row[0]
+            for row in db.session.query(MonthlyFigure.franchise_id)
+            .filter_by(month=period_month, year=period_year)
+            .distinct()
+            .all()
+        ]
+        total_saved += rebuild_performance_results(period_month, period_year, franchise_ids, "growth_bracket")
+    log_action("Performance", "Recalculated all performance cache rows", f"Rows saved: {total_saved}; Periods: {len(periods)}")
+    flash(f"All performance cache rows rebuilt. Rows saved: {total_saved}; periods: {len(periods)}.", "success")
+    month, year = selected_period_from_request(request.form)
     return redirect(url_for("performance.index", month=month, year=year, target_mode="growth_bracket"))
 
 

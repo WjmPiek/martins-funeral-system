@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Martins Funerals System</title>
+
+    <link rel="preload" href="{{ url_for('static', filename='img/logo.png') }}" as="image" fetchpriority="high">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v66-user-friendly-sidebar') }}">
+</head>
+<body class="app-body">
+    {% if current_user.is_authenticated %}
+        <div class="app-shell">
+            <aside class="sidebar">
+                <a class="sidebar-logo" href="{{ url_for('dashboard.index') }}">
+                    <img
+                        src="{{ url_for('static', filename='img/logo.png') }}"
+                        alt="System Logo"
+                        width="180"
+                        height="81"
+                        loading="eager"
+                        decoding="async"
+                        fetchpriority="high"
+                    >
+                    <span>Martins Funerals System</span>
+                </a>
+
+                <nav class="sidebar-nav">
+                    {% set nav_role_names = current_user.roles|map(attribute='name')|list %}
+                    {% set is_franchise_user = 'Franchise User' in nav_role_names or 'Manager' in nav_role_names or 'Employee' in nav_role_names or 'Agent' in nav_role_names %}
+                    {% set is_admin_user = 'Admin' in nav_role_names or 'Super Admin' in nav_role_names %}
+                    {% set is_finance_user = 'Finance Manager' in nav_role_names or 'Finance Assistant' in nav_role_names %}
+
+                    {# Menu order: lower-priority/admin setup first, daily important work lower in the sidebar. #}
+                    {% if privileged_user and franchise_view_mode %}
+                        <div class="nav-group-title">Admin</div>
+                        <a href="{{ url_for('dashboard.main_dashboard') }}">Back to Main Dashboard</a>
+
+                        {% if current_user.has_permission('manuals:view') %}<a href="{{ url_for('manuals.index') }}">Manuals</a>{% endif %}
+                        {% if current_user.has_permission('heat_map:view') %}<a href="{{ url_for('heatmap.index') }}">Heat Map</a>{% endif %}
+                        {% if current_user.has_permission('attendance:view') %}<a href="{{ url_for('attendance.index') }}">Attendance</a>{% endif %}
+
+                        <div class="nav-group-title">Selected Franchise</div>
+
+                        <details class="nav-section" open>
+                            <summary>Franchise Details <span class="nav-count-badge">2</span></summary>
+                            <div class="nav-subtabs">
+                                <a href="{{ url_for('franchise.details') }}">Franchise Details</a>
+                                {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}<a href="{{ url_for('franchise.employees') }}">Employees</a>{% endif %}
+                            </div>
+                        </details>
+
+                        <details class="nav-section" open>
+                            <summary>Monthly Figures <span class="nav-count-badge">4</span></summary>
+                            <div class="nav-subtabs">
+                                <a href="{{ url_for('performance.index') }}">Performance</a>
+                                <a href="{{ url_for('monthly.index') }}">Monthly Figures</a>
+                                <a href="{{ url_for('royalties.index') }}">Royalties</a>
+                                {% if current_user.has_permission('finance:view') %}<a href="#">Finance</a>{% endif %}
+                            </div>
+                        </details>
+                    {% else %}
+                        {# Low-priority/admin and setup areas at the top. #}
+                        {% if current_user.has_permission('users:view') or current_user.has_permission('user_roles:view') or current_user.has_permission('performance:manage_inactive') or is_admin_user or is_finance_user %}
+                            <div class="nav-group-title">Admin</div>
+                            <details class="nav-section" open>
+                                <summary>Users <span class="nav-count-badge">4</span></summary>
+                                <div class="nav-subtabs">
+                                    {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.users') }}">Users</a>{% endif %}
+                                    {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.franchise_employees') }}">Employees</a>{% endif %}
+                                    {% if current_user.has_permission('user_roles:view') %}<a href="{{ url_for('admin.roles') }}">User Roles</a>{% endif %}
+                                    {% if current_user.has_permission('performance:manage_inactive') or is_admin_user or 'Finance Manager' in nav_role_names %}<a href="{{ url_for('performance.inactive_franchises') }}">Old Franchises</a>{% endif %}
+                                </div>
+                            </details>
+
+                            {% if current_user.has_permission('franchise_management:view') %}<a href="#">Franchise Management</a>{% endif %}
+                            {% if current_user.has_permission('audit_logs:view') %}<a href="{{ url_for('admin.audit_logs') }}">Audit Logs</a>{% endif %}
+                            {% if current_user.has_permission('system_administration:view') %}<a href="#">System Administration</a>{% endif %}
+                            {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.imports_data') }}">Imports & Data</a>{% endif %}
+                        {% endif %}
+
+                        {# Operational/support modules in the middle. #}
+                        {% if current_user.has_permission('manuals:view') %}<a href="{{ url_for('manuals.index') }}">Manuals</a>{% endif %}
+                        {% if current_user.has_permission('heat_map:view') %}<a href="{{ url_for('heatmap.index') }}">Heat Map</a>{% endif %}
+                        {% if current_user.has_permission('insurance_claims:view') and not is_franchise_user %}<a href="{{ url_for('insurance_claims.index') }}">Insurance Claims</a>{% endif %}
+                        {% if current_user.has_permission('joinings:view') and not is_franchise_user %}<a href="#">Joinings</a>{% endif %}
+                        {% if current_user.has_permission('funeral_services:view') and not is_franchise_user %}<a href="#">Funeral Services</a>{% endif %}
+                        {% if current_user.has_permission('attendance:view') %}<a href="{{ url_for('attendance.index') }}">Attendance</a>{% endif %}
+
+                        {# Important daily franchise and performance work lower in the sidebar. #}
+                        {% if current_user.has_permission('franchise_details:view') or current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}
+                            <details class="nav-section" open>
+                                <summary>Franchise Details <span class="nav-count-badge">2</span></summary>
+                                <div class="nav-subtabs">
+                                    {% if current_user.has_permission('franchise_details:view') %}<a href="{{ url_for('franchise.details') }}">Franchise Details</a>{% endif %}
+                                    {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}<a href="{{ url_for('franchise.employees') }}">Employees</a>{% endif %}
+                                </div>
+                            </details>
+                        {% endif %}
+
+                        {% if current_user.has_permission('performance:view') or current_user.has_permission('monthly_figures:view') or current_user.has_permission('royalties:view') or current_user.has_permission('finance:view') %}
+                            <details class="nav-section" open>
+                                <summary>Monthly Figures <span class="nav-count-badge">4</span></summary>
+                                <div class="nav-subtabs">
+                                    {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.index') }}">Performance</a>{% endif %}
+                                    {% if current_user.has_permission('monthly_figures:view') %}<a href="{{ url_for('monthly.index') }}">Monthly Figures</a>{% endif %}
+                                    {% if current_user.has_permission('royalties:view') %}<a href="{{ url_for('royalties.index') }}">Royalties</a>{% endif %}
+                                    {% if current_user.has_permission('finance:view') %}<a href="#">Finance</a>{% endif %}
+                                </div>
+                            </details>
+                        {% endif %}
+
+                        {% if current_user.has_permission('dashboard:view') and not is_franchise_user %}
+                            <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
+                        {% endif %}
+                    {% endif %}
+                </nav>
+            </aside>
+
+            <div class="main-panel">
+                <header class="topbar">
+                    <div class="page-title">
+                        Martins Funerals System
+                        {% if franchise_view_mode and selected_franchise %}
+                            <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
+                        {% endif %}
+                    </div>
+                    <div class="topbar-user">
+                        <span>Logged in as</span>
+                        <strong>{{ current_user.full_name }}</strong>
+                        <small>{{ current_user.roles|map(attribute='name')|join(', ') or 'No Role' }}</small>
+                        {% if privileged_user and franchise_view_mode %}
+                            <a class="logout-link secondary-link" href="{{ url_for('dashboard.main_dashboard') }}">Main Dashboard</a>
+                        {% endif %}
+                        <a class="logout-link" href="{{ url_for('auth.logout') }}">Logout</a>
+                    </div>
+                </header>
+
+                <main class="content-area">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            <div class="messages">
+                                {% for category, message in messages %}
+                                    <div class="alert {{ category }}">{{ message }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+                    {% block app_content %}{% endblock %}
+                </main>
+            </div>
+        </div>
+    {% else %}
+        <nav class="nav">
+            <div class="brand">Martins Funerals System</div>
+            <div>
+                <a href="{{ url_for('auth.login') }}">Login</a>
+                <a href="{{ url_for('auth.register') }}">Register</a>
+            </div>
+        </nav>
+        <main class="container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="messages">
+                        {% for category, message in messages %}
+                            <div class="alert {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            {% block auth_content %}{% endblock %}
+        </main>
+    {% endif %}
+
+<script>
+// V3.5: hold mouse button and drag tables left/right or up/down.
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.table-responsive, .system-report-wrap').forEach(function (wrap) {
+    if (wrap.dataset.dragScrollReady === '1') return;
+    wrap.dataset.dragScrollReady = '1';
+
+    var isDown = false;
+    var startX = 0;
+    var startY = 0;
+    var scrollLeft = 0;
+    var scrollTop = 0;
+
+    wrap.addEventListener('mousedown', function (event) {
+      if (event.button !== 0) return;
+      if (event.target.closest('a, button, input, select, textarea, label')) return;
+      isDown = true;
+      wrap.classList.add('is-dragging');
+      startX = event.pageX - wrap.offsetLeft;
+      startY = event.pageY - wrap.offsetTop;
+      scrollLeft = wrap.scrollLeft;
+      scrollTop = wrap.scrollTop;
+    });
+
+    wrap.addEventListener('mouseleave', function () {
+      isDown = false;
+      wrap.classList.remove('is-dragging');
+    });
+
+    wrap.addEventListener('mouseup', function () {
+      isDown = false;
+      wrap.classList.remove('is-dragging');
+    });
+
+    wrap.addEventListener('mousemove', function (event) {
+      if (!isDown) return;
+      event.preventDefault();
+      var x = event.pageX - wrap.offsetLeft;
+      var y = event.pageY - wrap.offsetTop;
+      wrap.scrollLeft = scrollLeft - (x - startX);
+      wrap.scrollTop = scrollTop - (y - startY);
+    });
+  });
+});
+</script>
+
+
+<script>
+// Preserve the sidebar scroll position between normal Flask page loads.
+(function () {
+  var key = 'martins-sidebar-scroll-top';
+  var sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
+
+  var saved = sessionStorage.getItem(key);
+  if (saved !== null) {
+    sidebar.scrollTop = parseInt(saved, 10) || 0;
+  }
+
+  sidebar.addEventListener('scroll', function () {
+    sessionStorage.setItem(key, String(sidebar.scrollTop));
+  }, { passive: true });
+})();
+</script>
+
+</body>
+</html>

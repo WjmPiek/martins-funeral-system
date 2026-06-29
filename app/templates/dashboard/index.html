@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Dashboard</h1>
+      {% if privileged_user and not franchise_view_mode %}
+        <p class="muted">Main dashboard: all franchises are shown below.</p>
+      {% elif accessible_franchises|length > 1 %}
+        <p class="muted">Main franchise dashboard: all franchises linked to your user are shown below.</p>
+      {% else %}
+        <p class="muted">Franchise dashboard: only data for the selected franchise is shown.</p>
+      {% endif %}
+    </div>
+
+    {% if privileged_user and franchise_view_mode %}
+      <a class="btn secondary button-auto" href="{{ url_for('dashboard.main_dashboard') }}">Back to Main Dashboard</a>
+    {% elif privileged_user %}
+      <span class="badge success">Franchise Management Access</span>
+    {% else %}
+      <span class="badge warning">Franchise Access</span>
+    {% endif %}
+  </div>
+
+  {% if (privileged_user and not franchise_view_mode) or (not privileged_user and accessible_franchises|length > 1) %}
+    <div class="activity-summary-card">
+      <span class="badge success">Active franchises: {{ active_franchises|length }}</span>
+      <span class="badge danger">No data: {{ inactive_franchises|length }}</span>
+      <span class="muted">{{ activity_period_label }}</span>
+    </div>
+
+    {% if active_franchises %}
+      <h2 class="dashboard-franchise-heading active-heading">Active franchises</h2>
+      <div class="branch-grid">
+        {% for franchise in active_franchises %}
+          <a class="branch-card branch-card-active" href="{{ url_for('dashboard.select_franchise', franchise_id=franchise.id) }}">
+            <div class="branch-status-row"><span class="status-dot green"></span><span class="badge success">Active</span></div>
+            <h2>{{ franchise.business_name or 'Unnamed Franchise' }}</h2>
+            <div class="branch-details">
+              <div><span>Address</span><strong>{{ franchise.office_address or 'Not captured' }}</strong></div>
+              <div><span>Office Number</span><strong>{{ franchise.office_number or 'Not captured' }}</strong></div>
+              <div><span>24-Hour Number</span><strong>{{ franchise.after_hours_number or 'Not captured' }}</strong></div>
+              <div><span>Email</span><strong>{{ franchise.public_email or franchise.franchisee_email or 'Not captured' }}</strong></div>
+            </div>
+            <div class="branch-meta"><span>Click to open franchise dashboard</span></div>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if inactive_franchises %}
+      <h2 class="dashboard-franchise-heading inactive-heading">Franchises without data for the past 6 months</h2>
+      <div class="branch-grid">
+        {% for franchise in inactive_franchises %}
+          <a class="branch-card branch-card-inactive" href="{{ url_for('dashboard.select_franchise', franchise_id=franchise.id) }}">
+            <div class="branch-status-row"><span class="status-dot red"></span><span class="badge danger">No recent data</span></div>
+            <h2>{{ franchise.business_name or 'Unnamed Franchise' }}</h2>
+            <div class="branch-details">
+              <div><span>Address</span><strong>{{ franchise.office_address or 'Not captured' }}</strong></div>
+              <div><span>Office Number</span><strong>{{ franchise.office_number or 'Not captured' }}</strong></div>
+              <div><span>24-Hour Number</span><strong>{{ franchise.after_hours_number or 'Not captured' }}</strong></div>
+              <div><span>Email</span><strong>{{ franchise.public_email or franchise.franchisee_email or 'Not captured' }}</strong></div>
+            </div>
+            <div class="branch-meta"><span>Click to open franchise dashboard</span></div>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if not active_franchises and not inactive_franchises %}
+      <div class="form-section-card">
+        <h2>No franchises captured yet</h2>
+        <p class="muted">Create a franchise under Franchise Details.</p>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  {% if not (privileged_user and not franchise_view_mode) %}
+    {% if selected_franchise %}
+      {% if linked_franchise_group %}
+      <div class="form-section-card linked-dashboard-group">
+        <h2>Linked Franchise Group</h2>
+        <p class="muted">This branch is linked for grouped dashboard/royalty calculations.</p>
+        <p><strong>Main franchise user:</strong> {{ linked_franchise_group.user.full_name }} - {{ linked_franchise_group.user.email }}</p>
+        <p><strong>Linked franchises:</strong> {{ linked_franchise_group.branch_names|join(' + ') }}</p>
+      </div>
+      {% endif %}
+
+      <div class="branch-card active franchise-dashboard-card">
+        <h2>{{ selected_franchise.business_name or 'Unnamed Franchise' }}</h2>
+        <div class="branch-details">
+          <div><span>Address</span><strong>{{ selected_franchise.office_address or 'Not captured' }}</strong></div>
+          <div><span>Office Number</span><strong>{{ selected_franchise.office_number or 'Not captured' }}</strong></div>
+          <div><span>24-Hour Number</span><strong>{{ selected_franchise.after_hours_number or 'Not captured' }}</strong></div>
+          <div><span>Email</span><strong>{{ selected_franchise.public_email or selected_franchise.franchisee_email or 'Not captured' }}</strong></div>
+        </div>
+      </div>
+
+      
+{% if performance_snapshot %}
+<div class="highlight-card performance-dashboard-card movement-{{ performance_snapshot.movement }}">
+    <div>
+        <div class="muted">Performance Leaderboard</div>
+        <h2>#{{ performance_snapshot.rank }} of {{ performance_snapshot.total }} — {{ performance_snapshot.franchise_name }}</h2>
+        <p>{{ performance_snapshot.period_label }} weighted score: <strong>{{ '%.2f'|format(performance_snapshot.score) }}%</strong></p>
+    </div>
+    <div class="leaderboard-move {{ performance_snapshot.movement }}">{{ performance_snapshot.movement_label }}{% if performance_snapshot.movement_delta %} {{ performance_snapshot.movement_delta|abs }}{% endif %}</div>
+    <div class="performance-mini-grid">
+        {% for metric in performance_snapshot.metrics %}
+            <div><span>{{ metric.label }}</span><strong>{{ '%.0f'|format(metric.target_percent) }}%</strong></div>
+        {% endfor %}
+    </div>
+    <a class="btn secondary" href="{{ url_for('performance.franchise', franchise_id=selected_franchise.id) }}">Open Performance</a>
+</div>
+{% endif %}
+
+{% if leaderboard_snapshot %}
+      <div class="form-section-card dashboard-leaderboard-card">
+        <div>
+          <p class="muted">Leaderboard position - {{ leaderboard_snapshot.period_label }}</p>
+          <h2>#{{ leaderboard_snapshot.rank }} of {{ leaderboard_snapshot.total }}</h2>
+          <p><strong>{{ leaderboard_snapshot.franchise_name }}</strong></p>
+        </div>
+        <div class="dashboard-leaderboard-metrics">
+          <span class="leaderboard-movement {{ leaderboard_snapshot.movement_class }}">
+            {{ leaderboard_snapshot.movement_label }}{% if leaderboard_snapshot.movement_delta %} {{ leaderboard_snapshot.movement_delta|abs }}{% endif %}
+          </span>
+          <a class="btn secondary button-auto" href="{{ url_for('leaderboard.index') }}">Open Leaderboard</a>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="dashboard-action-grid">
+        {% if current_user.has_permission('franchise_details:view') %}
+        <a class="dashboard-action-card" href="{{ url_for('franchise.details') }}">
+          <strong>Franchise Details</strong>
+          <span>View and maintain selected franchise profile.</span>
+        </a>
+        {% endif %}
+        {% if current_user.has_permission('monthly_figures:view') %}
+        <a class="dashboard-action-card" href="{{ url_for('monthly.index') }}">
+          <strong>Monthly Figures</strong>
+          <span>View monthly imported figures for this franchise.</span>
+        </a>
+        {% endif %}
+        {% if current_user.has_permission('royalties:view') %}
+        <a class="dashboard-action-card" href="{{ url_for('royalties.index') }}">
+          <strong>Royalties</strong>
+          <span>View royalty calculations and history for this franchise.</span>
+        </a>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="form-section-card">
+        <h2>No franchise assigned</h2>
+        <p class="muted">Ask Admin or Finance to assign this user to one or more franchises.</p>
+      </div>
+    {% endif %}
+  {% endif %}
+</section>
+{% endblock %}
