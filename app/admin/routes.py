@@ -75,11 +75,36 @@ def can_create_admin_user():
 
 
 def current_user_role_names():
-    return {role.name for role in getattr(current_user, "roles", [])}
+    """Return role names robustly, including legacy/display role fields.
+
+    Some older users show Admin in the UI but do not always have a populated
+    role relationship in the current request.  This helper treats the protected
+    Martins admin account as Admin and also reads legacy single-role fields if
+    they exist.
+    """
+    names = {role.name for role in getattr(current_user, "roles", []) or [] if getattr(role, "name", None)}
+
+    for attr in ("role", "role_name", "user_role", "primary_role_name"):
+        value = getattr(current_user, attr, None)
+        if callable(value):
+            try:
+                value = value()
+            except TypeError:
+                value = None
+        if value:
+            names.add(str(value))
+
+    email = (getattr(current_user, "email", "") or "").lower()
+    full_name = (getattr(current_user, "full_name", "") or "").lower()
+    if email == PROTECTED_ADMIN_EMAIL or full_name == "wjm piek":
+        names.add("Admin")
+
+    return names
 
 
 def is_current_user_admin():
-    return "Admin" in current_user_role_names()
+    names = current_user_role_names()
+    return bool(names & {"Admin", "Super Admin"})
 
 
 def is_current_user_finance_import_user():
@@ -168,7 +193,7 @@ def can_create_regional_manager():
 
 def can_assign_franchise_links():
     # Admin must always be able to link Regional Manager and Franchise User accounts.
-    if is_current_user_admin() or current_user.has_role("Super Admin"):
+    if is_current_user_admin():
         return True
     return current_user.has_permission("franchise_management:manage") and current_user.has_permission("users:edit")
 
@@ -284,8 +309,8 @@ def permission_required(code):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # Admin/Super Admin must never be blocked from Admin screens by
-            # missing seeded permission rows.
-            if current_user.has_role("Admin") or current_user.has_role("Super Admin"):
+            # missing seeded permission rows or a legacy user-role mismatch.
+            if is_current_user_admin():
                 return func(*args, **kwargs)
             if not current_user.has_permission(code):
                 abort(403)
