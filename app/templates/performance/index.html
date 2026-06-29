@@ -38,6 +38,12 @@
     <label>Growth % <input type="number" step="0.01" name="growth" value="{{ growth }}"></label>
     <button class="btn" type="submit">Update</button>
 </form>
+<div class="kpi-link-row">
+    {% for key, metric in metrics.items() %}
+        <a class="btn secondary" href="{{ url_for('performance.kpi', metric_key=key, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">{{ metric.label }}</a>
+    {% endfor %}
+</div>
+
 
 {% if show_manage_targets %}
 <form method="post" action="{{ url_for('performance.recalculate') }}" class="filter-bar">

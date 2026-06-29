@@ -32,6 +32,8 @@ from app.performance.service import (
     annual_budget_plan_for_period,
     save_annual_budget_targets,
     franchise_dashboard,
+    metric_page_summary,
+    metric_trend_summary,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -130,6 +132,45 @@ def index():
         selected_year=year,
         selected_period_label=month_label(month, year),
         show_manage_targets=current_user.has_permission("performance:manage_targets"),
+    )
+
+
+@performance_bp.route("/kpi/<metric_key>")
+@login_required
+@permission_required("performance:view")
+def kpi(metric_key):
+    if metric_key not in PERFORMANCE_METRICS:
+        abort(404)
+    month, year = selected_period_from_request(request.args)
+    mode = request_mode()
+    growth = request_growth()
+    ids = accessible_franchise_ids()
+    summary = metric_page_summary(metric_key, month, year, ids, mode, growth)
+    selected = get_selected_franchise()
+    my_row = None
+    chart_data = None
+    if selected and selected.id in ids:
+        my_row = next((row for row in summary["rows"] if row["franchise_id"] == selected.id), None)
+        chart_data = trend_series(selected.id, metric_key, month, year, 12, mode, growth)
+    elif not is_privileged_user() and ids:
+        first_id = ids[0]
+        my_row = next((row for row in summary["rows"] if row["franchise_id"] == first_id), None)
+        chart_data = trend_series(first_id, metric_key, month, year, 12, mode, growth)
+    return render_template(
+        "performance/kpi.html",
+        summary=summary,
+        my_row=my_row,
+        chart_data=chart_data or [],
+        metrics=PERFORMANCE_METRICS,
+        metric_key=metric_key,
+        target_modes=TARGET_MODES,
+        target_mode=mode,
+        growth=growth,
+        month_options=MONTHS,
+        year_options=reporting_years(),
+        selected_month=month,
+        selected_year=year,
+        selected_period_label=month_label(month, year),
     )
 
 

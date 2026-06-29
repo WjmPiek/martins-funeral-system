@@ -756,3 +756,69 @@ def franchise_dashboard(franchise_id, month, year, mode="growth_bracket", growth
         "health_label": health_label(score),
         "insights": dashboard_decision_insights(metric_rows),
     }
+
+# Phase 5: dedicated KPI page helpers
+
+def metric_direction_label(value):
+    value = to_decimal(value)
+    if value > 0:
+        return "up"
+    if value < 0:
+        return "down"
+    return "same"
+
+
+def metric_page_summary(metric_key, month, year, franchise_ids, mode="growth_bracket", growth_percent=DEFAULT_GROWTH_PERCENT):
+    """Build one KPI decision page for Cash, Sales, Insurance, Joinings or Funerals."""
+    if metric_key not in PERFORMANCE_METRICS:
+        metric_key = "cash"
+    actuals_by = period_actuals(month, year, franchise_ids, [metric_key])
+    targets_by = targets_for_period(month, year, franchise_ids, mode, growth_percent, [metric_key])
+    rows = ranked_performance(month, year, franchise_ids, mode, growth_percent, metric_key)
+    previous_m, previous_y = previous_month(month, year)
+    rows = attach_movement(
+        rows,
+        ranked_performance(previous_m, previous_y, franchise_ids, mode, growth_percent, metric_key),
+    )
+    total_actual = sum((actuals_by.get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
+    total_target = sum((targets_by.get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
+    previous_total = sum((period_actuals(previous_m, previous_y, [fid], [metric_key]).get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
+    last_year_total = sum((period_actuals(month, year - 1, [fid], [metric_key]).get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
+    three_year_values = []
+    for m, y in previous_years(month, year, 3):
+        total = sum((period_actuals(m, y, [fid], [metric_key]).get(fid, {}).get(metric_key, Decimal("0")) for fid in franchise_ids), Decimal("0"))
+        if total > 0:
+            three_year_values.append(total)
+    three_year_avg = safe_average(three_year_values)
+    top_rows = rows[:10]
+    bottom_rows = list(reversed(rows[-10:])) if len(rows) > 10 else rows[-5:]
+    return {
+        "metric_key": metric_key,
+        "metric": PERFORMANCE_METRICS[metric_key],
+        "total_actual": round_money(total_actual),
+        "total_target": round_money(total_target),
+        "target_percent": percent(total_actual, total_target),
+        "target_difference": round_money(total_actual - total_target),
+        "previous_month": round_money(previous_total),
+        "previous_month_difference": round_money(total_actual - previous_total),
+        "previous_month_growth": growth_rate(total_actual, previous_total),
+        "last_year": round_money(last_year_total),
+        "last_year_difference": round_money(total_actual - last_year_total),
+        "last_year_growth": growth_rate(total_actual, last_year_total),
+        "three_year_average": round_money(three_year_avg),
+        "three_year_difference": round_money(total_actual - three_year_avg),
+        "three_year_growth": growth_rate(total_actual, three_year_avg),
+        "rows": rows,
+        "top_rows": top_rows,
+        "bottom_rows": bottom_rows,
+        "status": achievement_status(percent(total_actual, total_target)),
+    }
+
+
+def metric_trend_summary(franchise_id, metric_key, month, year, months=12, mode="growth_bracket", growth_percent=DEFAULT_GROWTH_PERCENT):
+    series = trend_series(franchise_id, metric_key, month, year, months, mode, growth_percent)
+    return {
+        "labels": [item["label"] for item in series],
+        "actuals": [float(item["actual"]) for item in series],
+        "targets": [float(item["target"]) for item in series],
+    }
