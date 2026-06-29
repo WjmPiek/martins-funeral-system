@@ -134,10 +134,22 @@ def index():
         my_row = next((row for row in rows if row["franchise_id"] == selected.id), None)
     elif not is_privileged_user() and rows:
         my_row = rows[0]
+    graph_metric = request.args.get("chart_metric") or (metric_key if metric_key in PERFORMANCE_METRICS else "cash")
+    if graph_metric not in PERFORMANCE_METRICS:
+        graph_metric = "cash"
+    graph_franchise_id = selected.id if selected and selected.id in ids else (rows[0]["franchise_id"] if rows else (ids[0] if ids else None))
+    graph_data = None
+    graph_franchise = None
+    if graph_franchise_id:
+        graph_franchise = Franchise.query.get(graph_franchise_id)
+        graph_data = graph_engine_payload(graph_franchise_id, graph_metric, month, year, 12, mode, growth)
     return render_template(
         "performance/index.html",
         rows=rows,
         my_row=my_row,
+        graph_data=graph_data,
+        graph_franchise=graph_franchise,
+        chart_metric=graph_metric,
         metrics=PERFORMANCE_METRICS,
         metric_key=metric_key,
         target_modes=TARGET_MODES,
@@ -236,6 +248,49 @@ def franchise(franchise_id):
 
 
 
+
+
+@performance_bp.route("/graphs")
+@login_required
+@permission_required("performance:view")
+def graphs():
+    month, year = selected_period_from_request(request.args)
+    mode = request_mode()
+    growth = request_growth()
+    ids = accessible_franchise_ids()
+    ensure_performance_results(month, year, ids, "growth_bracket")
+    metric_key = request.args.get("metric", "cash")
+    if metric_key not in PERFORMANCE_METRICS:
+        metric_key = "cash"
+    periods = request.args.get("periods", 12, type=int)
+    if periods not in (6, 12, 24, 36):
+        periods = 12
+    franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all() if ids else []
+    selected = get_selected_franchise()
+    franchise_id = request.args.get("franchise_id", type=int)
+    if franchise_id and franchise_id not in ids:
+        abort(403)
+    if not franchise_id:
+        franchise_id = selected.id if selected and selected.id in ids else (franchises[0].id if franchises else None)
+    selected_franchise = Franchise.query.get(franchise_id) if franchise_id else None
+    graph_data = graph_engine_payload(franchise_id, metric_key, month, year, periods, mode, growth) if franchise_id else None
+    return render_template(
+        "performance/graphs.html",
+        graph_data=graph_data,
+        franchises=franchises,
+        selected_franchise=selected_franchise,
+        metrics=PERFORMANCE_METRICS,
+        metric_key=metric_key,
+        periods=periods,
+        target_modes=TARGET_MODES,
+        target_mode=mode,
+        growth=growth,
+        month_options=MONTHS,
+        year_options=reporting_years(),
+        selected_month=month,
+        selected_year=year,
+        selected_period_label=month_label(month, year),
+    )
 
 
 @performance_bp.route("/decision-centre")

@@ -1,12 +1,14 @@
 {% extends "base.html" %}
+{% from "performance/_graph_charts.html" import chart_card, graph_assets %}
 {% block app_content %}
 <div class="page-header">
     <div>
-        <h1>Performance Leaderboard</h1>
-        <p class="muted">Simple rank board. Current rank decides the position; previous rank only calculates Up, Down or Same.</p>
+        <h1>Performance</h1>
+        <p class="muted">Fast monthly performance graphs and leaderboard for {{ selected_period_label }}.</p>
     </div>
     {% if show_manage_targets %}
     <div class="button-row">
+        <a class="btn secondary" href="{{ url_for('performance.graphs', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Graphs</a>
         <a class="btn secondary" href="{{ url_for('performance.decision_centre_view', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Decision Centre</a>
         <a class="btn secondary" href="{{ url_for('performance.executive', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Executive Dashboard</a>
         <a class="btn secondary" href="{{ url_for('performance.targets', month=selected_month, year=selected_year) }}">Manual Targets</a>
@@ -62,6 +64,39 @@
 </form>
 {% endif %}
 
+
+{% if graph_data %}
+<div class="panel-card graph-engine-card">
+    <h2>Graphs — {{ graph_data.metric_label }}{% if graph_franchise %} for {{ graph_franchise.business_name }}{% endif %}</h2>
+    <p class="muted">Graphs are back on the Performance page. They read from the fast pre-calculated performance cache.</p>
+    <form class="filter-bar" method="get">
+        <input type="hidden" name="month" value="{{ selected_month }}">
+        <input type="hidden" name="year" value="{{ selected_year }}">
+        <input type="hidden" name="target_mode" value="{{ target_mode }}">
+        <input type="hidden" name="growth" value="{{ growth }}">
+        <label>Graph KPI
+            <select name="chart_metric">
+                {% for key, metric in metrics.items() %}<option value="{{ key }}" {% if key == chart_metric %}selected{% endif %}>{{ metric.label }}</option>{% endfor %}
+            </select>
+        </label>
+        <button class="btn" type="submit">Update Graphs</button>
+        <a class="btn secondary" href="{{ url_for('performance.graphs', month=selected_month, year=selected_year, metric=chart_metric, target_mode=target_mode, growth=growth) }}">Open graph page</a>
+    </form>
+</div>
+
+<div class="grid-two graph-grid">
+    {{ chart_card('Actual vs Target', 'Imported actual values compared with the saved/calculated target.', graph_data.actual_vs_target, [{'key':'actual','label':'Actual'}, {'key':'target','label':'Target'}], 'R' if graph_data.metric_key in ['cash','sales','insurance'] else '', '', 'line') }}
+    {{ chart_card('Same Month Previous Year', 'This year compared with the same month last year.', graph_data.previous_year, [{'key':'actual','label':'This year'}, {'key':'previous_year','label':'Last year'}], 'R' if graph_data.metric_key in ['cash','sales','insurance'] else '', '', 'line') }}
+    {{ chart_card('Forecast vs Target', 'Projected result compared with target.', graph_data.forecast, [{'key':'forecast','label':'Forecast'}, {'key':'target','label':'Target'}], 'R' if graph_data.metric_key in ['cash','sales','insurance'] else '', '', 'line') }}
+    {{ chart_card('Growth Trend', 'Growth percentage trend for the selected KPI.', graph_data.growth_trend, [{'key':'growth_percent','label':'Growth %'}], '', '%', 'line') }}
+</div>
+{% endif %}
+
+<div class="panel-card">
+    <h2>Performance Leaderboard</h2>
+    <p class="muted">Current rank decides the position; previous rank only calculates Up, Down or Same.</p>
+</div>
+
 {% if my_row %}
 <div class="highlight-card leaderboard-card movement-{{ my_row.movement }}">
     <div>
@@ -93,4 +128,6 @@
     </tbody>
 </table>
 </div>
+{{ graph_assets() }}
+<style>.graph-grid{margin:1rem 0}.graph-engine-card{border-left:6px solid #0d6efd}</style>
 {% endblock %}
