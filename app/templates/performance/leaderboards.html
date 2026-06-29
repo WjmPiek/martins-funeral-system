@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="page-header">
+    <div>
+        <h1>Leaderboard Decision Centre</h1>
+        <p class="muted">Phase 7: clean ranking for Overall, Cash, Sales, Insurance, Joinings and Funerals. Display shows rank, franchise and movement only.</p>
+    </div>
+    <div class="button-row">
+        <a class="btn secondary" href="{{ url_for('performance.index', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Simple Leaderboard</a>
+    </div>
+</div>
+
+<form class="filter-bar" method="get">
+    <label>Month
+        <select name="month">
+            {% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Year
+        <select name="year">
+            {% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Target Mode
+        <select name="target_mode">
+            {% for key, label in target_modes.items() %}<option value="{{ key }}" {% if key == target_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Growth % <input type="number" step="0.01" name="growth" value="{{ growth }}"></label>
+    <button class="btn" type="submit">Update</button>
+</form>
+
+{% for board in boards %}
+<section class="content-card" style="margin-bottom: 1.5rem;">
+    <div class="section-header">
+        <div>
+            <h2>{{ board.label }}</h2>
+            <p class="muted">{{ selected_period_label }} ranking. Current rank decides the position; previous month only decides movement.</p>
+        </div>
+    </div>
+
+    <div class="dashboard-grid three">
+        <div class="highlight-card">
+            <div class="muted">Top franchise</div>
+            {% if board.rows %}<h3>#1 {{ board.rows[0].franchise_name }}</h3><div class="leaderboard-move {{ board.rows[0].movement }}">{{ board.rows[0].movement_text }}</div>{% else %}<h3>No data</h3>{% endif %}
+        </div>
+        <div class="highlight-card">
+            <div class="muted">Biggest climber</div>
+            {% if board.biggest_climbers %}<h3>#{{ board.biggest_climbers[0].rank }} {{ board.biggest_climbers[0].franchise_name }}</h3><div class="leaderboard-move up">{{ board.biggest_climbers[0].movement_text }}</div>{% else %}<h3>None</h3><div class="leaderboard-move same">Same</div>{% endif %}
+        </div>
+        <div class="highlight-card">
+            <div class="muted">Needs attention</div>
+            {% if board.biggest_droppers %}<h3>#{{ board.biggest_droppers[0].rank }} {{ board.biggest_droppers[0].franchise_name }}</h3><div class="leaderboard-move down">{{ board.biggest_droppers[0].movement_text }}</div>{% else %}<h3>None</h3><div class="leaderboard-move same">Stable</div>{% endif %}
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr><th>Rank</th><th>Franchise</th><th>Movement</th><th>Decision</th><th>Open</th></tr></thead>
+            <tbody>
+            {% for row in board.rows %}
+                <tr>
+                    <td><strong>#{{ row.rank }}</strong></td>
+                    <td>{{ row.franchise_name }}</td>
+                    <td><span class="leaderboard-move {{ row.movement }}">{{ row.movement_text }}</span></td>
+                    <td>{{ row.decision_label }}</td>
+                    <td><a href="{{ url_for('performance.franchise', franchise_id=row.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open</a></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5">No leaderboard data found for this period.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endfor %}
+{% endblock %}

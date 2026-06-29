@@ -35,6 +35,7 @@ from app.performance.service import (
     metric_page_summary,
     metric_trend_summary,
     graph_engine_payload,
+    leaderboard_decision_centre,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -205,6 +206,32 @@ def franchise(franchise_id):
         graph_data=graph_data,
         metrics=PERFORMANCE_METRICS,
         snapshot=snapshot,
+        target_modes=TARGET_MODES,
+        target_mode=mode,
+        growth=growth,
+        month_options=MONTHS,
+        year_options=reporting_years(),
+        selected_month=month,
+        selected_year=year,
+        selected_period_label=month_label(month, year),
+    )
+
+
+
+
+@performance_bp.route("/leaderboards")
+@login_required
+@permission_required("performance:view")
+def leaderboards():
+    month, year = selected_period_from_request(request.args)
+    mode = request_mode()
+    growth = request_growth()
+    ids = accessible_franchise_ids()
+    boards = leaderboard_decision_centre(month, year, ids, mode, growth)
+    return render_template(
+        "performance/leaderboards.html",
+        boards=boards,
+        metrics=PERFORMANCE_METRICS,
         target_modes=TARGET_MODES,
         target_mode=mode,
         growth=growth,

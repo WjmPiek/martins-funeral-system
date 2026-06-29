@@ -906,3 +906,61 @@ def graph_engine_payload(franchise_id, metric_key, month, year, periods=12, mode
         'forecast': forecast_series(franchise_id, metric_key, month, year, periods, mode, growth_percent),
         'growth_trend': growth_trend_series(franchise_id, metric_key, month, year, periods),
     }
+
+# Phase 7: Leaderboard decision centre helpers
+
+def movement_text(row):
+    delta = abs(int(row.get('movement_delta') or 0))
+    movement = row.get('movement') or 'same'
+    if movement == 'up' and delta:
+        return f"Up by {delta}"
+    if movement == 'down' and delta:
+        return f"Down by {delta}"
+    return 'Same'
+
+
+def leaderboard_rows(metric_key, month, year, franchise_ids, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    """Return clean leaderboard rows ordered by current rank only.
+
+    Figures are calculated internally for ranking, but the returned rows are intended for
+    display as rank, franchise name and movement only.
+    """
+    if metric_key != 'overall' and metric_key not in PERFORMANCE_METRICS:
+        metric_key = 'overall'
+    prev_m, prev_y = previous_month(month, year)
+    rows = attach_movement(
+        ranked_performance(month, year, franchise_ids, mode, growth_percent, metric_key),
+        ranked_performance(prev_m, prev_y, franchise_ids, mode, growth_percent, metric_key),
+    )
+    rows.sort(key=lambda item: item['rank'])
+    for row in rows:
+        row['movement_text'] = movement_text(row)
+        if row.get('movement') == 'up':
+            row['decision_label'] = 'Improving'
+        elif row.get('movement') == 'down':
+            row['decision_label'] = 'Needs attention'
+        else:
+            row['decision_label'] = 'Stable'
+    return rows
+
+
+def leaderboard_decision_centre(month, year, franchise_ids, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    """Build overall and KPI-specific leaderboards for Phase 7."""
+    boards = []
+    board_keys = [('overall', {'label': 'Overall Performance'})] + list(PERFORMANCE_METRICS.items())
+    for key, config in board_keys:
+        rows = leaderboard_rows(key, month, year, franchise_ids, mode, growth_percent)
+        climbers = [row for row in rows if row.get('movement') == 'up']
+        climbers.sort(key=lambda row: abs(row.get('movement_delta') or 0), reverse=True)
+        droppers = [row for row in rows if row.get('movement') == 'down']
+        droppers.sort(key=lambda row: abs(row.get('movement_delta') or 0), reverse=True)
+        boards.append({
+            'key': key,
+            'label': config.get('label', 'Overall Performance') if isinstance(config, dict) else str(config),
+            'rows': rows,
+            'top_10': rows[:10],
+            'bottom_10': rows[-10:] if len(rows) > 10 else rows[-5:],
+            'biggest_climbers': climbers[:5],
+            'biggest_droppers': droppers[:5],
+        })
+    return boards
