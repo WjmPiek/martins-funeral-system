@@ -54,7 +54,7 @@
                             <summary>Monthly Figures <span class="nav-count-badge">5</span></summary>
                             <div class="nav-subtabs">
                                 <a href="{{ url_for('performance.graphs') }}">Performance Graphs</a>
-                                <a href="{{ url_for('performance.index') }}">Performance Leaderboard</a>
+                                <a href="{{ url_for('performance.index') }}">Leaderboard</a>
                                 <a href="{{ url_for('monthly.index') }}">Monthly Figures</a>
                                 <a href="{{ url_for('royalties.index') }}">Royalties</a>
                                 {% if current_user.has_permission('finance:view') %}<a href="#">Finance</a>{% endif %}
@@ -104,7 +104,7 @@
                                 <summary>Monthly Figures <span class="nav-count-badge">5</span></summary>
                                 <div class="nav-subtabs">
                                     {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.graphs') }}">Performance Graphs</a>{% endif %}
-                                    {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.index') }}">Performance Leaderboard</a>{% endif %}
+                                    {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.index') }}">Leaderboard</a>{% endif %}
                                     {% if current_user.has_permission('monthly_figures:view') %}<a href="{{ url_for('monthly.index') }}">Monthly Figures</a>{% endif %}
                                     {% if current_user.has_permission('royalties:view') %}<a href="{{ url_for('royalties.index') }}">Royalties</a>{% endif %}
                                     {% if current_user.has_permission('finance:view') %}<a href="#">Finance</a>{% endif %}

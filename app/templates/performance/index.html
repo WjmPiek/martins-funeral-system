@@ -1,10 +1,9 @@
 {% extends "base.html" %}
-{% from "performance/_graph_charts.html" import chart_card, graph_assets %}
 {% block app_content %}
 <div class="page-header">
     <div>
-        <h1>Performance</h1>
-        <p class="muted">Fast monthly performance graphs and leaderboard for {{ selected_period_label }}.</p>
+        <h1>Leaderboard</h1>
+        <p class="muted">Live monthly KPI leaderboard for {{ selected_period_label }}.</p>
     </div>
     {% if show_manage_targets %}
     <div class="button-row">
@@ -28,12 +27,6 @@
             {% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}
         </select>
     </label>
-    <label>KPI
-        <select name="metric">
-            <option value="overall" {% if metric_key == 'overall' %}selected{% endif %}>Overall Score</option>
-            {% for key, metric in metrics.items() %}<option value="{{ key }}" {% if key == metric_key %}selected{% endif %}>{{ metric.label }}</option>{% endfor %}
-        </select>
-    </label>
     <label>Target Mode
         <select name="target_mode">
             {% for key, label in target_modes.items() %}<option value="{{ key }}" {% if key == target_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}
@@ -42,11 +35,7 @@
     <label>Growth % <input type="number" step="0.01" name="growth" value="{{ growth }}"></label>
     <button class="btn" type="submit">Update</button>
 </form>
-<div class="kpi-link-row">
-    {% for key, metric in metrics.items() %}
-        <a class="btn secondary" href="{{ url_for('performance.kpi', metric_key=key, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">{{ metric.label }}</a>
-    {% endfor %}
-</div>
+
 
 
 {% if show_manage_targets %}
@@ -65,69 +54,32 @@
 {% endif %}
 
 
-{% if graph_data %}
-<div class="panel-card graph-engine-card">
-    <h2>Graphs — {{ graph_data.metric_label }}{% if graph_franchise %} for {{ graph_franchise.business_name }}{% endif %}</h2>
-    <p class="muted">Graphs are back on the Performance page. They read from the fast pre-calculated performance cache.</p>
-    <form class="filter-bar" method="get">
-        <input type="hidden" name="month" value="{{ selected_month }}">
-        <input type="hidden" name="year" value="{{ selected_year }}">
-        <input type="hidden" name="target_mode" value="{{ target_mode }}">
-        <input type="hidden" name="growth" value="{{ growth }}">
-        <label>Graph KPI
-            <select name="chart_metric">
-                {% for key, metric in metrics.items() %}<option value="{{ key }}" {% if key == chart_metric %}selected{% endif %}>{{ metric.label }}</option>{% endfor %}
-            </select>
-        </label>
-        <button class="btn" type="submit">Update Graphs</button>
-        <a class="btn secondary" href="{{ url_for('performance.graphs', month=selected_month, year=selected_year, metric=chart_metric, target_mode=target_mode, growth=growth) }}">Open graph page</a>
-    </form>
-</div>
-
-<div class="grid-two graph-grid">
-    {{ chart_card('Actual vs Target', 'Imported actual values compared with the saved/calculated target.', graph_data.actual_vs_target, [{'key':'actual','label':'Actual'}, {'key':'target','label':'Target'}], 'R' if graph_data.metric_key in ['cash','sales','insurance'] else '', '', 'line') }}
-    {{ chart_card('Same Month Previous Year', 'This year compared with the same month last year.', graph_data.previous_year, [{'key':'actual','label':'This year'}, {'key':'previous_year','label':'Last year'}], 'R' if graph_data.metric_key in ['cash','sales','insurance'] else '', '', 'line') }}
-    {{ chart_card('Forecast vs Target', 'Projected result compared with target.', graph_data.forecast, [{'key':'forecast','label':'Forecast'}, {'key':'target','label':'Target'}], 'R' if graph_data.metric_key in ['cash','sales','insurance'] else '', '', 'line') }}
-    {{ chart_card('Growth Trend', 'Growth percentage trend for the selected KPI.', graph_data.growth_trend, [{'key':'growth_percent','label':'Growth %'}], '', '%', 'line') }}
-</div>
-{% endif %}
-
 <div class="panel-card">
-    <h2>Performance Leaderboard</h2>
-    <p class="muted">Current rank decides the position; previous rank only calculates Up, Down or Same.</p>
+    <h2>Leaderboard</h2>
+    <p class="muted">Live KPI leaderboards for {{ selected_period_label }}. Graphs are removed from this tab and remain available under Performance Graphs.</p>
 </div>
 
-{% if my_row %}
-<div class="highlight-card leaderboard-card movement-{{ my_row.movement }}">
-    <div>
-        <div class="muted">Your / selected franchise position</div>
-        <h2>#{{ my_row.rank }} of {{ rows|length }} — {{ my_row.franchise_name }}</h2>
-    </div>
-    <div class="leaderboard-move {{ my_row.movement }}">{{ my_row.movement_label }}{% if my_row.movement_delta %} {{ my_row.movement_delta|abs }}{% endif %}</div>
-</div>
-{% endif %}
-
-<div class="table-responsive">
-<table class="data-table">
-    <thead>
-        <tr>
-            <th>Rank</th><th>Franchise</th><th>Movement</th><th>Detail</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for row in rows %}
-        <tr>
-            <td><strong>#{{ row.rank }}</strong></td>
-            <td>{{ row.franchise_name }}</td>
-            <td><span class="leaderboard-move {{ row.movement }}">{{ row.movement_label }}{% if row.movement_delta %} by {{ row.movement_delta|abs }}{% endif %}</span></td>
-            <td><a href="{{ url_for('performance.franchise', franchise_id=row.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open</a></td>
-        </tr>
-    {% else %}
-        <tr><td colspan="4">No performance data found for this period.</td></tr>
+<div class="leaderboard-five-grid">
+    {% for board in metric_boards %}
+    <section class="leaderboard-column panel-card">
+        <h3>{{ board.title }}</h3>
+        <div class="mini-leaderboard-list">
+            {% for row in board.rows %}
+            <a class="mini-leaderboard-row movement-{{ row.movement }}" href="{{ url_for('performance.franchise', franchise_id=row.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">
+                <span class="mini-rank">#{{ row.rank }}</span>
+                <span class="mini-name">{{ row.franchise_name }}</span>
+                <span class="leaderboard-move {{ row.movement }}">{{ row.movement_label }}{% if row.movement_delta %} {{ row.movement_delta|abs }}{% endif %}</span>
+            </a>
+            {% else %}
+            <div class="mini-leaderboard-empty">No data</div>
+            {% endfor %}
+        </div>
+    </section>
     {% endfor %}
-    </tbody>
-</table>
 </div>
-{{ graph_assets() }}
-<style>.graph-grid{margin:1rem 0}.graph-engine-card{border-left:6px solid #0d6efd}</style>
+
+<style>
+.leaderboard-five-grid{display:grid;grid-template-columns:repeat(5,minmax(190px,1fr));gap:1rem;align-items:start;margin-top:1rem}.leaderboard-column{padding:1rem}.leaderboard-column h3{margin:.1rem 0 .75rem;font-size:1.05rem}.mini-leaderboard-list{display:grid;gap:.45rem}.mini-leaderboard-row{display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:center;text-decoration:none;color:inherit;border:1px solid #e5e7eb;border-radius:12px;padding:.55rem;background:#fff}.mini-leaderboard-row:hover{border-color:#b6c2cf;box-shadow:0 2px 8px rgba(15,23,42,.08)}.mini-rank{font-weight:800}.mini-name{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mini-leaderboard-empty{padding:.75rem;border:1px dashed #cbd5e1;border-radius:12px;color:#64748b;text-align:center}@media(max-width:1200px){.leaderboard-five-grid{grid-template-columns:repeat(2,minmax(220px,1fr))}}@media(max-width:700px){.leaderboard-five-grid{grid-template-columns:1fr}.mini-leaderboard-row{grid-template-columns:auto 1fr}.mini-leaderboard-row .leaderboard-move{grid-column:2}}
+</style>
 {% endblock %}
+

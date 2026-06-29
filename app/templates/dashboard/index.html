@@ -100,7 +100,7 @@
 {% if performance_snapshot %}
 <div class="highlight-card performance-dashboard-card movement-{{ performance_snapshot.movement }}">
     <div>
-        <div class="muted">Performance Leaderboard</div>
+        <div class="muted">Leaderboard</div>
         <h2>#{{ performance_snapshot.rank }} of {{ performance_snapshot.total }} — {{ performance_snapshot.franchise_name }}</h2>
         <p>{{ performance_snapshot.period_label }} weighted score: <strong>{{ '%.2f'|format(performance_snapshot.score) }}%</strong></p>
     </div>

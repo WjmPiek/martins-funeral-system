@@ -36,6 +36,7 @@ from app.performance.service import (
     metric_page_summary,
     metric_trend_summary,
     graph_engine_payload,
+    leaderboard_rows,
     leaderboard_decision_centre,
     executive_dashboard,
     executive_insights,
@@ -117,41 +118,32 @@ def index():
     month, year = selected_period_from_request(request.args)
     mode = request_mode()
     growth = request_growth()
-    metric_key = request.args.get("metric", "overall")
-    if metric_key != "overall" and metric_key not in PERFORMANCE_METRICS:
-        metric_key = "overall"
     ids = accessible_franchise_ids()
     ensure_performance_results(month, year, ids, "growth_bracket")
     previous_m, previous_y = previous_month(month, year)
     ensure_performance_results(previous_m, previous_y, ids, "growth_bracket")
-    rows = attach_movement(
-        ranked_performance(month, year, ids, mode, growth, metric_key),
-        ranked_performance(previous_m, previous_y, ids, mode, growth, metric_key),
-    )
-    selected = get_selected_franchise()
-    my_row = None
-    if selected:
-        my_row = next((row for row in rows if row["franchise_id"] == selected.id), None)
-    elif not is_privileged_user() and rows:
-        my_row = rows[0]
-    graph_metric = request.args.get("chart_metric") or (metric_key if metric_key in PERFORMANCE_METRICS else "cash")
-    if graph_metric not in PERFORMANCE_METRICS:
-        graph_metric = "cash"
-    graph_franchise_id = selected.id if selected and selected.id in ids else (rows[0]["franchise_id"] if rows else (ids[0] if ids else None))
-    graph_data = None
-    graph_franchise = None
-    if graph_franchise_id:
-        graph_franchise = Franchise.query.get(graph_franchise_id)
-        graph_data = graph_engine_payload(graph_franchise_id, graph_metric, month, year, 12, mode, growth)
+
+    # Live KPI leaderboards shown side-by-side on the Leaderboard tab.
+    metric_order = ["cash", "sales", "insurance_premiums", "joinings", "funerals"]
+    metric_titles = {
+        "cash": "Cash",
+        "sales": "Sales",
+        "insurance_premiums": "Insurance",
+        "joinings": "Joining's",
+        "funerals": "Funerals",
+    }
+    metric_boards = []
+    for key in metric_order:
+        board_rows = leaderboard_rows(key, month, year, ids, mode, growth)
+        metric_boards.append({
+            "key": key,
+            "title": metric_titles.get(key, PERFORMANCE_METRICS[key]["label"]),
+            "rows": board_rows,
+        })
     return render_template(
         "performance/index.html",
-        rows=rows,
-        my_row=my_row,
-        graph_data=graph_data,
-        graph_franchise=graph_franchise,
-        chart_metric=graph_metric,
+        metric_boards=metric_boards,
         metrics=PERFORMANCE_METRICS,
-        metric_key=metric_key,
         target_modes=TARGET_MODES,
         target_mode=mode,
         growth=growth,
