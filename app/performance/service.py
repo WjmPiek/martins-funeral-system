@@ -584,3 +584,107 @@ def rebuild_performance_results(month, year, franchise_ids=None, mode="growth_br
             saved += 1
     db.session.commit()
     return saved
+
+
+def months_in_year():
+    return [month for month, _name in MONTHS]
+
+
+def annual_actual(franchise_id, metric_key, year):
+    total = Decimal("0")
+    for month in months_in_year():
+        total += period_actuals(month, year, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+    return round_money(total)
+
+
+def seasonal_weights(franchise_id, metric_key, target_year, history_years=3):
+    """Return month -> seasonal weight based on previous years.
+
+    If there is not enough historical data, distribute the annual target evenly.
+    This lets Phase 3 generate a realistic month-by-month budget from the
+    franchise's own historical pattern instead of forcing every month to be 1/12.
+    """
+    monthly_totals = {month: Decimal("0") for month in months_in_year()}
+    grand_total = Decimal("0")
+    for year in range(target_year - history_years, target_year):
+        for month in months_in_year():
+            value = period_actuals(month, year, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+            if value > 0:
+                monthly_totals[month] += value
+                grand_total += value
+    if grand_total <= 0:
+        return {month: (Decimal("1") / Decimal("12")) for month in months_in_year()}
+    return {month: (monthly_totals[month] / grand_total) for month in months_in_year()}
+
+
+def annual_growth_percent(franchise_id, metric_key, target_year):
+    # Use December as the target-year anchor because it considers the most recent
+    # previous-year monthly business size for the bracket engine.
+    return bracket_growth_percent(franchise_id, metric_key, 12, target_year)
+
+
+def annual_budget_plan(franchise_id, target_year, metric_keys=None, history_years=3):
+    metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
+    plan = []
+    for metric_key in metric_keys:
+        previous_year_total = annual_actual(franchise_id, metric_key, target_year - 1)
+        three_year_values = [annual_actual(franchise_id, metric_key, target_year - offset) for offset in range(1, history_years + 1)]
+        usable_values = [value for value in three_year_values if value > 0]
+        baseline = safe_average(usable_values) if usable_values else previous_year_total
+        growth_percent_value = annual_growth_percent(franchise_id, metric_key, target_year)
+        annual_target = round_money(baseline * (Decimal("1") + growth_percent_value / Decimal("100")))
+        weights = seasonal_weights(franchise_id, metric_key, target_year, history_years)
+        monthly_targets = []
+        allocated = Decimal("0")
+        for month in months_in_year():
+            if month == 12:
+                monthly_target = round_money(annual_target - allocated)
+            else:
+                monthly_target = round_money(annual_target * weights[month])
+                allocated += monthly_target
+            monthly_targets.append({
+                "month": month,
+                "month_name": MONTH_NAME[month],
+                "weight_percent": (weights[month] * Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP),
+                "target_value": monthly_target,
+            })
+        plan.append({
+            "metric": metric_key,
+            "metric_label": PERFORMANCE_METRICS[metric_key]["label"],
+            "format": PERFORMANCE_METRICS[metric_key]["format"],
+            "previous_year_total": previous_year_total,
+            "baseline": round_money(baseline),
+            "growth_percent": growth_percent_value,
+            "annual_target": annual_target,
+            "monthly_targets": monthly_targets,
+        })
+    return plan
+
+
+def annual_budget_plan_for_period(target_year, franchise_ids, metric_keys=None, history_years=3):
+    return {
+        franchise_id: annual_budget_plan(franchise_id, target_year, metric_keys, history_years)
+        for franchise_id in franchise_ids
+    }
+
+
+def save_annual_budget_targets(target_year, franchise_ids, metric_keys=None, history_years=3):
+    metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
+    saved = 0
+    for franchise_id in franchise_ids:
+        for metric_plan in annual_budget_plan(franchise_id, target_year, metric_keys, history_years):
+            metric_key = metric_plan["metric"]
+            for month_target in metric_plan["monthly_targets"]:
+                target = FranchiseTarget.query.filter_by(
+                    franchise_id=franchise_id,
+                    metric=metric_key,
+                    year=target_year,
+                    month=month_target["month"],
+                ).first()
+                if not target:
+                    target = FranchiseTarget(franchise_id=franchise_id, metric=metric_key, year=target_year, month=month_target["month"])
+                    db.session.add(target)
+                target.target_value = month_target["target_value"]
+                saved += 1
+    db.session.commit()
+    return saved

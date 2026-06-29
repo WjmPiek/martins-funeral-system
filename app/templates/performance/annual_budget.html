@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Annual Performance Budget{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h3 mb-1">Annual Performance Budget</h1>
+            <p class="text-muted mb-0">Generate fair monthly targets from historical seasonal patterns and growth brackets.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="{{ url_for('performance.targets') }}">Monthly Targets</a>
+            <a class="btn btn-outline-secondary" href="{{ url_for('performance.growth_brackets') }}">Growth Brackets</a>
+        </div>
+    </div>
+
+    <form class="card card-body mb-3" method="get">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Budget Year</label>
+                <select class="form-select" name="year">
+                    {% for year in year_options %}
+                    <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary" type="submit">Preview Budget</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="alert alert-info">
+        Phase 3 builds a 12-month budget for Cash, Sales, Insurance Premiums, Joinings and Funerals. It uses the previous 3 years to calculate seasonal monthly weights, then applies the correct growth bracket per franchise and KPI.
+    </div>
+
+    <form method="post" class="mb-3">
+        <input type="hidden" name="year" value="{{ selected_year }}">
+        <button class="btn btn-success" type="submit">Generate Annual Budget Targets for {{ selected_year }}</button>
+    </form>
+
+    {% for franchise in franchises %}
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <strong>{{ franchise.business_name }}</strong>
+        </div>
+        <div class="card-body p-0">
+            {% for metric_plan in plan.get(franchise.id, []) %}
+            <div class="p-3 border-bottom">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">{{ metric_plan.metric_label }}</h5>
+                    <span class="badge bg-primary">Growth {{ metric_plan.growth_percent }}%</span>
+                </div>
+                <div class="row text-muted small mb-2">
+                    <div class="col-md-4">Previous Year: {{ metric_plan.previous_year_total }}</div>
+                    <div class="col-md-4">Baseline: {{ metric_plan.baseline }}</div>
+                    <div class="col-md-4">Annual Target: <strong>{{ metric_plan.annual_target }}</strong></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Seasonal Weight</th>
+                                <th>Monthly Target</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in metric_plan.monthly_targets %}
+                            <tr>
+                                <td>{{ row.month_name }}</td>
+                                <td>{{ row.weight_percent }}%</td>
+                                <td>{{ row.target_value }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning">No franchises available for your current access.</div>
+    {% endfor %}
+</div>
+{% endblock %}

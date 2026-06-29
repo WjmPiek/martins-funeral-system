@@ -29,6 +29,8 @@ from app.performance.service import (
     rebuild_performance_results,
     target_plan_for_period,
     save_growth_bracket_targets,
+    annual_budget_plan_for_period,
+    save_annual_budget_targets,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -191,6 +193,33 @@ def generate_targets():
     log_action("Performance", "Generated fair bracket targets", f"Targets generated: {saved}; Period: {month_label(month, year)}")
     flash(f"Generated {saved} fair growth-bracket targets for {month_label(month, year)}.", "success")
     return redirect(url_for("performance.targets", month=month, year=year))
+
+
+@performance_bp.route("/annual-budget", methods=["GET", "POST"])
+@login_required
+@permission_required("performance:manage_targets")
+def annual_budget():
+    try:
+        target_year = int(request.values.get("year") or selected_period_from_request(request.args)[1])
+    except Exception:
+        target_year = selected_period_from_request(request.args)[1]
+    ids = accessible_franchise_ids()
+    franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all() if ids else []
+    if request.method == "POST":
+        saved = save_annual_budget_targets(target_year, ids)
+        log_action("Performance", "Generated annual performance budget", f"Targets generated: {saved}; Year: {target_year}")
+        flash(f"Generated {saved} monthly budget targets for {target_year}.", "success")
+        return redirect(url_for("performance.annual_budget", year=target_year))
+    plan = annual_budget_plan_for_period(target_year, ids)
+    return render_template(
+        "performance/annual_budget.html",
+        franchises=franchises,
+        plan=plan,
+        metrics=PERFORMANCE_METRICS,
+        month_options=MONTHS,
+        year_options=reporting_years(),
+        selected_year=target_year,
+    )
 
 
 @performance_bp.route("/growth-brackets", methods=["GET", "POST"])
