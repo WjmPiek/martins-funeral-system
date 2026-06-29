@@ -19,12 +19,30 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 PROTECTED_ADMIN_EMAIL = "wjm@martinsdirect.com"
 
 ADMIN_SIDE_ROLE_NAMES = {"Admin", "Finance Manager", "Finance Assistant", "Regional Manager"}
-FRANCHISE_SIDE_ROLE_NAMES = {"Franchise User", "Franchise Manager", "Read Only User"}
+FRANCHISE_SIDE_ROLE_NAMES = {"Franchise User", "Franchise Manager", "Read Only User", "Franchise Employee"}
+ADMIN_CREATABLE_ROLE_NAMES = ["Finance Manager", "Finance Assistant", "Regional Manager", "Franchise User"]
+FRANCHISE_CREATABLE_ROLE_NAMES = ["Franchise Manager", "Franchise Employee"]
 FINANCE_ADMIN_USERS = {
     "renette@martinsdirect.com": "Finance Manager",
     "lowhaan@martinsdirect.com": "Finance Assistant",
     "deon@martinsdirect.com": "Finance Assistant",
 }
+
+
+
+def admin_creatable_roles():
+    """Roles that Martins admin/finance users may create from the Admin Users page."""
+    if is_current_user_admin():
+        allowed = ADMIN_CREATABLE_ROLE_NAMES
+    elif current_user.has_role("Finance Manager"):
+        allowed = ["Finance Assistant", "Regional Manager", "Franchise User"]
+    else:
+        allowed = []
+    return Role.query.filter(Role.name.in_(allowed)).order_by(Role.name).all()
+
+
+def can_create_admin_user():
+    return (is_current_user_admin() or current_user.has_role("Finance Manager")) and current_user.has_permission("users:add")
 
 
 def current_user_role_names():
@@ -58,6 +76,37 @@ def is_admin_side_user(user):
 def is_franchise_side_user(user):
     names = user_role_names(user)
     return bool(names & FRANCHISE_SIDE_ROLE_NAMES) and not is_admin_side_user(user)
+
+
+def is_role_admin_side(role_name):
+    return role_name in ADMIN_SIDE_ROLE_NAMES
+
+
+def role_requires_franchise_scope(role_name):
+    return role_name in {"Regional Manager", "Franchise User"}
+
+
+def normalise_user_scope_for_role(user, role_name, franchise_ids=None):
+    """Keep admin-side users out of franchise hierarchy and scope franchise roles correctly."""
+    user.parent_franchise_user_id = None
+
+    if role_requires_franchise_scope(role_name):
+        selected_franchises = Franchise.query.filter(
+            Franchise.id.in_(franchise_ids or []),
+            Franchise.is_performance_active == True,
+        ).order_by(Franchise.business_name).all()
+        if not selected_franchises:
+            return False, "Please link at least one active franchise for Regional Manager or Franchise User accounts."
+        user.assigned_franchises = selected_franchises
+        return True, ""
+
+    # Finance/Admin-side users are Martins users. They must not sit under a franchise user.
+    if is_role_admin_side(role_name):
+        user.assigned_franchises = []
+        return True, ""
+
+    # Unknown roles are not allowed from the Admin create form.
+    return False, "Please select a valid Admin-created role."
 
 
 def tidy_finance_admin_users():
@@ -309,7 +358,60 @@ def users():
         can_manage_old_franchises=can_manage_old_franchises(),
         admin_side_role_names=ADMIN_SIDE_ROLE_NAMES,
         franchise_side_role_names=FRANCHISE_SIDE_ROLE_NAMES,
+        admin_creatable_roles=admin_creatable_roles(),
+        can_create_admin_user=can_create_admin_user(),
     )
+
+
+@admin_bp.route("/users/create", methods=["POST"])
+@login_required
+def create_admin_user():
+    if not can_create_admin_user():
+        abort(403)
+
+    name = request.form.get("name", "").strip()
+    surname = request.form.get("surname", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "").strip()
+    role_id = request.form.get("role_id", type=int)
+    franchise_ids = [int(item) for item in request.form.getlist("franchise_ids")]
+
+    if not name or not surname or not email or not password or not role_id:
+        flash("Name, surname, email, password and role are required.", "danger")
+        return redirect(url_for("admin.users"))
+
+    if User.query.filter(db.func.lower(User.email) == email).first():
+        flash("A user with that email address already exists.", "danger")
+        return redirect(url_for("admin.users"))
+
+    role = Role.query.get_or_404(role_id)
+    allowed_roles = {item.name for item in admin_creatable_roles()}
+    if role.name not in allowed_roles:
+        flash("You are not allowed to create that user role.", "danger")
+        return redirect(url_for("admin.users"))
+
+    user = User(
+        name=name,
+        surname=surname,
+        email=email,
+        is_active=True,
+        is_active_account=True,
+        parent_franchise_user_id=None,
+        created_by_user_id=current_user.id,
+    )
+    user.set_password(password)
+    user.roles.append(role)
+
+    ok, message = normalise_user_scope_for_role(user, role.name, franchise_ids)
+    if not ok:
+        flash(message, "danger")
+        return redirect(url_for("admin.users"))
+
+    db.session.add(user)
+    db.session.commit()
+    log_action("Users", "Created admin-managed user", f"User: {email}; Role: {role.name}")
+    flash(f"User {user.full_name} was created as {role.name}.", "success")
+    return redirect(url_for("admin.users"))
 
 
 @admin_bp.route("/franchises/<int:franchise_id>/reactivate-performance", methods=["POST"])
@@ -349,6 +451,14 @@ def update_user_roles(user_id):
     if any(role.name == "Regional Manager" for role in selected_roles) and not can_create_regional_manager():
         flash("Your role does not have permission to create or assign Regional Manager users.", "danger")
         return redirect(url_for("admin.users"))
+    selected_role_names = {role.name for role in selected_roles}
+    if selected_role_names & ADMIN_SIDE_ROLE_NAMES:
+        # Admin/Finance-side users are not franchise children and must not carry franchise links.
+        user.parent_franchise_user_id = None
+        user.assigned_franchises = []
+    elif selected_role_names & {"Regional Manager", "Franchise User"}:
+        user.parent_franchise_user_id = None
+
     user.roles = selected_roles
     log_action("Users", "Updated user roles", f"User: {user.full_name}")
     db.session.commit()

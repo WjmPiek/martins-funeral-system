@@ -72,13 +72,30 @@ def can_edit_franchise_financials():
 
 
 
-def accessible_franchises_for_current_user():
+def accessible_franchises_for_current_user(include_old=False):
+    """Return only the franchises the current user may see.
+
+    Normal franchise/regional users only see active franchises linked to their user.
+    Old/no-data franchises stay hidden from Franchise Details until Admin, Super Admin
+    or Finance Manager activates them again from the Old Franchises screen.
+    """
+    query = Franchise.query
+    if not include_old:
+        query = query.filter(Franchise.is_performance_active == True)
+
     if current_user.has_permission("franchise_management:view") or current_user.has_permission("franchise_management:manage"):
-        return Franchise.query.order_by(Franchise.business_name.asc()).all()
-    if getattr(current_user, "assigned_franchises", None):
-        return sorted(current_user.assigned_franchises, key=lambda item: item.business_name or "")
+        return query.order_by(Franchise.business_name.asc()).all()
+
+    linked = list(getattr(current_user, "assigned_franchises", None) or [])
+    if not include_old:
+        linked = [item for item in linked if getattr(item, "is_performance_active", True)]
+    if linked:
+        return sorted(linked, key=lambda item: item.business_name or "")
+
     selected = get_selected_franchise()
-    return [selected] if selected else []
+    if selected and (include_old or getattr(selected, "is_performance_active", True)):
+        return [selected]
+    return []
 
 
 def franchise_has_royalty_scale(franchise_id):
@@ -134,7 +151,7 @@ def get_or_create_franchise():
         session["selected_franchise_id"] = franchise.id
         return franchise
 
-    franchise = Franchise.query.order_by(Franchise.id.asc()).first()
+    franchise = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.id.asc()).first()
     if franchise:
         return franchise
     franchise = Franchise(business_name="Martins Funerals Franchise")
@@ -316,13 +333,19 @@ def can_manage_own_franchise_employees():
     return current_user.has_permission("franchise_employees:manage") or current_user.has_permission("franchise_employees:add")
 
 
-def employee_role():
-    role = Role.query.filter_by(name="Franchise Employee").first()
-    if not role:
-        role = Role(name="Franchise Employee", description="Employee created under a franchise user", is_system_role=True)
-        db.session.add(role)
-        db.session.flush()
-    return role
+FRANCHISE_USER_CREATABLE_ROLE_NAMES = ["Franchise Manager", "Franchise Employee", "Franchise Agent"]
+
+
+def franchise_creatable_roles():
+    roles = []
+    for role_name in FRANCHISE_USER_CREATABLE_ROLE_NAMES:
+        role = Role.query.filter_by(name=role_name).first()
+        if not role:
+            role = Role(name=role_name, description=f"{role_name} created under a franchise user", is_system_role=True)
+            db.session.add(role)
+            db.session.flush()
+        roles.append(role)
+    return roles
 
 
 def franchises_available_for_employee_creation():
@@ -351,7 +374,7 @@ def employees():
     franchises = franchises_available_for_employee_creation()
     if not franchises:
         flash("Your user is not linked to any franchise yet. Ask Admin to link your franchise before creating employee users.", "warning")
-        return render_template("franchise/employees.html", franchises=[], employees=[])
+        return render_template("franchise/employees.html", franchises=[], employees=[], creatable_roles=franchise_creatable_roles())
 
     if request.method == "POST":
         if not can_manage_own_franchise_employees():
@@ -362,6 +385,7 @@ def employees():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "").strip()
         franchise_id = request.form.get("franchise_id", type=int)
+        role_id = request.form.get("role_id", type=int)
 
         if not name or not surname or not email or not password:
             flash("Name, surname, email and password are required.", "danger")
@@ -386,17 +410,22 @@ def employees():
             parent_franchise_user_id=current_user.id,
             created_by_user_id=current_user.id,
         )
+        selected_role = next((role for role in franchise_creatable_roles() if role.id == role_id), None)
+        if not selected_role:
+            flash("Please select Manager, Employee or Agent.", "danger")
+            return redirect(url_for("franchise.employees"))
+
         user.set_password(password)
-        user.roles.append(employee_role())
+        user.roles.append(selected_role)
         user.assigned_franchises.append(selected_franchise)
         db.session.add(user)
-        log_action("Franchise Employees", "Created franchise employee user", f"Employee: {email}; Franchise: {selected_franchise.business_name}")
+        log_action("Franchise Employees", "Created franchise employee user", f"Employee: {email}; Role: {selected_role.name}; Franchise: {selected_franchise.business_name}")
         db.session.commit()
         flash(f"Employee user {user.full_name} was created under {selected_franchise.business_name}.", "success")
         return redirect(url_for("franchise.employees"))
 
     employees = User.query.filter_by(parent_franchise_user_id=current_user.id).order_by(User.name, User.surname).all()
-    return render_template("franchise/employees.html", franchises=franchises, employees=employees)
+    return render_template("franchise/employees.html", franchises=franchises, employees=employees, creatable_roles=franchise_creatable_roles())
 
 
 @franchise_bp.route("/employees/<int:user_id>/update", methods=["POST"])
@@ -410,6 +439,16 @@ def update_employee(user_id):
 
     user.name = request.form.get("name", user.name).strip() or user.name
     user.surname = request.form.get("surname", user.surname).strip() or user.surname
+
+    role_id = request.form.get("role_id", type=int)
+    if role_id:
+        selected_role = next((role for role in franchise_creatable_roles() if role.id == role_id), None)
+        if not selected_role:
+            flash("Please select Manager, Employee or Agent.", "danger")
+            return redirect(url_for("franchise.employees"))
+        # Franchise-created users may only carry franchise-side employee roles.
+        user.roles = [selected_role]
+
     password = request.form.get("password", "").strip()
     if password:
         user.set_password(password)

@@ -21,6 +21,46 @@
     </div>
   </div>
 
+
+  {% if can_create_admin_user %}
+  <div class="form-section-card">
+    <h2>Create Martins / Franchise User</h2>
+    <p class="muted">Admin creates Finance Manager, Finance Assistant, Regional Manager and Franchise User accounts here. Franchise users create their own Manager, Employee or Agent users from their Employee Users tab.</p>
+    <form method="post" action="{{ url_for('admin.create_admin_user') }}" class="professional-form">
+      <div class="form-grid">
+        <label for="new_user_name">Name</label>
+        <input id="new_user_name" name="name" required>
+
+        <label for="new_user_surname">Surname</label>
+        <input id="new_user_surname" name="surname" required>
+
+        <label for="new_user_email">Email</label>
+        <input id="new_user_email" type="email" name="email" required>
+
+        <label for="new_user_password">Password</label>
+        <input id="new_user_password" type="password" name="password" required>
+
+        <label for="new_user_role">Role</label>
+        <select id="new_user_role" name="role_id" required>
+          <option value="">Select role...</option>
+          {% for role in admin_creatable_roles %}
+            <option value="{{ role.id }}" data-role-name="{{ role.name }}">{{ role.name }}</option>
+          {% endfor %}
+        </select>
+
+        <label for="new_user_franchises" class="new-user-scope-field">Linked Franchise(s)</label>
+        <select id="new_user_franchises" class="new-user-scope-field" name="franchise_ids" multiple size="6">
+          {% for franchise in franchises %}
+            <option value="{{ franchise.id }}">{{ franchise.business_name or 'Unnamed Franchise' }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <p class="muted" id="new-user-role-help">Choose the user role first. Franchise User and Regional Manager accounts need franchise scope. Finance Manager and Finance Assistant accounts are Martins admin-side users and will not be linked to any franchise.</p>
+      <button type="submit" class="btn button-auto">Create User</button>
+    </form>
+  </div>
+  {% endif %}
+
   <div class="franchise-user-layout">
     <div class="franchise-list-card franchise-selector-card">
       <div class="franchise-tabs">
@@ -249,6 +289,38 @@ document.addEventListener("click", function(event) { if (event.target.classList.
   tabs.forEach(tab=>tab.addEventListener('click',()=>showPanel(tab.dataset.target)));
   if(search){search.addEventListener('input', filterItems);}
   if(jump){jump.addEventListener('change', function(){ if(this.value){ window.location.href=this.value; } });}
+})();
+</script>
+
+<script>
+(function(){
+  const roleSelect = document.getElementById('new_user_role');
+  const scopeFields = Array.from(document.querySelectorAll('.new-user-scope-field'));
+  const franchiseSelect = document.getElementById('new_user_franchises');
+  const help = document.getElementById('new-user-role-help');
+  const rolesNeedingScope = new Set(['Regional Manager', 'Franchise User']);
+
+  function updateCreateUserScope(){
+    if(!roleSelect){ return; }
+    const selected = roleSelect.options[roleSelect.selectedIndex];
+    const roleName = selected ? selected.getAttribute('data-role-name') : '';
+    const needsScope = rolesNeedingScope.has(roleName);
+    scopeFields.forEach(function(el){ el.style.display = needsScope ? '' : 'none'; });
+    if(franchiseSelect){
+      franchiseSelect.required = needsScope;
+      if(!needsScope){ Array.from(franchiseSelect.options).forEach(function(option){ option.selected = false; }); }
+    }
+    if(help){
+      help.textContent = needsScope
+        ? 'This role must be linked to one or more active franchises. Only that scoped data will be visible.'
+        : 'This is a Martins admin-side role. It will not be placed under any franchise user or linked to franchise data.';
+    }
+  }
+
+  if(roleSelect){
+    roleSelect.addEventListener('change', updateCreateUserScope);
+    updateCreateUserScope();
+  }
 })();
 </script>
 {% endblock %}
