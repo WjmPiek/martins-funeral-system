@@ -3,7 +3,7 @@
 <section class="page-section">
   <div class="section-header">
     <div>
-      <h1>Franchise Employee Users</h1>
+      <h1>Employees</h1>
       <p class="muted">Admin view of all employee users created under franchise users. Admin can view, edit, deactivate and relink them.</p>
     </div>
   </div>
@@ -29,7 +29,7 @@
             <div class="modal-backdrop" id="admin-employee-modal-{{ user.id }}" aria-hidden="true">
               <div class="modal-card" role="dialog" aria-modal="true">
                 <div class="modal-header">
-                  <div><h2>Edit Franchise Employee</h2><p>{{ user.email }}</p></div>
+                  <div><h2>Edit Employee</h2><p>{{ user.email }}</p></div>
                   <button type="button" class="modal-close" onclick="closeAdminEmployeeModal('admin-employee-modal-{{ user.id }}')">x</button>
                 </div>
                 <form method="post" action="{{ url_for('admin.update_franchise_employee', user_id=user.id) }}">
@@ -53,7 +53,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="center-cell">No franchise employee users found.</td></tr>
+        <tr><td colspan="6" class="center-cell">No employees found.</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -1645,6 +1645,50 @@ def assign_user_franchises(user_id):
     return redirect(url_for("admin.users"))
 
 
+@admin_bp.route("/users/<int:user_id>/clean-scope", methods=["POST"])
+@login_required
+@permission_required("users:edit")
+def clean_single_user_scope(user_id):
+    if not can_assign_franchise_links():
+        flash("Your role does not have permission to clean user scope.", "danger")
+        return redirect(url_for("admin.users"))
+    user = User.query.get_or_404(user_id)
+    role_names = user_role_names(user)
+    if role_names & ADMIN_SIDE_ROLE_NAMES:
+        user.parent_franchise_user_id = None
+        user.assigned_franchises = []
+        flash(f"{user.full_name} was cleaned as an Admin/Finance-side user with no franchise links.", "success")
+    elif role_names & FRANCHISE_SIDE_ROLE_NAMES:
+        user.parent_franchise_user_id = None if "Franchise User" in role_names or "Regional Manager" in role_names else user.parent_franchise_user_id
+        flash(f"{user.full_name} was checked as a franchise-side user. Franchise links were kept for that user only.", "success")
+    else:
+        user.parent_franchise_user_id = None
+        flash(f"{user.full_name} was checked. No franchise scope changes were required.", "success")
+    log_action("Users", "Cleaned one user scope", f"User: {user.full_name}")
+    db.session.commit()
+    return redirect(url_for("admin.users"))
+
+
+@admin_bp.route("/users/<int:user_id>/clear-franchise-links", methods=["POST"])
+@login_required
+@permission_required("users:edit")
+def clear_single_user_franchise_links(user_id):
+    if not can_assign_franchise_links():
+        flash("Your role does not have permission to clear franchise links.", "danger")
+        return redirect(url_for("admin.users"))
+    user = User.query.get_or_404(user_id)
+    if is_admin_side_user(user):
+        user.assigned_franchises = []
+        user.parent_franchise_user_id = None
+        flash(f"{user.full_name} is an Admin/Finance-side user. Franchise links were cleared for this user only.", "success")
+    else:
+        user.assigned_franchises = []
+        flash(f"Franchise links cleared for {user.full_name} only.", "success")
+    log_action("Users", "Cleared one user franchise links", f"User: {user.full_name}")
+    db.session.commit()
+    return redirect(url_for("admin.users"))
+
+
 @admin_bp.route("/users/clean-finance-admin-users", methods=["POST"])
 @login_required
 @permission_required("users:edit")

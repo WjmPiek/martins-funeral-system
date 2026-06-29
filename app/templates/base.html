@@ -28,47 +28,51 @@
                 <nav class="sidebar-nav">
                     {% if privileged_user and franchise_view_mode %}
                         <div class="nav-group-title">Selected Franchise</div>
-                        <a href="{{ url_for('dashboard.index') }}">Franchise Dashboard</a>
                         <a href="{{ url_for('franchise.details') }}">Franchise Details</a>
-                        {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}<a href="{{ url_for('franchise.employees') }}">Employee Users</a>{% endif %}
+                        {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}<a class="sidebar-sub-link" href="{{ url_for('franchise.employees') }}">Employees</a>{% endif %}
                         <a href="{{ url_for('performance.index') }}">Performance</a>
+                        <a href="{{ url_for('monthly.index') }}">Monthly Figures</a>
+                        <a class="sidebar-sub-link" href="{{ url_for('royalties.index') }}">Royalties</a>
+                        {% if current_user.has_permission('finance:view') %}<a class="sidebar-sub-link" href="#">Finance</a>{% endif %}
                         <a href="{{ url_for('heatmap.index') }}">Heat Map</a>
                         <a href="{{ url_for('manuals.index') }}">Manuals</a>
-                        <a href="{{ url_for('monthly.index') }}">Monthly Figures</a>
-                        <a href="{{ url_for('royalties.index') }}">Royalties</a>
                         {% if current_user.has_permission('attendance:view') %}<a href="{{ url_for('attendance.index') }}">Attendance</a>{% endif %}
                         <div class="nav-group-title">Admin</div>
                         <a href="{{ url_for('dashboard.main_dashboard') }}">Back to Main Dashboard</a>
                     {% else %}
-                        {% if current_user.has_permission('dashboard:view') %}
+                        {% set nav_role_names = current_user.roles|map(attribute='name')|list %}
+                        {% set franchise_only_nav = nav_role_names|select('in', ['Franchise User','Franchise Manager','Franchise Employee','Franchise Agent','Agent','Employee','Manager'])|list|length > 0 and not ('Admin' in nav_role_names or 'Finance Manager' in nav_role_names or 'Finance Assistant' in nav_role_names or 'Regional Manager' in nav_role_names) %}
+                        {% if current_user.has_permission('dashboard:view') and not franchise_only_nav %}
                             <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
                         {% endif %}
 
-                        {% if current_user.has_permission('franchise_settings:view') %}
-                            <div class="nav-group-title">Franchise Settings</div>
+                        {% if current_user.has_permission('franchise_settings:view') or current_user.has_permission('franchise_details:view') %}
+                            <div class="nav-group-title">Franchise Details</div>
                             {% if current_user.has_permission('franchise_details:view') %}<a href="{{ url_for('franchise.details') }}">Franchise Details</a>{% endif %}
+                            {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}<a class="sidebar-sub-link" href="{{ url_for('franchise.employees') }}">Employees</a>{% endif %}
                         {% endif %}
 
+                        {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.index') }}">Performance</a>{% endif %}
+                        {% if current_user.has_permission('monthly_figures:view') or current_user.has_permission('royalties:view') or current_user.has_permission('finance:view') %}
+                            <div class="nav-group-title">Monthly Figures</div>
+                            {% if current_user.has_permission('monthly_figures:view') %}<a href="{{ url_for('monthly.index') }}">Monthly Figures</a>{% endif %}
+                            {% if current_user.has_permission('royalties:view') %}<a class="sidebar-sub-link" href="{{ url_for('royalties.index') }}">Royalties</a>{% endif %}
+                            {% if current_user.has_permission('finance:view') %}<a class="sidebar-sub-link" href="#">Finance</a>{% endif %}
+                        {% endif %}
+                        {% if current_user.has_permission('heat_map:view') %}<a href="{{ url_for('heatmap.index') }}">Heat Map</a>{% endif %}
+                        {% if current_user.has_permission('manuals:view') %}<a href="{{ url_for('manuals.index') }}">Manuals</a>{% endif %}
                         {% if current_user.has_permission('joinings:view') %}<a href="#">Joinings</a>{% endif %}
                         {% if current_user.has_permission('funeral_services:view') %}<a href="#">Funeral Services</a>{% endif %}
                         {% if current_user.has_permission('insurance_claims:view') %}<a href="{{ url_for('insurance_claims.index') }}">Insurance Claims</a>{% endif %}
-                        {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.index') }}">Performance</a>{% endif %}
-                        {% if current_user.has_permission('heat_map:view') %}<a href="{{ url_for('heatmap.index') }}">Heat Map</a>{% endif %}
-                        {% if current_user.has_permission('manuals:view') %}<a href="{{ url_for('manuals.index') }}">Manuals</a>{% endif %}
-                        {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}<a href="{{ url_for('franchise.employees') }}">Employee Users</a>{% endif %}
-                        {% if current_user.has_permission('royalties:view') %}<a href="{{ url_for('royalties.index') }}">Royalties</a>{% endif %}
-                        {% if current_user.has_permission('monthly_figures:view') %}<a href="{{ url_for('monthly.index') }}">Monthly Figures</a>{% endif %}
-                        {% if current_user.has_permission('finance:view') %}<a href="#">Finance</a>{% endif %}
 
-                        {% set nav_role_names = current_user.roles|map(attribute='name')|list %}{% if current_user.has_permission('users:view') or current_user.has_permission('user_roles:view') or 'Admin' in nav_role_names or 'Finance Manager' in nav_role_names or 'Finance Assistant' in nav_role_names %}
-                            <div class="nav-group-title">Admin</div>
+                        {% if current_user.has_permission('users:view') or current_user.has_permission('user_roles:view') or 'Admin' in nav_role_names or 'Finance Manager' in nav_role_names or 'Finance Assistant' in nav_role_names %}
+                            <div class="nav-group-title">Users</div>
                             {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.users') }}">Users</a>{% endif %}
-                            {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.franchise_employees') }}">Franchise Employee Users</a>{% endif %}
+                            {% if current_user.has_permission('users:view') %}<a class="sidebar-sub-link" href="{{ url_for('admin.franchise_employees') }}">Employees</a>{% endif %}
+                            {% if current_user.has_permission('user_roles:view') %}<a class="sidebar-sub-link" href="{{ url_for('admin.roles') }}">User Roles</a>{% endif %}
                             {% if current_user.has_permission('performance:manage_inactive') or 'Admin' in nav_role_names or 'Super Admin' in nav_role_names or 'Finance Manager' in nav_role_names %}<a href="{{ url_for('performance.inactive_franchises') }}">Old Franchises</a>{% endif %}
-                            {% if current_user.has_permission('user_roles:view') %}<a href="{{ url_for('admin.roles') }}">User Roles</a>{% endif %}
                             {% if current_user.has_permission('franchise_management:view') %}<a href="#">Franchise Management</a>{% endif %}
-                            {% if current_user.has_permission('finance:view') %}<a href="#">Finance</a>{% endif %}
-                            {% set nav_role_names = current_user.roles|map(attribute='name')|list %}{% if 'Admin' in nav_role_names or 'Finance Manager' in nav_role_names or 'Finance Assistant' in nav_role_names %}<a href="{{ url_for('admin.imports_data') }}">Imports & Data</a>{% endif %}
+                            {% if 'Admin' in nav_role_names or 'Finance Manager' in nav_role_names or 'Finance Assistant' in nav_role_names %}<a href="{{ url_for('admin.imports_data') }}">Imports & Data</a>{% endif %}
                             {% if current_user.has_permission('audit_logs:view') %}<a href="{{ url_for('admin.audit_logs') }}">Audit Logs</a>{% endif %}
                             {% if current_user.has_permission('system_administration:view') %}<a href="#">System Administration</a>{% endif %}
                         {% endif %}
