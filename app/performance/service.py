@@ -47,7 +47,11 @@ PERFORMANCE_METRICS = {
     },
     "funerals": {
         "label": "Funerals",
-        "source_field": "number_of_funerals",
+        # Imported monthly PDF/Excel files store the operational funeral count as MF Files.
+        # Some older/manual records may use number_of_funerals, so metric_field_expression()
+        # below adds both fields when available.
+        "source_field": "mf_files",
+        "fallback_fields": ["number_of_funerals"],
         "format": "number",
         "weight": Decimal("0.10"),
         "higher_is_better": True,
@@ -248,6 +252,12 @@ def previous_month(month, year):
     return (12, year - 1) if month == 1 else (month - 1, year)
 
 
+def default_graph_period():
+    """Graphs open on the last completed month by default."""
+    now = datetime.now()
+    return previous_month(now.month, now.year)
+
+
 def same_month_last_year(month, year):
     return month, year - 1
 
@@ -292,7 +302,7 @@ def has_recent_performance_data(franchise_id, month, year, periods=3):
     conditions = []
     for m, y in period_pairs:
         conditions.append((MonthlyFigure.month == m) & (MonthlyFigure.year == y))
-    total_columns = [func.coalesce(func.sum(metric_field(metric_key)), 0) for metric_key in PERFORMANCE_METRICS]
+    total_columns = [func.coalesce(func.sum(metric_field_expression(metric_key)), 0) for metric_key in PERFORMANCE_METRICS]
     row = (
         db.session.query(*total_columns)
         .filter(MonthlyFigure.franchise_id == franchise_id)
@@ -379,6 +389,27 @@ def metric_field(metric_key):
     return getattr(MonthlyFigure, PERFORMANCE_METRICS[metric_key]["source_field"])
 
 
+def metric_field_expression(metric_key):
+    """Return the SQL expression used for KPI actuals.
+
+    Funerals must not disappear from graphs: current imports capture funerals as
+    MF Files, while older/manual records may use number_of_funerals.  Add both
+    fields when they exist so the graph, leaderboard and inactivity scan all use
+    the same live value.
+    """
+    config = PERFORMANCE_METRICS[metric_key]
+    fields = [config["source_field"]] + list(config.get("fallback_fields", []))
+    expression = None
+    for field_name in fields:
+        if not hasattr(MonthlyFigure, field_name):
+            continue
+        column = func.coalesce(getattr(MonthlyFigure, field_name), 0)
+        expression = column if expression is None else expression + column
+    if expression is None:
+        expression = func.coalesce(metric_field(metric_key), 0)
+    return expression
+
+
 def period_actuals(month, year, franchise_ids, metric_keys=None):
     franchise_ids = filter_active_franchise_ids(franchise_ids)
     metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
@@ -386,7 +417,7 @@ def period_actuals(month, year, franchise_ids, metric_keys=None):
         return {}
     columns = [MonthlyFigure.franchise_id]
     for metric_key in metric_keys:
-        columns.append(func.coalesce(func.sum(metric_field(metric_key)), 0).label(metric_key))
+        columns.append(func.coalesce(func.sum(metric_field_expression(metric_key)), 0).label(metric_key))
     rows = (
         db.session.query(*columns)
         .filter(MonthlyFigure.franchise_id.in_(franchise_ids))

@@ -54,6 +54,7 @@
       <div class="franchise-tab-panel" id="old-franchises">
         <h2>Old Franchises</h2>
         <p class="muted">These branches have no Cash, Sales, Insurance, Joinings or Funerals data in the last 3 months. They are hidden from targets, graphs and calculations until activated again.</p>
+        <h3>Hidden branches</h3>
         <div class="franchise-list-scroll">
         {% for row in old_franchises %}
           {% set franchise = row.franchise %}
@@ -73,13 +74,31 @@
           <p class="muted">No old franchises found.</p>
         {% endfor %}
         </div>
+
+        <h3>Franchise users linked only to old branches</h3>
+        <p class="muted">These users are separated from active franchise users because their linked branches are hidden from performance calculations.</p>
+        <div class="franchise-list-scroll">
+        {% for user in old_franchise_users %}
+          <div class="franchise-list-item old-franchise-row franchise-search-item" data-name="{{ ((user.full_name or '') ~ ' ' ~ (user.email or ''))|lower }}">
+            <strong>{{ user.full_name or user.email }}</strong>
+            <span>{{ user.email }}</span>
+            <div class="linked-branches">
+              {% for franchise in user.assigned_franchises %}
+                {% if not franchise.is_performance_active %}<span class="linked-branch-pill">{{ franchise.business_name or 'Unnamed Franchise' }}</span>{% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        {% else %}
+          <p class="muted">No franchise users are linked only to old franchises.</p>
+        {% endfor %}
+        </div>
       </div>
     </div>
 
     <div class="franchise-users-card">
       <div class="form-section-card">
-        <h2>All Registered Users</h2>
-        <p class="muted">Admin-side users are not franchise users and do not receive franchise links on this page.</p>
+        <h2>Active Registered Users</h2>
+        <p class="muted">Franchise users linked only to old/no-data branches are moved to the Old Franchises tab. Admin-side users are not franchise users and do not receive franchise links on this page.</p>
       </div>
 
       <div class="form-section-card linked-groups-card">

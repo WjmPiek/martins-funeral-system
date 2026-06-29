@@ -48,6 +48,7 @@ from app.performance.service import (
     auto_hide_inactive_franchises,
     reactivate_franchise_performance,
     graph_payload_for_scope,
+    default_graph_period,
     active_franchises_for_ids,
 )
 
@@ -122,7 +123,10 @@ def index():
 @login_required
 @permission_required("performance:view")
 def graphs():
-    month, year = selected_period_from_request(request.args)
+    if "month" not in request.args and "year" not in request.args:
+        month, year = default_graph_period()
+    else:
+        month, year = selected_period_from_request(request.args)
     mode = request_mode()
     growth = request_growth()
     metric_key = request.args.get("metric", "cash")
@@ -311,7 +315,10 @@ def executive():
 @login_required
 @permission_required("performance:view")
 def leaderboards():
-    month, year = selected_period_from_request(request.args)
+    if "month" not in request.args and "year" not in request.args:
+        month, year = default_graph_period()
+    else:
+        month, year = selected_period_from_request(request.args)
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()

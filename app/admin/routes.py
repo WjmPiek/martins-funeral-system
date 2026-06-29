@@ -120,6 +120,19 @@ def ordered_franchises_for_user(user):
         return primary + rest
     return linked_sorted
 
+def active_linked_franchises_for_user(user):
+    return [franchise for franchise in ordered_franchises_for_user(user) if getattr(franchise, "is_performance_active", True)]
+
+
+def old_linked_franchises_for_user(user):
+    return [franchise for franchise in ordered_franchises_for_user(user) if not getattr(franchise, "is_performance_active", True)]
+
+
+def franchise_user_has_active_data(user):
+    return bool(active_linked_franchises_for_user(user))
+
+
+
 def can_change_user_roles():
     # Role changes are deliberately stricter than normal Users Edit permission.
     # Only Admin and Finance Assistant users may assign/change roles, and their role
@@ -269,8 +282,10 @@ def users():
 
     all_users = User.query.order_by(User.name, User.surname).all()
     admin_side_users = [user for user in all_users if is_admin_side_user(user)]
-    franchise_side_users = [user for user in all_users if is_franchise_side_user(user)]
-    other_users = [user for user in all_users if user not in admin_side_users and user not in franchise_side_users]
+    all_franchise_side_users = [user for user in all_users if is_franchise_side_user(user)]
+    franchise_side_users = [user for user in all_franchise_side_users if franchise_user_has_active_data(user)]
+    old_franchise_users = [user for user in all_franchise_side_users if not franchise_user_has_active_data(user) and old_linked_franchises_for_user(user)]
+    other_users = [user for user in all_users if user not in admin_side_users and user not in all_franchise_side_users]
     linked_franchise_groups = []
     for user in franchise_side_users:
         linked = ordered_franchises_for_user(user)
@@ -283,6 +298,7 @@ def users():
         admin_side_users=admin_side_users,
         franchise_side_users=franchise_side_users,
         other_users=other_users,
+        old_franchise_users=old_franchise_users,
         linked_franchise_groups=linked_franchise_groups,
         roles=Role.query.order_by(Role.name).all(),
         franchises=franchises,
