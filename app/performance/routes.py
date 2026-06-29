@@ -47,6 +47,8 @@ from app.performance.service import (
     inactive_franchise_candidates,
     auto_hide_inactive_franchises,
     reactivate_franchise_performance,
+    graph_payload_for_scope,
+    active_franchises_for_ids,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -112,30 +114,56 @@ def dashboard():
 @login_required
 @permission_required("performance:view")
 def index():
+    # The main Performance tab is now a graph-only view.
+    return redirect(url_for("performance.graphs", **request.args.to_dict(flat=True)))
+
+
+@performance_bp.route("/graphs")
+@login_required
+@permission_required("performance:view")
+def graphs():
     month, year = selected_period_from_request(request.args)
     mode = request_mode()
     growth = request_growth()
-    metric_key = request.args.get("metric", "overall")
-    if metric_key != "overall" and metric_key not in PERFORMANCE_METRICS:
-        metric_key = "overall"
+    metric_key = request.args.get("metric", "cash")
+    if metric_key not in PERFORMANCE_METRICS:
+        metric_key = "cash"
+    scope = request.args.get("scope", "group")
+    try:
+        periods = int(request.args.get("periods", 12))
+    except Exception:
+        periods = 12
+    periods = max(3, min(periods, 36))
+
+    all_ids = accessible_franchise_ids(include_inactive=True)
+    # Keep old/no-data branches hidden automatically on graph pages.
+    auto_hide_inactive_franchises(month, year, all_ids, current_user.id)
     ids = accessible_franchise_ids()
-    previous_m, previous_y = previous_month(month, year)
-    rows = attach_movement(
-        ranked_performance(month, year, ids, mode, growth, metric_key),
-        ranked_performance(previous_m, previous_y, ids, mode, growth, metric_key),
-    )
-    selected = get_selected_franchise()
-    my_row = None
-    if selected:
-        my_row = next((row for row in rows if row["franchise_id"] == selected.id), None)
-    elif not is_privileged_user() and rows:
-        my_row = rows[0]
+    franchises = active_franchises_for_ids(ids)
+
+    franchise_id = request.args.get("franchise_id", type=int)
+    selected_franchise = None
+    if scope == "franchise":
+        if franchise_id is None:
+            selected = get_selected_franchise()
+            franchise_id = selected.id if selected and selected.id in ids else (ids[0] if ids else None)
+        if franchise_id not in ids:
+            abort(403)
+        selected_franchise = Franchise.query.get_or_404(franchise_id)
+        graph_data = graph_payload_for_scope(metric_key, month, year, franchise_id=franchise_id, periods=periods, mode=mode, growth_percent=growth)
+    else:
+        scope = "group"
+        graph_data = graph_payload_for_scope(metric_key, month, year, franchise_ids=ids, periods=periods, mode=mode, growth_percent=growth)
+
     return render_template(
-        "performance/index.html",
-        rows=rows,
-        my_row=my_row,
+        "performance/graphs.html",
+        graph_data=graph_data,
         metrics=PERFORMANCE_METRICS,
         metric_key=metric_key,
+        scope=scope,
+        periods=periods,
+        franchises=franchises,
+        selected_franchise=selected_franchise,
         target_modes=TARGET_MODES,
         target_mode=mode,
         growth=growth,
@@ -144,7 +172,6 @@ def index():
         selected_month=month,
         selected_year=year,
         selected_period_label=month_label(month, year),
-        show_manage_targets=current_user.has_permission("performance:manage_targets"),
     )
 
 

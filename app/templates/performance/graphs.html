@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "performance/_graph_charts.html" import chart_card, graph_assets %}
+{% block app_content %}
+<section class="page-section performance-graphs-page">
+  <div class="section-header">
+    <div>
+      <h1>Performance Graphs</h1>
+      <p class="muted">Graph-only view for the whole active group or one selected franchise. Old franchises with no KPI data for 3 months are hidden automatically.</p>
+    </div>
+    <div class="quick-actions">
+      <a class="btn secondary button-auto" href="{{ url_for('performance.leaderboards', month=selected_month, year=selected_year) }}">Leaderboards</a>
+      <a class="btn secondary button-auto" href="{{ url_for('performance.inactive_franchises', month=selected_month, year=selected_year) }}">Old Franchises</a>
+    </div>
+  </div>
+
+  <form class="filter-bar instant-filter-bar" method="get">
+    <label>Month
+      <select name="month">
+        {% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Year
+      <select name="year">
+        {% for year in year_options %}<option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Show
+      <select name="scope" id="graph-scope-select">
+        <option value="group" {% if scope == 'group' %}selected{% endif %}>Whole active group</option>
+        <option value="franchise" {% if scope == 'franchise' %}selected{% endif %}>One franchise</option>
+      </select>
+    </label>
+    <label id="graph-franchise-field" {% if scope != 'franchise' %}style="display:none"{% endif %}>Franchise
+      <select name="franchise_id">
+        {% for franchise in franchises %}
+        <option value="{{ franchise.id }}" {% if selected_franchise and selected_franchise.id == franchise.id %}selected{% endif %}>{{ franchise.business_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>KPI
+      <select name="metric">
+        {% for key, metric in metrics.items() %}<option value="{{ key }}" {% if key == metric_key %}selected{% endif %}>{{ metric.label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Period
+      <select name="periods">
+        <option value="6" {% if periods == 6 %}selected{% endif %}>6 months</option>
+        <option value="12" {% if periods == 12 %}selected{% endif %}>12 months</option>
+        <option value="24" {% if periods == 24 %}selected{% endif %}>24 months</option>
+        <option value="36" {% if periods == 36 %}selected{% endif %}>36 months</option>
+      </select>
+    </label>
+    <input type="hidden" name="target_mode" value="{{ target_mode }}">
+    <input type="hidden" name="growth" value="{{ growth }}">
+    <button class="btn button-auto" type="submit">Update Graphs</button>
+  </form>
+
+  <div class="graph-dashboard-title">
+    <h2>{{ graph_data.metric_label }} - {{ 'Whole active group' if scope == 'group' else selected_franchise.business_name }}</h2>
+    <p class="muted">Selected period ending {{ selected_period_label }}.</p>
+  </div>
+
+  <div class="graph-grid-two">
+    {{ chart_card('Actual vs Target', 'Shows whether performance is above or below the fair target line.', graph_data.actual_vs_target.points, graph_data.actual_vs_target.series, graph_data.value_prefix, graph_data.value_suffix) }}
+    {{ chart_card('Compare to Last Year', 'Compares this year against the same month last year.', graph_data.previous_year.points, graph_data.previous_year.series, graph_data.value_prefix, graph_data.value_suffix) }}
+    {{ chart_card('Forecast vs Target', 'Current forecast compared to the target line.', graph_data.forecast.points, graph_data.forecast.series, graph_data.value_prefix, graph_data.value_suffix) }}
+    {{ chart_card('Growth Trend', 'Month-on-month growth percentage for the selected KPI.', graph_data.growth.points, graph_data.growth.series, graph_data.growth.value_prefix, graph_data.growth.value_suffix) }}
+  </div>
+</section>
+
+{{ graph_assets() }}
+<style>
+.performance-graphs-page .graph-grid-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.graph-dashboard-title{margin:1rem 0}.instant-filter-bar{align-items:end}.instant-filter-bar select{min-width:150px}@media(max-width:1000px){.performance-graphs-page .graph-grid-two{grid-template-columns:1fr}.instant-filter-bar{display:grid;grid-template-columns:1fr 1fr}.instant-filter-bar button{grid-column:1/-1}}
+</style>
+<script>
+(function(){
+  const scope = document.getElementById('graph-scope-select');
+  const field = document.getElementById('graph-franchise-field');
+  if(scope && field){scope.addEventListener('change', function(){field.style.display = this.value === 'franchise' ? '' : 'none';});}
+})();
+</script>
+{% endblock %}

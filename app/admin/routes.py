@@ -12,6 +12,7 @@ from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
+from app.performance.service import auto_hide_inactive_franchises, inactive_franchise_candidates, reactivate_franchise_performance
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -94,6 +95,12 @@ def can_assign_franchise_links():
 
 def can_bulk_import_users():
     return current_user.has_permission("users:add") or current_user.has_permission("users:import")
+
+
+def can_manage_old_franchises():
+    names = current_user_role_names()
+    return bool(names & {"Admin", "Super Admin", "Finance Manager"}) or current_user.has_permission("performance:manage_inactive")
+
 
 
 
@@ -240,7 +247,13 @@ def seed():
 @login_required
 @permission_required("users:view")
 def users():
-    franchises = Franchise.query.order_by(Franchise.business_name).all()
+    # Keep the franchise selector clean: branches with no KPI data in the last 3 months
+    # are hidden automatically and shown in the Old Franchises tab until reactivated.
+    now = datetime.utcnow()
+    auto_hide_inactive_franchises(now.month, now.year, [franchise.id for franchise in Franchise.query.all()], current_user.id)
+    franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
+    old_franchise_rows = inactive_franchise_candidates(now.month, now.year, [franchise.id for franchise in Franchise.query.order_by(Franchise.business_name).all()])
+    old_franchises = [row for row in old_franchise_rows if not row["is_performance_active"]]
     selected_franchise_id = request.args.get("franchise_id", type=int)
 
     if selected_franchise_id:
@@ -273,12 +286,29 @@ def users():
         linked_franchise_groups=linked_franchise_groups,
         roles=Role.query.order_by(Role.name).all(),
         franchises=franchises,
+        old_franchises=old_franchises,
         selected_franchise=None,
         can_assign_franchise_links=can_assign_franchise_links(),
         can_change_user_roles=can_change_user_roles(),
+        can_manage_old_franchises=can_manage_old_franchises(),
         admin_side_role_names=ADMIN_SIDE_ROLE_NAMES,
         franchise_side_role_names=FRANCHISE_SIDE_ROLE_NAMES,
     )
+
+
+@admin_bp.route("/franchises/<int:franchise_id>/reactivate-performance", methods=["POST"])
+@login_required
+@permission_required("users:view")
+def reactivate_old_franchise(franchise_id):
+    if not can_manage_old_franchises():
+        abort(403)
+    franchise = reactivate_franchise_performance(franchise_id, current_user.id)
+    if franchise:
+        log_action("Franchise", "Reactivated old franchise", f"Franchise: {franchise.business_name}; ID: {franchise.id}")
+        flash(f"{franchise.business_name} has been activated again and will be included in details, targets, graphs and calculations.", "success")
+        return redirect(url_for("admin.users", franchise_id=franchise.id))
+    flash("Franchise could not be found.", "danger")
+    return redirect(url_for("admin.users"))
 
 
 @admin_bp.route("/users/<int:user_id>/roles", methods=["POST"])

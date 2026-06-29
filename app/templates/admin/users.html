@@ -22,16 +22,58 @@
   </div>
 
   <div class="franchise-user-layout">
-    <div class="franchise-list-card">
-      <h2>Franchises</h2>
-      {% for franchise in franchises %}
-        <a class="franchise-list-item" href="{{ url_for('admin.users', franchise_id=franchise.id) }}">
-          <strong>{{ franchise.business_name or 'Unnamed Franchise' }}</strong>
-          <span>Click to open franchise details</span>
-        </a>
-      {% else %}
-        <p class="muted">No franchises captured yet.</p>
-      {% endfor %}
+    <div class="franchise-list-card franchise-selector-card">
+      <div class="franchise-tabs">
+        <button type="button" class="franchise-tab is-active" data-target="active-franchises">Active Franchises</button>
+        <button type="button" class="franchise-tab" data-target="old-franchises">Old Franchises <span class="badge warning">{{ old_franchises|length }}</span></button>
+      </div>
+
+      <input class="franchise-search-input" id="franchise-search" type="search" placeholder="Search franchise..." autocomplete="off">
+
+      <div class="franchise-tab-panel is-active" id="active-franchises">
+        <h2>Franchise Details</h2>
+        <p class="muted">Only active franchises appear here. Select a franchise to open its details page instantly.</p>
+        <select class="franchise-jump-select" id="franchise-jump-select">
+          <option value="">Select franchise...</option>
+          {% for franchise in franchises %}
+            <option value="{{ url_for('admin.users', franchise_id=franchise.id) }}">{{ franchise.business_name or 'Unnamed Franchise' }}</option>
+          {% endfor %}
+        </select>
+        <div class="franchise-list-scroll">
+        {% for franchise in franchises %}
+          <a class="franchise-list-item franchise-search-item" data-name="{{ (franchise.business_name or '')|lower }}" href="{{ url_for('admin.users', franchise_id=franchise.id) }}">
+            <strong>{{ franchise.business_name or 'Unnamed Franchise' }}</strong>
+            <span>Click to open franchise details</span>
+          </a>
+        {% else %}
+          <p class="muted">No active franchises captured yet.</p>
+        {% endfor %}
+        </div>
+      </div>
+
+      <div class="franchise-tab-panel" id="old-franchises">
+        <h2>Old Franchises</h2>
+        <p class="muted">These branches have no Cash, Sales, Insurance, Joinings or Funerals data in the last 3 months. They are hidden from targets, graphs and calculations until activated again.</p>
+        <div class="franchise-list-scroll">
+        {% for row in old_franchises %}
+          {% set franchise = row.franchise %}
+          <div class="franchise-list-item old-franchise-row franchise-search-item" data-name="{{ (franchise.business_name or '')|lower }}">
+            <strong>{{ franchise.business_name or 'Unnamed Franchise' }}</strong>
+            <span>{{ row.reason }}</span>
+            <div class="old-franchise-actions">
+              <a class="btn secondary button-auto" href="{{ url_for('admin.users', franchise_id=franchise.id) }}">Open details</a>
+              {% if can_manage_old_franchises %}
+              <form method="post" action="{{ url_for('admin.reactivate_old_franchise', franchise_id=franchise.id) }}">
+                <button type="submit" class="btn button-auto">Activate</button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+        {% else %}
+          <p class="muted">No old franchises found.</p>
+        {% endfor %}
+        </div>
+      </div>
     </div>
 
     <div class="franchise-users-card">
@@ -172,5 +214,22 @@ function openRoleModal(id) { const modal = document.getElementById(id); if (moda
 function closeRoleModal(id) { const modal = document.getElementById(id); if (modal) { modal.classList.remove("is-open"); modal.setAttribute("aria-hidden", "true"); } }
 document.addEventListener("keydown", function(event) { if (event.key === "Escape") { document.querySelectorAll(".modal-backdrop.is-open").forEach(function(modal) { modal.classList.remove("is-open"); modal.setAttribute("aria-hidden", "true"); }); } });
 document.addEventListener("click", function(event) { if (event.target.classList.contains("modal-backdrop")) { event.target.classList.remove("is-open"); event.target.setAttribute("aria-hidden", "true"); } });
+</script>
+
+<style>
+.franchise-selector-card{position:sticky;top:1rem;align-self:start}.franchise-tabs{display:flex;gap:.4rem;margin-bottom:.75rem}.franchise-tab{border:1px solid #d8dee9;background:#f8fafc;border-radius:999px;padding:.55rem .75rem;font-weight:700;cursor:pointer}.franchise-tab.is-active{background:#17304f;color:#fff;border-color:#17304f}.franchise-search-input,.franchise-jump-select{width:100%;padding:.65rem .75rem;border:1px solid #cbd5e1;border-radius:10px;margin-bottom:.75rem}.franchise-tab-panel{display:none}.franchise-tab-panel.is-active{display:block}.franchise-list-scroll{max-height:66vh;overflow:auto;padding-right:.25rem}.old-franchise-row{background:#fff8e1;border-color:#f4c542}.old-franchise-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}.old-franchise-actions form{margin:0}
+</style>
+<script>
+(function(){
+  const tabs = document.querySelectorAll('.franchise-tab');
+  const panels = document.querySelectorAll('.franchise-tab-panel');
+  const search = document.getElementById('franchise-search');
+  const jump = document.getElementById('franchise-jump-select');
+  function showPanel(id){tabs.forEach(t=>t.classList.toggle('is-active', t.dataset.target===id)); panels.forEach(p=>p.classList.toggle('is-active', p.id===id)); filterItems();}
+  function filterItems(){const q=(search&&search.value||'').toLowerCase().trim(); document.querySelectorAll('.franchise-tab-panel.is-active .franchise-search-item').forEach(item=>{item.style.display=!q || (item.dataset.name||'').includes(q) ? '' : 'none';});}
+  tabs.forEach(tab=>tab.addEventListener('click',()=>showPanel(tab.dataset.target)));
+  if(search){search.addEventListener('input', filterItems);}
+  if(jump){jump.addEventListener('change', function(){ if(this.value){ window.location.href=this.value; } });}
+})();
 </script>
 {% endblock %}

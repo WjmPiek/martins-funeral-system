@@ -1566,3 +1566,100 @@ def user_access_summary(user):
         "franchises": franchises,
         "scope_label": "All franchises" if user.has_permission("franchise_management:view") or user.has_permission("franchise_management:manage") else f"{len(franchises)} assigned franchise(s)",
     }
+
+# Phase 13: graph-only performance dashboard helpers
+
+def active_franchises_for_ids(franchise_ids):
+    ids = filter_active_franchise_ids(franchise_ids)
+    if not ids:
+        return []
+    return Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all()
+
+
+def group_period_actual(month, year, franchise_ids, metric_key):
+    ids = filter_active_franchise_ids(franchise_ids)
+    if not ids:
+        return Decimal("0")
+    total = Decimal("0")
+    rows = period_actuals(month, year, ids, [metric_key])
+    for franchise_id in ids:
+        total += rows.get(franchise_id, {}).get(metric_key, Decimal("0"))
+    return round_money(total)
+
+
+def group_period_target(month, year, franchise_ids, metric_key, mode="growth_bracket", growth_percent=DEFAULT_GROWTH_PERCENT):
+    ids = filter_active_franchise_ids(franchise_ids)
+    if not ids:
+        return Decimal("0")
+    total = Decimal("0")
+    rows = targets_for_period(month, year, ids, mode, growth_percent, [metric_key])
+    for franchise_id in ids:
+        total += rows.get(franchise_id, {}).get(metric_key, Decimal("0"))
+    return round_money(total)
+
+
+def graph_periods_ending(month, year, periods=12):
+    items = []
+    m, y = month, year
+    for _ in range(periods):
+        items.append((m, y))
+        m, y = previous_month(m, y)
+    items.reverse()
+    return items
+
+
+def graph_payload_for_scope(metric_key, month, year, franchise_ids=None, franchise_id=None, periods=12, mode="growth_bracket", growth_percent=DEFAULT_GROWTH_PERCENT):
+    """Return physical graph payload for either one franchise or the whole active group."""
+    if metric_key not in PERFORMANCE_METRICS:
+        metric_key = "cash"
+    config = PERFORMANCE_METRICS[metric_key]
+    is_money = config.get("format") == "money"
+    prefix = "R" if is_money else ""
+    suffix = "" if is_money else ""
+    periods_list = graph_periods_ending(month, year, periods)
+    scope_ids = filter_active_franchise_ids(franchise_ids or [])
+    points = []
+    for m, y in periods_list:
+        if franchise_id:
+            actual = period_actuals(m, y, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+            target = targets_for_period(m, y, [franchise_id], mode, growth_percent, [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+            previous_year = period_actuals(m, y - 1, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+        else:
+            actual = group_period_actual(m, y, scope_ids, metric_key)
+            target = group_period_target(m, y, scope_ids, metric_key, mode, growth_percent)
+            previous_year = group_period_actual(m, y - 1, scope_ids, metric_key)
+        forecast = actual
+        prev_m, prev_y = previous_month(m, y)
+        previous_month_value = period_actuals(prev_m, prev_y, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0")) if franchise_id else group_period_actual(prev_m, prev_y, scope_ids, metric_key)
+        points.append({
+            "label": f"{MONTH_NAME.get(m, m)[:3]} {y}",
+            "actual": float(actual),
+            "target": float(target),
+            "previous_year": float(previous_year),
+            "forecast": float(forecast),
+            "growth_percent": float(growth_rate(actual, previous_month_value)),
+        })
+    return {
+        "metric": metric_key,
+        "metric_label": config["label"],
+        "value_prefix": prefix,
+        "value_suffix": suffix,
+        "actual_vs_target": {
+            "points": points,
+            "series": [{"key": "actual", "label": "Actual"}, {"key": "target", "label": "Target"}],
+        },
+        "previous_year": {
+            "points": points,
+            "series": [{"key": "actual", "label": "Actual"}, {"key": "previous_year", "label": "Same Month Last Year"}],
+        },
+        "forecast": {
+            "points": points,
+            "series": [{"key": "forecast", "label": "Forecast"}, {"key": "target", "label": "Target"}],
+        },
+        "growth": {
+            "points": points,
+            "series": [{"key": "growth_percent", "label": "Growth %"}],
+            "value_prefix": "",
+            "value_suffix": "%",
+        },
+    }
