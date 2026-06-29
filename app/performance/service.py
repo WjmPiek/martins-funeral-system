@@ -5,7 +5,7 @@ from sqlalchemy import func
 
 from app.extensions import db
 from app.franchise_context import get_accessible_franchises, get_selected_franchise, is_franchise_view_mode
-from app.models import Franchise, FranchiseTarget, MonthlyFigure
+from app.models import Franchise, FranchiseTarget, MonthlyFigure, PerformanceGrowthBracket, PerformanceResult
 
 MONTHS = [
     (1, "January"), (2, "February"), (3, "March"), (4, "April"),
@@ -60,6 +60,7 @@ TARGET_MODES = {
     "previous_year_growth": "Previous Year + Growth %",
     "three_year_average": "3-Year Same Month Average",
     "three_year_growth": "3-Year Average + Growth %",
+    "growth_bracket": "Fair Growth Bracket",
 }
 
 DEFAULT_GROWTH_PERCENT = Decimal("10")
@@ -70,6 +71,75 @@ def to_decimal(value):
     if value is None:
         return Decimal("0")
     return Decimal(str(value))
+
+
+
+def growth_rate(value, baseline):
+    value = to_decimal(value)
+    baseline = to_decimal(baseline)
+    if baseline <= 0:
+        return Decimal("0")
+    return ((value - baseline) / baseline * Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def safe_average(values):
+    values = [to_decimal(value) for value in values if to_decimal(value) > 0]
+    if not values:
+        return Decimal("0")
+    return sum(values, Decimal("0")) / Decimal(len(values))
+
+
+def default_basis_metric(metric_key):
+    # Money KPIs use their own value. Count KPIs use themselves so joinings and funerals can have realistic count brackets.
+    return metric_key if metric_key in PERFORMANCE_METRICS else "cash"
+
+
+def historical_basis_value(franchise_id, metric_key, month, year):
+    """Return the baseline used to select a fair growth bracket.
+
+    The target bracket is based on historical business size, not a single percentage for everybody.
+    Prefer same month last year, then previous month, then a 3-year same-month average.
+    """
+    last_year = comparison_value(franchise_id, metric_key, month, year, "same_month_last_year")
+    if last_year > 0:
+        return last_year
+    prev = comparison_value(franchise_id, metric_key, month, year, "previous_month")
+    if prev > 0:
+        return prev
+    return comparison_value(franchise_id, metric_key, month, year, "three_year_average")
+
+
+def bracket_growth_percent(franchise_id, metric_key, month, year):
+    basis_metric = default_basis_metric(metric_key)
+    basis_value = historical_basis_value(franchise_id, basis_metric, month, year)
+    brackets = (
+        PerformanceGrowthBracket.query
+        .filter_by(metric=metric_key, is_active=True)
+        .order_by(PerformanceGrowthBracket.amount_from.asc())
+        .all()
+    )
+    if not brackets:
+        # Fallback keeps Phase 1 safe before Head Office edits brackets.
+        if metric_key in ("joinings", "funerals"):
+            return Decimal("10")
+        if basis_value < Decimal("150000"):
+            return Decimal("15")
+        if basis_value < Decimal("300000"):
+            return Decimal("12")
+        if basis_value < Decimal("500000"):
+            return Decimal("10")
+        if basis_value < Decimal("750000"):
+            return Decimal("8")
+        if basis_value < Decimal("1200000"):
+            return Decimal("6")
+        return Decimal("5")
+    for bracket in brackets:
+        low = to_decimal(bracket.amount_from)
+        high = bracket.amount_to
+        high = to_decimal(high) if high is not None else None
+        if basis_value >= low and (high is None or basis_value < high):
+            return to_decimal(bracket.growth_percent)
+    return to_decimal(brackets[-1].growth_percent)
 
 
 def round_money(value):
@@ -191,6 +261,10 @@ def auto_target_for(franchise_id, metric_key, month, year, mode="previous_year_g
         if mode == "three_year_growth":
             average = average * (Decimal("1") + growth_percent / Decimal("100"))
         return round_money(average)
+    if mode == "growth_bracket":
+        baseline = historical_basis_value(franchise_id, metric_key, month, year)
+        bracket_percent = bracket_growth_percent(franchise_id, metric_key, month, year)
+        return round_money(baseline * (Decimal("1") + bracket_percent / Decimal("100")))
     return Decimal("0")
 
 
@@ -382,3 +456,41 @@ def dashboard_snapshot(franchise_id, month=None, year=None, mode="manual", growt
         "period_label": month_label(month, year),
         "metrics": metric_rows,
     }
+
+
+def forecast_value(franchise_id, metric_key, month, year):
+    # Phase 1 conservative forecast: use current actual until daily PDF import dates are available.
+    return period_actuals(month, year, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+
+
+def rebuild_performance_results(month, year, franchise_ids=None, mode="growth_bracket"):
+    franchise_ids = franchise_ids or accessible_franchise_ids()
+    actuals_by = period_actuals(month, year, franchise_ids)
+    targets_by = targets_for_period(month, year, franchise_ids, mode, DEFAULT_GROWTH_PERCENT)
+    saved = 0
+    for franchise_id in franchise_ids:
+        actuals = actuals_by.get(franchise_id, {})
+        targets = targets_by.get(franchise_id, {})
+        for metric_key in PERFORMANCE_METRICS:
+            actual = actuals.get(metric_key, Decimal("0"))
+            target = targets.get(metric_key, Decimal("0"))
+            previous = comparison_value(franchise_id, metric_key, month, year, "previous_month")
+            last_year = comparison_value(franchise_id, metric_key, month, year, "same_month_last_year")
+            three_year = comparison_value(franchise_id, metric_key, month, year, "three_year_average")
+            result = PerformanceResult.query.filter_by(
+                franchise_id=franchise_id, metric=metric_key, year=year, month=month
+            ).first()
+            if not result:
+                result = PerformanceResult(franchise_id=franchise_id, metric=metric_key, year=year, month=month)
+                db.session.add(result)
+            result.actual_value = round_money(actual)
+            result.target_value = round_money(target)
+            result.achievement_percent = percent(actual, target)
+            result.growth_percent = growth_rate(actual, last_year or previous)
+            result.previous_month_value = round_money(previous)
+            result.same_month_last_year_value = round_money(last_year)
+            result.three_year_average_value = round_money(three_year)
+            result.forecast_value = round_money(forecast_value(franchise_id, metric_key, month, year))
+            saved += 1
+    db.session.commit()
+    return saved

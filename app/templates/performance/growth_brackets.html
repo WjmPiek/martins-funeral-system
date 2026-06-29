@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="page-header">
+    <div>
+        <h1>Growth Target Brackets</h1>
+        <p class="muted">Fair growth targets based on business size. These brackets prevent a R1m franchise and a R200k franchise from receiving the same unrealistic growth percentage.</p>
+    </div>
+    <a class="btn secondary" href="{{ url_for('performance.index', target_mode='growth_bracket') }}">Back to Performance</a>
+</div>
+
+<form method="post">
+{% for metric_key, metric in metrics.items() %}
+<div class="panel-card" style="margin-bottom: 1rem;">
+    <h2>{{ metric.label }}</h2>
+    <p class="muted">Set the growth target percentage for each {{ metric.label }} bracket. Leave the last "To" value blank for open-ended.</p>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr><th>From</th><th>To</th><th>Growth Target %</th></tr></thead>
+            <tbody>
+            {% set rows = existing.get(metric_key, []) %}
+            {% for i in range(1, 8) %}
+                {% set b = rows[i-1] if rows|length >= i else None %}
+                <tr>
+                    <td>
+                        <input type="hidden" name="{{ metric_key }}_{{ i }}_id" value="{{ b.id if b else '' }}">
+                        <input type="number" step="0.01" name="{{ metric_key }}_{{ i }}_from" value="{{ b.amount_from if b else '' }}" placeholder="0">
+                    </td>
+                    <td><input type="number" step="0.01" name="{{ metric_key }}_{{ i }}_to" value="{{ b.amount_to if b and b.amount_to is not none else '' }}" placeholder="Open ended"></td>
+                    <td><input type="number" step="0.01" name="{{ metric_key }}_{{ i }}_percent" value="{{ b.growth_percent if b else '' }}" placeholder="10"></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+<button class="btn" type="submit">Save Growth Brackets</button>
+</form>
+{% endblock %}

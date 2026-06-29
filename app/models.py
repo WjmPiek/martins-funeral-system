@@ -254,6 +254,47 @@ class FranchiseTarget(db.Model):
     )
 
 
+class PerformanceGrowthBracket(db.Model):
+    __tablename__ = "performance_growth_brackets"
+    id = db.Column(db.Integer, primary_key=True)
+    metric = db.Column(db.String(80), nullable=False, index=True)
+    amount_from = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    amount_to = db.Column(db.Numeric(14, 2), nullable=True)
+    growth_percent = db.Column(db.Numeric(6, 2), nullable=False, default=0)
+    basis_metric = db.Column(db.String(80), nullable=False, default="cash")
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        db.UniqueConstraint("metric", "amount_from", "amount_to", "basis_metric", name="uq_performance_growth_bracket"),
+    )
+
+
+class PerformanceResult(db.Model):
+    __tablename__ = "performance_results"
+    id = db.Column(db.Integer, primary_key=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
+    metric = db.Column(db.String(80), nullable=False, index=True)
+    year = db.Column(db.Integer, nullable=False, index=True)
+    month = db.Column(db.Integer, nullable=False, index=True)
+    actual_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    target_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    achievement_percent = db.Column(db.Numeric(8, 2), nullable=False, default=0)
+    growth_percent = db.Column(db.Numeric(8, 2), nullable=False, default=0)
+    previous_month_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    same_month_last_year_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    three_year_average_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    forecast_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    source = db.Column(db.String(80), nullable=False, default="monthly_figures")
+    calculated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    franchise = db.relationship("Franchise", backref=db.backref("performance_results", lazy=True, cascade="all, delete-orphan"))
+    __table_args__ = (
+        db.UniqueConstraint("franchise_id", "metric", "year", "month", name="uq_performance_result_period_metric"),
+    )
+
+
 class HeatmapRecord(db.Model):
     __tablename__ = "heatmap_records"
     id = db.Column(db.Integer, primary_key=True)

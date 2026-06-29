@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 from app.audit import log_action
 from app.extensions import db
 from app.franchise_context import get_accessible_franchises, get_selected_franchise, is_privileged_user
-from app.models import Franchise, FranchiseTarget
+from app.models import Franchise, FranchiseTarget, PerformanceGrowthBracket
 from app.performance.service import (
     DEFAULT_GROWTH_PERCENT,
     MONTHS,
@@ -26,6 +26,7 @@ from app.performance.service import (
     targets_for_period,
     to_decimal,
     trend_series,
+    rebuild_performance_results,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -43,7 +44,7 @@ def permission_required(code):
 
 
 def request_mode():
-    mode = request.args.get("target_mode", "manual")
+    mode = request.args.get("target_mode", "growth_bracket")
     return mode if mode in TARGET_MODES else "manual"
 
 
@@ -175,3 +176,61 @@ def targets():
         selected_year=year,
         selected_period_label=month_label(month, year),
     )
+
+
+@performance_bp.route("/growth-brackets", methods=["GET", "POST"])
+@login_required
+@permission_required("performance:manage_targets")
+def growth_brackets():
+    if request.method == "POST":
+        updated = 0
+        for metric_key in PERFORMANCE_METRICS:
+            for index in range(1, 8):
+                from_raw = (request.form.get(f"{metric_key}_{index}_from") or "").replace("R", "").replace(",", "").strip()
+                to_raw = (request.form.get(f"{metric_key}_{index}_to") or "").replace("R", "").replace(",", "").strip()
+                pct_raw = (request.form.get(f"{metric_key}_{index}_percent") or "").replace("%", "").strip()
+                if not from_raw and not pct_raw:
+                    continue
+                try:
+                    amount_from = Decimal(from_raw or "0")
+                    amount_to = Decimal(to_raw) if to_raw else None
+                    growth_percent = Decimal(pct_raw or "0")
+                except Exception:
+                    continue
+                bracket_id = request.form.get(f"{metric_key}_{index}_id")
+                bracket = PerformanceGrowthBracket.query.get(int(bracket_id)) if bracket_id else None
+                if not bracket:
+                    bracket = PerformanceGrowthBracket(metric=metric_key)
+                    db.session.add(bracket)
+                bracket.amount_from = amount_from
+                bracket.amount_to = amount_to
+                bracket.growth_percent = growth_percent
+                bracket.basis_metric = metric_key
+                bracket.is_active = True
+                updated += 1
+        db.session.commit()
+        log_action("Performance", "Updated growth brackets", f"Growth brackets updated: {updated}")
+        flash("Growth target brackets saved.", "success")
+        return redirect(url_for("performance.growth_brackets"))
+
+    existing = {}
+    for bracket in PerformanceGrowthBracket.query.filter_by(is_active=True).order_by(
+        PerformanceGrowthBracket.metric.asc(), PerformanceGrowthBracket.amount_from.asc()
+    ).all():
+        existing.setdefault(bracket.metric, []).append(bracket)
+    return render_template(
+        "performance/growth_brackets.html",
+        metrics=PERFORMANCE_METRICS,
+        existing=existing,
+    )
+
+
+@performance_bp.route("/recalculate", methods=["POST"])
+@login_required
+@permission_required("performance:manage_targets")
+def recalculate():
+    month, year = selected_period_from_request(request.form)
+    saved = rebuild_performance_results(month, year, accessible_franchise_ids(), "growth_bracket")
+    log_action("Performance", "Recalculated performance results", f"Rows saved: {saved}; Period: {month_label(month, year)}")
+    flash(f"Performance results recalculated for {month_label(month, year)}.", "success")
+    return redirect(url_for("performance.index", month=month, year=year, target_mode="growth_bracket"))
