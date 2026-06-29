@@ -10,6 +10,7 @@
         <p class="muted">Phase 8: Head Office decision centre for {{ selected_period_label }}. Shows where to praise, where to support, and which franchises are at risk.</p>
     </div>
     <div class="button-row">
+        <a class="btn secondary" href="{{ url_for('performance.insights', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Insights</a>
         <a class="btn secondary" href="{{ url_for('performance.leaderboards', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Leaderboards</a>
         <a class="btn secondary" href="{{ url_for('performance.dashboard', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Franchise Dashboard</a>
     </div>

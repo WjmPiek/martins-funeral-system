@@ -37,6 +37,8 @@ from app.performance.service import (
     graph_engine_payload,
     leaderboard_decision_centre,
     executive_dashboard,
+    executive_insights,
+    franchise_insights,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -258,6 +260,52 @@ def leaderboards():
     return render_template(
         "performance/leaderboards.html",
         boards=boards,
+        metrics=PERFORMANCE_METRICS,
+        target_modes=TARGET_MODES,
+        target_mode=mode,
+        growth=growth,
+        month_options=MONTHS,
+        year_options=reporting_years(),
+        selected_month=month,
+        selected_year=year,
+        selected_period_label=month_label(month, year),
+    )
+
+
+@performance_bp.route("/insights")
+@login_required
+@permission_required("performance:view")
+def insights():
+    month, year = selected_period_from_request(request.args)
+    mode = request_mode()
+    growth = request_growth()
+    ids = accessible_franchise_ids()
+    selected = get_selected_franchise()
+    franchise_id = request.args.get("franchise_id", type=int)
+    if franchise_id and franchise_id not in ids:
+        abort(403)
+    if franchise_id:
+        franchise = Franchise.query.get_or_404(franchise_id)
+        insight_data = {
+            "period_label": month_label(month, year),
+            "items": franchise_insights(franchise_id, month, year, mode, growth),
+            "counts": {},
+            "franchise": franchise,
+        }
+    elif selected and selected.id in ids and not is_privileged_user():
+        insight_data = {
+            "period_label": month_label(month, year),
+            "items": franchise_insights(selected.id, month, year, mode, growth),
+            "counts": {},
+            "franchise": selected,
+        }
+    else:
+        insight_data = executive_insights(month, year, ids, mode, growth)
+    franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all() if ids else []
+    return render_template(
+        "performance/insights.html",
+        insights=insight_data,
+        franchises=franchises,
         metrics=PERFORMANCE_METRICS,
         target_modes=TARGET_MODES,
         target_mode=mode,

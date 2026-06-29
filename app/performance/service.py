@@ -1048,3 +1048,203 @@ def executive_dashboard(month, year, franchise_ids, mode='growth_bracket', growt
         'forecast_risk': forecast_risk[:15],
         'total_franchises': len(overall_rows),
     }
+
+
+# Phase 9: Performance intelligence insights
+
+def _insight_severity(status):
+    if status in ('critical', 'danger'):
+        return 'danger'
+    if status in ('warning', 'watch'):
+        return 'warning'
+    return 'good'
+
+
+def consecutive_metric_direction(franchise_id, metric_key, month, year, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT, periods=6):
+    """Return consecutive improvement/decline streak for a metric based on actual values."""
+    series = trend_series(franchise_id, metric_key, month, year, periods, mode, growth_percent)
+    if len(series) < 2:
+        return {'direction': 'same', 'count': 0}
+    values = [to_decimal(item.get('actual')) for item in series]
+    direction = 'same'
+    count = 0
+    for idx in range(len(values) - 1, 0, -1):
+        current = values[idx]
+        previous = values[idx - 1]
+        if current > previous:
+            step = 'up'
+        elif current < previous:
+            step = 'down'
+        else:
+            step = 'same'
+        if direction == 'same':
+            direction = step
+            count = 1 if step != 'same' else 0
+        elif step == direction:
+            count += 1
+        else:
+            break
+    return {'direction': direction, 'count': count}
+
+
+def record_month_check(franchise_id, metric_key, month, year, lookback=36):
+    current = actual_value(franchise_id, metric_key, month, year)
+    if current <= 0:
+        return False
+    values = []
+    current_m, current_y = month, year
+    for _ in range(lookback):
+        current_m, current_y = previous_month(current_m, current_y)
+        value = actual_value(franchise_id, metric_key, current_m, current_y)
+        if value > 0:
+            values.append(value)
+    return bool(values) and current >= max(values)
+
+
+def franchise_insights(franchise_id, month, year, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    """Build user-friendly decision insights for one franchise."""
+    franchise = Franchise.query.get(franchise_id)
+    rows = franchise_metric_summary(franchise_id, month, year, mode, growth_percent)
+    insights = []
+    for row in rows:
+        metric_key = row['metric_key']
+        label = row['label']
+        actual = to_decimal(row.get('actual'))
+        target = to_decimal(row.get('target'))
+        target_percent = to_decimal(row.get('target_percent'))
+        prev_growth = to_decimal(row.get('previous_month_growth'))
+        year_growth = to_decimal(row.get('last_year_growth'))
+        streak = consecutive_metric_direction(franchise_id, metric_key, month, year, mode, growth_percent)
+        if target > 0 and target_percent < Decimal('80'):
+            insights.append({
+                'severity': 'danger',
+                'metric_key': metric_key,
+                'metric_label': label,
+                'title': f'{label} is far below target',
+                'message': f'{label} is at {target_percent}% of target for {month_label(month, year)}. Review activity urgently and compare with the previous three months.',
+                'action': 'Immediate support required',
+            })
+        elif target > 0 and target_percent < Decimal('95'):
+            insights.append({
+                'severity': 'warning',
+                'metric_key': metric_key,
+                'metric_label': label,
+                'title': f'{label} is close but below target',
+                'message': f'{label} is at {target_percent}% of target. A focused push before month-end can still close the gap.',
+                'action': 'Monitor weekly',
+            })
+        elif target > 0 and target_percent >= Decimal('110'):
+            insights.append({
+                'severity': 'good',
+                'metric_key': metric_key,
+                'metric_label': label,
+                'title': f'{label} is ahead of target',
+                'message': f'{label} is at {target_percent}% of target. Capture what worked so it can be repeated next month.',
+                'action': 'Recognise and repeat',
+            })
+        if prev_growth <= Decimal('-10'):
+            insights.append({
+                'severity': 'warning',
+                'metric_key': metric_key,
+                'metric_label': label,
+                'title': f'{label} dropped versus last month',
+                'message': f'{label} is {abs(prev_growth)}% down from the previous month.',
+                'action': 'Check month-on-month causes',
+            })
+        if year_growth <= Decimal('-10'):
+            insights.append({
+                'severity': 'danger',
+                'metric_key': metric_key,
+                'metric_label': label,
+                'title': f'{label} is down versus last year',
+                'message': f'{label} is {abs(year_growth)}% lower than the same month last year.',
+                'action': 'Investigate annual decline',
+            })
+        if streak['direction'] == 'down' and streak['count'] >= 3:
+            insights.append({
+                'severity': 'danger',
+                'metric_key': metric_key,
+                'metric_label': label,
+                'title': f'{label} has declined for {streak["count"]} months',
+                'message': f'{label} shows a consecutive downward trend. This is a branch health risk.',
+                'action': 'Schedule branch support',
+            })
+        if streak['direction'] == 'up' and streak['count'] >= 3:
+            insights.append({
+                'severity': 'good',
+                'metric_key': metric_key,
+                'metric_label': label,
+                'title': f'{label} has improved for {streak["count"]} months',
+                'message': f'{label} is building momentum over consecutive months.',
+                'action': 'Keep current strategy',
+            })
+        if record_month_check(franchise_id, metric_key, month, year):
+            insights.append({
+                'severity': 'good',
+                'metric_key': metric_key,
+                'metric_label': label,
+                'title': f'Record month for {label}',
+                'message': f'{franchise.business_name if franchise else "This franchise"} produced its strongest {label} result in the recent history window.',
+                'action': 'Celebrate and document process',
+            })
+    priority = {'danger': 0, 'warning': 1, 'good': 2}
+    insights.sort(key=lambda item: (priority.get(item['severity'], 9), item['metric_label']))
+    return insights[:25]
+
+
+def executive_insights(month, year, franchise_ids, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    """Build Head Office insights across all accessible franchises."""
+    insights = []
+    executive = executive_dashboard(month, year, franchise_ids, mode, growth_percent)
+    for item in executive.get('forecast_risk', [])[:10]:
+        insights.append({
+            'severity': 'danger' if to_decimal(item.get('achievement')) < Decimal('80') else 'warning',
+            'franchise_id': item['franchise_id'],
+            'franchise_name': item['franchise_name'],
+            'metric_label': item['metric_label'],
+            'title': f'{item["franchise_name"]}: {item["metric_label"]} target risk',
+            'message': f'{item["metric_label"]} is only at {item["achievement"]}% achievement and ranked #{item["rank"]}.',
+            'action': 'Review with franchise owner',
+        })
+    for row in executive.get('biggest_droppers', [])[:5]:
+        insights.append({
+            'severity': 'warning',
+            'franchise_id': row['franchise_id'],
+            'franchise_name': row['franchise_name'],
+            'metric_label': 'Overall',
+            'title': f'{row["franchise_name"]} dropped on the leaderboard',
+            'message': f'Current rank is #{row["rank"]}; movement shows {row.get("movement_text", "Down")}.',
+            'action': 'Compare KPI detail',
+        })
+    for row in executive.get('biggest_climbers', [])[:5]:
+        insights.append({
+            'severity': 'good',
+            'franchise_id': row['franchise_id'],
+            'franchise_name': row['franchise_name'],
+            'metric_label': 'Overall',
+            'title': f'{row["franchise_name"]} is improving',
+            'message': f'Current rank is #{row["rank"]}; movement shows {row.get("movement_text", "Up")}.',
+            'action': 'Recognise improvement',
+        })
+    for summary in executive.get('kpi_summaries', []):
+        if to_decimal(summary.get('target_percent')) < Decimal('90'):
+            insights.append({
+                'severity': 'warning',
+                'franchise_id': None,
+                'franchise_name': 'Group',
+                'metric_label': summary['label'],
+                'title': f'Group {summary["label"]} is below target',
+                'message': f'Group achievement is {summary["target_percent"]}% for {month_label(month, year)}.',
+                'action': 'Prioritise this KPI nationally',
+            })
+    priority = {'danger': 0, 'warning': 1, 'good': 2}
+    insights.sort(key=lambda item: (priority.get(item['severity'], 9), item.get('franchise_name') or ''))
+    return {
+        'period_label': month_label(month, year),
+        'items': insights[:30],
+        'counts': {
+            'danger': sum(1 for item in insights if item['severity'] == 'danger'),
+            'warning': sum(1 for item in insights if item['severity'] == 'warning'),
+            'good': sum(1 for item in insights if item['severity'] == 'good'),
+        },
+    }
