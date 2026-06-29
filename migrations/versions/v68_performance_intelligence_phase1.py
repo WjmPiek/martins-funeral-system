@@ -1,13 +1,13 @@
 """Performance Intelligence Phase 1 foundation
 
-Revision ID: v68_performance_intelligence_phase1
+Revision ID: v68_perf_intel_p1
 Revises: v67_gross_old_royalty_fix
 Create Date: 2026-06-29
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "v68_performance_intelligence_phase1"
+revision = "v68_perf_intel_p1"
 down_revision = "v67_gross_old_royalty_fix"
 branch_labels = None
 depends_on = None

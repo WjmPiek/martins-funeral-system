@@ -142,6 +142,92 @@ def bracket_growth_percent(franchise_id, metric_key, month, year):
     return to_decimal(brackets[-1].growth_percent)
 
 
+
+def growth_bracket_label(bracket):
+    if not bracket:
+        return "Default bracket"
+    low = to_decimal(bracket.amount_from)
+    high = bracket.amount_to
+    if high is None:
+        return f"{low:,.2f}+"
+    return f"{low:,.2f} - {to_decimal(high):,.2f}"
+
+
+def selected_growth_bracket(franchise_id, metric_key, month, year):
+    """Return the exact bracket used for a franchise metric target.
+
+    Phase 2 makes the bracket engine transparent: users can see why a target
+    was selected, which baseline was used, and the growth percentage applied.
+    """
+    basis_metric = default_basis_metric(metric_key)
+    basis_value = historical_basis_value(franchise_id, basis_metric, month, year)
+    brackets = (
+        PerformanceGrowthBracket.query
+        .filter_by(metric=metric_key, is_active=True)
+        .order_by(PerformanceGrowthBracket.amount_from.asc())
+        .all()
+    )
+    for bracket in brackets:
+        low = to_decimal(bracket.amount_from)
+        high = to_decimal(bracket.amount_to) if bracket.amount_to is not None else None
+        if basis_value >= low and (high is None or basis_value < high):
+            return bracket, basis_value, basis_metric
+    return (brackets[-1] if brackets else None), basis_value, basis_metric
+
+
+def bracket_target_details(franchise_id, metric_key, month, year):
+    bracket, basis_value, basis_metric = selected_growth_bracket(franchise_id, metric_key, month, year)
+    growth_percent = to_decimal(bracket.growth_percent) if bracket else bracket_growth_percent(franchise_id, metric_key, month, year)
+    target_value = round_money(basis_value * (Decimal("1") + growth_percent / Decimal("100")))
+    return {
+        "metric": metric_key,
+        "metric_label": PERFORMANCE_METRICS[metric_key]["label"],
+        "basis_metric": basis_metric,
+        "basis_metric_label": PERFORMANCE_METRICS.get(basis_metric, {}).get("label", basis_metric),
+        "basis_value": round_money(basis_value),
+        "growth_percent": growth_percent,
+        "target_value": target_value,
+        "bracket_id": bracket.id if bracket else None,
+        "bracket_label": growth_bracket_label(bracket),
+    }
+
+
+def target_plan_for(franchise_id, month, year, metric_keys=None):
+    metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
+    return [bracket_target_details(franchise_id, metric_key, month, year) for metric_key in metric_keys]
+
+
+def target_plan_for_period(month, year, franchise_ids, metric_keys=None):
+    result = {}
+    for franchise_id in franchise_ids:
+        result[franchise_id] = {item["metric"]: item for item in target_plan_for(franchise_id, month, year, metric_keys)}
+    return result
+
+
+def save_growth_bracket_targets(month, year, franchise_ids, metric_keys=None):
+    """Capture current bracket-generated targets as Head Office targets.
+
+    This lets management generate fair targets from brackets and then keep
+    those exact values stable for reporting, while still allowing manual edits.
+    """
+    metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
+    saved = 0
+    for franchise_id in franchise_ids:
+        for detail in target_plan_for(franchise_id, month, year, metric_keys):
+            target = FranchiseTarget.query.filter_by(
+                franchise_id=franchise_id,
+                metric=detail["metric"],
+                year=year,
+                month=month,
+            ).first()
+            if not target:
+                target = FranchiseTarget(franchise_id=franchise_id, metric=detail["metric"], year=year, month=month)
+                db.session.add(target)
+            target.target_value = detail["target_value"]
+            saved += 1
+    db.session.commit()
+    return saved
+
 def round_money(value):
     return to_decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
@@ -262,9 +348,7 @@ def auto_target_for(franchise_id, metric_key, month, year, mode="previous_year_g
             average = average * (Decimal("1") + growth_percent / Decimal("100"))
         return round_money(average)
     if mode == "growth_bracket":
-        baseline = historical_basis_value(franchise_id, metric_key, month, year)
-        bracket_percent = bracket_growth_percent(franchise_id, metric_key, month, year)
-        return round_money(baseline * (Decimal("1") + bracket_percent / Decimal("100")))
+        return bracket_target_details(franchise_id, metric_key, month, year)["target_value"]
     return Decimal("0")
 
 
@@ -313,6 +397,7 @@ def franchise_metric_summary(franchise_id, month, year, mode="manual", growth_pe
         previous = comparison_value(franchise_id, metric_key, month, year, "previous_month")
         last_year = comparison_value(franchise_id, metric_key, month, year, "same_month_last_year")
         three_year = comparison_value(franchise_id, metric_key, month, year, "three_year_average")
+        bracket_details = bracket_target_details(franchise_id, metric_key, month, year)
         rows.append({
             "key": metric_key,
             "label": config["label"],
@@ -330,6 +415,11 @@ def franchise_metric_summary(franchise_id, month, year, mode="manual", growth_pe
             "three_year_average": three_year,
             "three_year_average_difference": actual - three_year,
             "three_year_average_percent": percent(actual, three_year),
+            "growth_target_percent": bracket_details["growth_percent"],
+            "growth_basis_value": bracket_details["basis_value"],
+            "growth_basis_metric": bracket_details["basis_metric"],
+            "growth_basis_metric_label": bracket_details["basis_metric_label"],
+            "growth_bracket_label": bracket_details["bracket_label"],
         })
     return rows
 

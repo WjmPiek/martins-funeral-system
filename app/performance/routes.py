@@ -27,6 +27,8 @@ from app.performance.service import (
     to_decimal,
     trend_series,
     rebuild_performance_results,
+    target_plan_for_period,
+    save_growth_bracket_targets,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -163,12 +165,14 @@ def targets():
         flash("Performance targets saved.", "success")
         return redirect(url_for("performance.targets", month=month, year=year))
     values = stored_targets(month, year, ids)
-    auto_values = targets_for_period(month, year, ids, "previous_year_growth", DEFAULT_GROWTH_PERCENT)
+    auto_values = targets_for_period(month, year, ids, "growth_bracket", DEFAULT_GROWTH_PERCENT)
+    bracket_plan = target_plan_for_period(month, year, ids)
     return render_template(
         "performance/targets.html",
         franchises=franchises,
         target_values=values,
         auto_values=auto_values,
+        bracket_plan=bracket_plan,
         metrics=PERFORMANCE_METRICS,
         month_options=MONTHS,
         year_options=reporting_years(),
@@ -176,6 +180,17 @@ def targets():
         selected_year=year,
         selected_period_label=month_label(month, year),
     )
+
+
+@performance_bp.route("/targets/generate", methods=["POST"])
+@login_required
+@permission_required("performance:manage_targets")
+def generate_targets():
+    month, year = selected_period_from_request(request.form)
+    saved = save_growth_bracket_targets(month, year, accessible_franchise_ids())
+    log_action("Performance", "Generated fair bracket targets", f"Targets generated: {saved}; Period: {month_label(month, year)}")
+    flash(f"Generated {saved} fair growth-bracket targets for {month_label(month, year)}.", "success")
+    return redirect(url_for("performance.targets", month=month, year=year))
 
 
 @performance_bp.route("/growth-brackets", methods=["GET", "POST"])
