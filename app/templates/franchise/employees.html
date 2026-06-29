@@ -3,14 +3,14 @@
 <section class="page-section">
   <div class="section-header">
     <div>
-      <h1>Employees</h1>
+      <h1>My Franchise Users</h1>
       <p class="muted">Create Manager, Employee or Agent users under your own franchise. They only see data for the franchise they are linked to and never see the Admin system.</p>
     </div>
   </div>
 
   {% if franchises %}
   <div class="form-section-card">
-    <h2>Create Employee</h2>
+    <h2>Create Franchise User</h2>
     <form method="post" class="professional-form compact-form">
       <div class="form-grid">
         <label for="franchise_id">Franchise</label>
@@ -46,7 +46,7 @@
   {% endif %}
 
   <div class="form-section-card">
-    <h2>Employees Created By Me</h2>
+    <h2>Users Created By Me</h2>
     <div class="table-responsive">
       <table class="system-report-table users-table">
         <thead>

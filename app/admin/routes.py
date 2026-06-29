@@ -19,15 +19,42 @@ admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 PROTECTED_ADMIN_EMAIL = "wjm@martinsdirect.com"
 
 ADMIN_SIDE_ROLE_NAMES = {"Admin", "Finance Manager", "Finance Assistant", "Regional Manager"}
-FRANCHISE_SIDE_ROLE_NAMES = {"Franchise User", "Franchise Manager", "Read Only User", "Franchise Employee"}
+FRANCHISE_SIDE_ROLE_NAMES = {"Franchise User", "Franchise Manager", "Franchise Employee", "Franchise Agent", "Read Only User"}
 ADMIN_CREATABLE_ROLE_NAMES = ["Finance Manager", "Finance Assistant", "Regional Manager", "Franchise User"]
-FRANCHISE_CREATABLE_ROLE_NAMES = ["Franchise Manager", "Franchise Employee"]
+FRANCHISE_CREATABLE_ROLE_NAMES = ["Franchise Manager", "Franchise Employee", "Franchise Agent"]
+
+ROLE_HELP_TEXT = {
+    "Finance Manager": "Martins Funerals South Africa user. Sees the whole financial system and is not linked to one franchise.",
+    "Finance Assistant": "Martins Funerals South Africa user. Finance support access and is not linked to one franchise.",
+    "Regional Manager": "Martins Funerals South Africa user. Must be linked to the franchises/region they manage.",
+    "Franchise User": "Franchise owner/user. Must be linked to the franchise(s) they own or operate.",
+}
 FINANCE_ADMIN_USERS = {
     "renette@martinsdirect.com": "Finance Manager",
     "lowhaan@martinsdirect.com": "Finance Assistant",
     "deon@martinsdirect.com": "Finance Assistant",
 }
 
+
+def ensure_user_hierarchy_roles():
+    """Ensure the mother-company and franchise-level roles exist for the create-user screens."""
+    descriptions = {
+        "Finance Manager": "Martins Funerals South Africa finance manager",
+        "Finance Assistant": "Martins Funerals South Africa finance assistant",
+        "Regional Manager": "Martins regional manager linked to selected franchises",
+        "Franchise User": "Franchise owner/user linked to selected franchise data",
+        "Franchise Manager": "Manager created by a franchise user",
+        "Franchise Employee": "Employee created by a franchise user",
+        "Franchise Agent": "Agent created by a franchise user",
+    }
+    changed = False
+    for role_name, description in descriptions.items():
+        role = Role.query.filter_by(name=role_name).first()
+        if not role:
+            db.session.add(Role(name=role_name, description=description, is_system_role=True))
+            changed = True
+    if changed:
+        db.session.flush()
 
 
 def admin_creatable_roles():
@@ -309,6 +336,8 @@ def seed():
 @login_required
 @permission_required("users:view")
 def users():
+    ensure_user_hierarchy_roles()
+    db.session.commit()
     # Keep the franchise selector clean: branches with no KPI data in the last 3 months
     # are hidden automatically and shown in the Old Franchises tab until reactivated.
     now = datetime.utcnow()
@@ -360,6 +389,7 @@ def users():
         franchise_side_role_names=FRANCHISE_SIDE_ROLE_NAMES,
         admin_creatable_roles=admin_creatable_roles(),
         can_create_admin_user=can_create_admin_user(),
+        role_help_text=ROLE_HELP_TEXT,
     )
 
 
@@ -1642,50 +1672,6 @@ def assign_user_franchises(user_id):
     log_action("Users", "Updated user franchise access", f"User: {user.full_name}")
     db.session.commit()
     flash(f"Franchise access updated for {user.full_name}.", "success")
-    return redirect(url_for("admin.users"))
-
-
-@admin_bp.route("/users/<int:user_id>/clean-scope", methods=["POST"])
-@login_required
-@permission_required("users:edit")
-def clean_single_user_scope(user_id):
-    if not can_assign_franchise_links():
-        flash("Your role does not have permission to clean user scope.", "danger")
-        return redirect(url_for("admin.users"))
-    user = User.query.get_or_404(user_id)
-    role_names = user_role_names(user)
-    if role_names & ADMIN_SIDE_ROLE_NAMES:
-        user.parent_franchise_user_id = None
-        user.assigned_franchises = []
-        flash(f"{user.full_name} was cleaned as an Admin/Finance-side user with no franchise links.", "success")
-    elif role_names & FRANCHISE_SIDE_ROLE_NAMES:
-        user.parent_franchise_user_id = None if "Franchise User" in role_names or "Regional Manager" in role_names else user.parent_franchise_user_id
-        flash(f"{user.full_name} was checked as a franchise-side user. Franchise links were kept for that user only.", "success")
-    else:
-        user.parent_franchise_user_id = None
-        flash(f"{user.full_name} was checked. No franchise scope changes were required.", "success")
-    log_action("Users", "Cleaned one user scope", f"User: {user.full_name}")
-    db.session.commit()
-    return redirect(url_for("admin.users"))
-
-
-@admin_bp.route("/users/<int:user_id>/clear-franchise-links", methods=["POST"])
-@login_required
-@permission_required("users:edit")
-def clear_single_user_franchise_links(user_id):
-    if not can_assign_franchise_links():
-        flash("Your role does not have permission to clear franchise links.", "danger")
-        return redirect(url_for("admin.users"))
-    user = User.query.get_or_404(user_id)
-    if is_admin_side_user(user):
-        user.assigned_franchises = []
-        user.parent_franchise_user_id = None
-        flash(f"{user.full_name} is an Admin/Finance-side user. Franchise links were cleared for this user only.", "success")
-    else:
-        user.assigned_franchises = []
-        flash(f"Franchise links cleared for {user.full_name} only.", "success")
-    log_action("Users", "Cleared one user franchise links", f"User: {user.full_name}")
-    db.session.commit()
     return redirect(url_for("admin.users"))
 
 

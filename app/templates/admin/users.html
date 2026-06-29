@@ -7,8 +7,17 @@
       <p>Users are separated between Martins Funerals South Africa/admin users and franchise-level users.</p>
     </div>
     <div class="quick-actions">
-      <span class="badge warning">Bulk user cleanup disabled</span>
-      <p class="muted">Clean, clear links or deactivate users individually from each user's Manage User window.</p>
+      {% if can_assign_franchise_links %}
+      <form method="post" action="{{ url_for('admin.clean_finance_admin_users') }}">
+        <button type="submit" class="btn secondary button-auto">Clean Admin/Finance Users</button>
+      </form>
+      <form method="post" action="{{ url_for('admin.clear_franchise_user_links') }}" onsubmit="return confirm('Clear all linked franchises from Franchise User, Franchise Manager and Regional Manager users? Finance/Admin users will not be changed.');">
+        <button type="submit" class="btn secondary button-auto">Clear Franchise User Links</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('admin.cleanup_inactive_users') }}">
+        <button type="submit" class="btn secondary button-auto">Deactivate Users Inactive 2+ Months</button>
+      </form>
     </div>
   </div>
 
@@ -16,7 +25,7 @@
   {% if can_create_admin_user %}
   <div class="form-section-card">
     <h2>Create Martins / Franchise User</h2>
-    <p class="muted">Admin creates Finance Manager, Finance Assistant, Regional Manager and Franchise User accounts here. Franchise users create their own Manager, Employee or Agent users from their Employees tab.</p>
+    <p class="muted">Admin creates Finance Manager, Finance Assistant, Regional Manager and Franchise User accounts here. Franchise users create their own Manager, Employee or Agent users from their Employee Users tab.</p>
     <form method="post" action="{{ url_for('admin.create_admin_user') }}" class="professional-form">
       <div class="form-grid">
         <label for="new_user_name">Name</label>
@@ -222,27 +231,6 @@
                 <hr><p class="muted">This user belongs under Martins Funerals South Africa/admin access, not under franchise users.</p>
                 {% else %}
                 <hr><p class="muted">Franchise linking is locked. Your role needs Franchise Management Manage and Users Edit.</p>
-                {% endif %}
-
-                {% if can_assign_franchise_links or current_user.has_permission('users:delete') %}
-                <hr>
-                <h3>Individual User Actions</h3>
-                <p class="muted">These actions affect only {{ user.full_name }}. They no longer clean or deactivate users in bulk.</p>
-                <div class="user-action-row">
-                  {% if can_assign_franchise_links %}
-                  <form method="post" class="inline-action-form" action="{{ url_for('admin.clean_single_user_scope', user_id=user.id) }}">
-                    <button type="submit" class="btn secondary small">Clean this user scope</button>
-                  </form>
-                  <form method="post" class="inline-action-form" action="{{ url_for('admin.clear_single_user_franchise_links', user_id=user.id) }}" onsubmit="return confirm('Clear franchise links for this user only?');">
-                    <button type="submit" class="btn secondary small">Clear this user's links</button>
-                  </form>
-                  {% endif %}
-                  {% if current_user.has_permission('users:delete') and not (user.email and user.email.lower() == 'wjm@martinsdirect.com') %}
-                  <form method="post" class="inline-action-form" action="{{ url_for('admin.delete_user', user_id=user.id) }}" onsubmit="return confirm('Deactivate this user only?');">
-                    <button type="submit" class="danger-btn small">Deactivate this user</button>
-                  </form>
-                  {% endif %}
-                </div>
                 {% endif %}
               </div>
             </div>
