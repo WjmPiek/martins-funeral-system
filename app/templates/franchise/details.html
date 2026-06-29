@@ -14,10 +14,74 @@
     {% endif %}
 </div>
 
+<div class="form-section-card no-print" id="franchise-selector-card">
+    <div class="section-title-row">
+        <div>
+            <h2>Select Franchise</h2>
+            <p class="muted">Search or choose a franchise. Selecting one opens its details immediately so missing agreement dates, minimum royalties and royalty scale brackets can be corrected.</p>
+        </div>
+        {% if missing_notifications %}
+            <span class="badge warning">{{ missing_notifications|length }} franchise{{ '' if missing_notifications|length == 1 else 's' }} need royalty setup</span>
+        {% else %}
+            <span class="badge success">All accessible franchises have royalty setup</span>
+        {% endif %}
+    </div>
+
+    <form method="get" action="{{ url_for('franchise.details') }}" class="professional-form" style="margin-bottom: 0;">
+        <div class="form-grid">
+            <label for="franchise_search">Search Franchise</label>
+            <input id="franchise_search" type="search" placeholder="Type to filter franchise list..." oninput="filterFranchiseDropdown()">
+
+            <label for="franchise_id_selector">Franchise</label>
+            <select id="franchise_id_selector" name="franchise_id" onchange="this.form.submit()">
+                {% for item in franchises %}
+                <option value="{{ item.id }}" data-search="{{ (item.business_name ~ ' ' ~ item.franchise_code ~ ' ' ~ item.franchisee_full_name)|lower }}" {% if item.id == franchise.id %}selected{% endif %}>
+                    {{ item.business_name or 'Unnamed Franchise' }}{% if item.franchise_code %} - {{ item.franchise_code }}{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+
+    {% if selected_missing_items %}
+    <div class="alert alert-warning" style="margin-top: 1rem;">
+        <strong>{{ franchise.business_name }} needs correction:</strong>
+        {{ selected_missing_items|join(', ') }}.
+        <a href="#royalty-scale-card">Go to Agreement / Royalty setup</a>
+    </div>
+    {% endif %}
+
+    {% if missing_notifications %}
+    <div class="table-responsive" style="margin-top: 1rem;">
+        <table class="table-compact">
+            <thead>
+                <tr>
+                    <th>Franchise</th>
+                    <th>Missing</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alert in missing_notifications %}
+                <tr {% if alert.franchise.id == franchise.id %}class="table-warning"{% endif %}>
+                    <td><strong>{{ alert.franchise.business_name or 'Unnamed Franchise' }}</strong></td>
+                    <td>{{ alert.missing|join(', ') }}</td>
+                    <td>
+                        <a class="button-secondary small" href="{{ url_for('franchise.details', franchise_id=alert.franchise.id) }}#royalty-scale-card">Correct details</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
 <form method="post" class="professional-form">
+    <input type="hidden" name="franchise_id" value="{{ franchise.id }}">
     {% if current_user.has_permission('franchise_details:export') %}
     <div class="quick-actions no-print">
-        <a class="button-secondary" href="{{ url_for('franchise.export_details_pdf') }}">Export Franchise Details PDF</a>
+        <a class="button-secondary" href="{{ url_for('franchise.export_details_pdf', franchise_id=franchise.id) }}">Export Franchise Details PDF</a>
     </div>
     {% endif %}
     <div class="form-section-card">
@@ -93,7 +157,7 @@
     </div>
 
     {% if can_view_agreement %}
-    <div class="form-section-card protected-section {% if not can_edit_agreement %}locked-section{% endif %}">
+    <div id="agreement-card" class="form-section-card protected-section {% if not can_edit_agreement %}locked-section{% endif %}">
         <div class="section-title-row">
             <div>
                 <h2>Franchise Agreement</h2>
@@ -118,7 +182,7 @@
     {% endif %}
 
     {% if can_view_scale %}
-    <div class="form-section-card protected-section {% if not can_edit_scale %}locked-section{% endif %}">
+    <div id="royalty-scale-card" class="form-section-card protected-section {% if not can_edit_scale %}locked-section{% endif %}">
         <div class="section-title-row">
             <div>
                 <h2>Royalty Scale</h2>
@@ -220,6 +284,20 @@
         <button class="button-auto" type="submit">Save Franchise Details</button>
     </div>
 </form>
+
+
+<script>
+function filterFranchiseDropdown() {
+    const input = document.getElementById('franchise_search');
+    const select = document.getElementById('franchise_id_selector');
+    if (!input || !select) return;
+    const query = input.value.toLowerCase().trim();
+    Array.from(select.options).forEach(function(option) {
+        const haystack = option.dataset.search || option.textContent.toLowerCase();
+        option.hidden = query && !haystack.includes(query);
+    });
+}
+</script>
 
 {% if can_edit_scale %}
 <script>

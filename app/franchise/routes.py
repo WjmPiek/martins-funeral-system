@@ -71,10 +71,68 @@ def can_edit_franchise_financials():
     return can_edit_franchise_agreement() or can_edit_royalty_scale()
 
 
-def get_or_create_franchise():
+
+def accessible_franchises_for_current_user():
+    if current_user.has_permission("franchise_management:view") or current_user.has_permission("franchise_management:manage"):
+        return Franchise.query.order_by(Franchise.business_name.asc()).all()
+    if getattr(current_user, "assigned_franchises", None):
+        return sorted(current_user.assigned_franchises, key=lambda item: item.business_name or "")
     selected = get_selected_franchise()
-    if selected:
+    return [selected] if selected else []
+
+
+def franchise_has_royalty_scale(franchise_id):
+    return RoyaltyScale.query.filter(
+        RoyaltyScale.franchise_id == franchise_id,
+        RoyaltyScale.percentage > 0,
+    ).first() is not None
+
+
+def missing_royalty_setup_items(franchise):
+    missing = []
+    if not franchise.agreement_start_date:
+        missing.append("agreement start date")
+    if not franchise.agreement_end_date:
+        missing.append("agreement end date")
+    if not franchise.minimum_royalty_amount or Decimal(franchise.minimum_royalty_amount or 0) <= 0:
+        missing.append("minimum royalty")
+    if not franchise_has_royalty_scale(franchise.id):
+        missing.append("royalty scale brackets")
+    return missing
+
+
+def missing_royalty_setup_notifications(franchises):
+    rows = []
+    for item in franchises:
+        missing = missing_royalty_setup_items(item)
+        if missing:
+            rows.append({
+                "franchise": item,
+                "missing": missing,
+                "message": f"{item.business_name or 'Unnamed Franchise'} needs: {', '.join(missing)}",
+            })
+    return rows
+
+def get_or_create_franchise():
+    accessible = accessible_franchises_for_current_user()
+    accessible_ids = {item.id for item in accessible}
+
+    requested_id = request.values.get("franchise_id", type=int)
+    if requested_id:
+        if requested_id not in accessible_ids:
+            abort(403)
+        franchise = Franchise.query.get_or_404(requested_id)
+        session["selected_franchise_id"] = franchise.id
+        return franchise
+
+    selected = get_selected_franchise()
+    if selected and (not accessible_ids or selected.id in accessible_ids):
         return selected
+
+    if accessible:
+        franchise = accessible[0]
+        session["selected_franchise_id"] = franchise.id
+        return franchise
 
     franchise = Franchise.query.order_by(Franchise.id.asc()).first()
     if franchise:
@@ -218,9 +276,15 @@ def details():
         linked_users,
         key=lambda user: (user.name or "", user.surname or "")
     )
+    accessible_franchises = accessible_franchises_for_current_user()
+    missing_notifications = missing_royalty_setup_notifications(accessible_franchises)
+    selected_missing_items = missing_royalty_setup_items(franchise)
     return render_template(
         "franchise/details.html",
         franchise=franchise,
+        franchises=accessible_franchises,
+        missing_notifications=missing_notifications,
+        selected_missing_items=selected_missing_items,
         scales=scales,
         readonly_finance_fields=readonly_finance_fields,
         franchise_users=franchise_users,
