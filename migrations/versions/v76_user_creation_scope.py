@@ -8,7 +8,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "v76_user_creation_scope"
-down_revision = "v75_user_scope_ui"
+down_revision = "v74_franchise_employees"
 branch_labels = None
 depends_on = None
 
