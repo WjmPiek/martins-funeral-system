@@ -1,4 +1,0 @@
-{% extends 'base.html' %}{% block content %}
-<h1>User Roles</h1><p class="text-muted">Admin role overview.</p>
-<div class="card"><div class="card-body table-responsive"><table class="table"><thead><tr><th>Role</th><th>Description</th></tr></thead><tbody>{% for r in roles %}<tr><td>{{ r.name }}</td><td>{{ r.description or '' }}</td></tr>{% endfor %}</tbody></table></div></div>
-{% endblock %}
