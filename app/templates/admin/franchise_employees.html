@@ -30,6 +30,12 @@
                   <div class="form-grid">
                     <label>Name</label><input name="name" value="{{ user.name }}" required>
                     <label>Surname</label><input name="surname" value="{{ user.surname }}" required>
+                    <label>Employee Type</label>
+                    <select name="role_id" required>
+                      {% for role in employee_roles %}
+                        <option value="{{ role.id }}" {% if role in user.roles %}selected{% endif %}>{{ role.name.replace('Franchise ', '') }}</option>
+                      {% endfor %}
+                    </select>
                     <label>New Password</label><input name="password" type="text" placeholder="Leave blank to keep current password">
                     <label>Status</label><select name="is_active"><option value="1" {% if user.is_active %}selected{% endif %}>Active</option><option value="0" {% if not user.is_active %}selected{% endif %}>Inactive</option></select>
                     <label>Franchise Links</label>

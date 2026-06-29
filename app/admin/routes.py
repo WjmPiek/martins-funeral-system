@@ -503,17 +503,31 @@ def update_user_roles(user_id):
         flash("Your role does not have permission to create or assign Regional Manager users.", "danger")
         return redirect(url_for("admin.users"))
     selected_role_names = {role.name for role in selected_roles}
-    if selected_role_names & ADMIN_SIDE_ROLE_NAMES:
-        # Admin/Finance-side users are not franchise children and must not carry franchise links.
+    franchise_ids = [int(item) for item in request.form.getlist("franchise_ids")]
+
+    # Mother-company finance/admin users must never sit under a franchise.
+    if selected_role_names & {"Admin", "Finance Manager", "Finance Assistant"}:
         user.parent_franchise_user_id = None
         user.assigned_franchises = []
     elif selected_role_names & {"Regional Manager", "Franchise User"}:
         user.parent_franchise_user_id = None
+        selected_franchises = Franchise.query.filter(
+            Franchise.id.in_(franchise_ids or []),
+            Franchise.is_performance_active == True,
+        ).order_by(Franchise.business_name).all()
+        if not selected_franchises:
+            flash("Regional Manager and Franchise User accounts must be linked to at least one active franchise.", "danger")
+            return redirect(url_for("admin.users"))
+        user.assigned_franchises = selected_franchises
+    else:
+        # Admin > Users is only for Martins users and registered franchise owner/user accounts.
+        # Franchise employees are managed separately under Admin > Employees and created by franchise owners.
+        user.parent_franchise_user_id = None
 
     user.roles = selected_roles
-    log_action("Users", "Updated user roles", f"User: {user.full_name}")
+    log_action("Users", "Updated user roles and scope", f"User: {user.full_name}")
     db.session.commit()
-    flash(f"Roles updated for {user.full_name}.", "success")
+    flash(f"User and scope updated for {user.full_name}.", "success")
     return redirect(url_for("admin.users"))
 
 
@@ -1746,11 +1760,13 @@ def franchise_employees():
     employees = [user for user in User.query.order_by(User.name, User.surname).all() if is_franchise_employee_user(user)]
     owners = {user.id: user for user in User.query.filter(User.id.in_([employee.parent_franchise_user_id for employee in employees if employee.parent_franchise_user_id])).all()} if employees else {}
     franchises = Franchise.query.order_by(Franchise.business_name).all()
+    employee_roles = Role.query.filter(Role.name.in_(["Franchise Manager", "Franchise Employee", "Franchise Agent"])).order_by(Role.name).all()
     return render_template(
         "admin/franchise_employees.html",
         employees=employees,
         owners=owners,
         franchises=franchises,
+        employee_roles=employee_roles,
     )
 
 
@@ -1765,6 +1781,15 @@ def update_franchise_employee(user_id):
 
     user.name = request.form.get("name", user.name).strip() or user.name
     user.surname = request.form.get("surname", user.surname).strip() or user.surname
+
+    role_id = request.form.get("role_id", type=int)
+    if role_id:
+        selected_role = Role.query.get(role_id)
+        if not selected_role or selected_role.name not in {"Franchise Manager", "Franchise Employee", "Franchise Agent"}:
+            flash("Please select Manager, Employee or Agent for franchise employees.", "danger")
+            return redirect(url_for("admin.franchise_employees"))
+        user.roles = [selected_role]
+
     password = request.form.get("password", "").strip()
     if password:
         user.set_password(password)
