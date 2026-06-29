@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block app_content %}
+<div class="page-header">
+    <div>
+        <h1>Inactive Franchise Control</h1>
+        <p class="muted">Franchises with no Cash, Sales, Insurance, Joinings or Funerals data for the last 3 months are hidden from targets, graphs and leaderboards.</p>
+    </div>
+</div>
+
+<form class="filter-bar" method="get">
+    <label>Month<select name="month">{% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label>Year<select name="year">{% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+    <button class="btn" type="submit">Check</button>
+</form>
+
+<div class="kpi-grid" style="margin-bottom: 1rem;">
+    <div class="kpi-card"><span class="muted">Active in calculations</span><strong>{{ active_count }}</strong></div>
+    <div class="kpi-card"><span class="muted">Hidden / inactive</span><strong>{{ hidden_count }}</strong></div>
+</div>
+
+<form class="filter-bar" method="post" action="{{ url_for('performance.scan_inactive_franchises') }}">
+    <input type="hidden" name="month" value="{{ selected_month }}">
+    <input type="hidden" name="year" value="{{ selected_year }}">
+    <button class="btn warning" type="submit">Hide franchises with no data for last 3 months</button>
+    <span class="muted">This uses the 3-month period ending {{ selected_period_label }}.</span>
+</form>
+
+<div class="table-responsive">
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Franchise</th>
+            <th>Status</th>
+            <th>Recent KPI data</th>
+            <th>Reason</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            <td><strong>{{ row.franchise.business_name }}</strong></td>
+            <td>
+                {% if row.is_performance_active %}
+                    <span class="badge bg-success">Active</span>
+                {% else %}
+                    <span class="badge bg-danger">Hidden</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if row.has_recent_data %}
+                    <span class="badge bg-success">Yes</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark">No data in last 3 months</span>
+                {% endif %}
+            </td>
+            <td class="muted">{{ row.reason }}</td>
+            <td>
+                {% if not row.is_performance_active %}
+                <form method="post" action="{{ url_for('performance.reactivate_inactive_franchise', franchise_id=row.franchise.id) }}" style="display:inline;">
+                    <input type="hidden" name="month" value="{{ selected_month }}">
+                    <input type="hidden" name="year" value="{{ selected_year }}">
+                    <button class="btn small" type="submit">Make active again</button>
+                </form>
+                {% else %}
+                    <span class="muted">Included</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No franchises available for your access level.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

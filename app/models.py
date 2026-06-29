@@ -161,6 +161,11 @@ class Franchise(db.Model):
     finance_manager_email = db.Column(db.String(255), default="")
     notification_60_sent_at = db.Column(db.DateTime)
     notification_30_sent_at = db.Column(db.DateTime)
+    is_performance_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    performance_inactive_at = db.Column(db.DateTime)
+    performance_inactive_reason = db.Column(db.String(255), default="")
+    performance_reactivated_at = db.Column(db.DateTime)
+    performance_reactivated_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

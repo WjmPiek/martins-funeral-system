@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import func
@@ -256,11 +256,98 @@ def previous_years(month, year, count=3):
     return [(month, year - index) for index in range(1, count + 1)]
 
 
-def accessible_franchise_ids():
+def is_franchise_performance_active(franchise):
+    return bool(getattr(franchise, "is_performance_active", True))
+
+
+def filter_active_franchise_ids(franchise_ids, include_inactive=False):
+    if include_inactive or not franchise_ids:
+        return franchise_ids
+    rows = Franchise.query.filter(Franchise.id.in_(franchise_ids)).all()
+    return [franchise.id for franchise in rows if is_franchise_performance_active(franchise)]
+
+
+def accessible_franchise_ids(include_inactive=False):
     selected = get_selected_franchise()
     if selected and is_franchise_view_mode():
-        return [selected.id]
-    return [franchise.id for franchise in get_accessible_franchises()]
+        ids = [selected.id]
+    else:
+        ids = [franchise.id for franchise in get_accessible_franchises()]
+    return filter_active_franchise_ids(ids, include_inactive=include_inactive)
+
+
+def previous_periods_including(month, year, count=3):
+    periods = []
+    m, y = month, year
+    for _ in range(count):
+        periods.append((m, y))
+        m, y = previous_month(m, y)
+    return periods
+
+
+def has_recent_performance_data(franchise_id, month, year, periods=3):
+    period_pairs = previous_periods_including(month, year, periods)
+    if not period_pairs:
+        return False
+    conditions = []
+    for m, y in period_pairs:
+        conditions.append((MonthlyFigure.month == m) & (MonthlyFigure.year == y))
+    total_columns = [func.coalesce(func.sum(metric_field(metric_key)), 0) for metric_key in PERFORMANCE_METRICS]
+    row = (
+        db.session.query(*total_columns)
+        .filter(MonthlyFigure.franchise_id == franchise_id)
+        .filter(db.or_(*conditions))
+        .first()
+    )
+    if not row:
+        return False
+    return any(to_decimal(value) > 0 for value in row)
+
+
+def inactive_franchise_candidates(month, year, franchise_ids=None):
+    ids = franchise_ids if franchise_ids is not None else accessible_franchise_ids(include_inactive=True)
+    franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all() if ids else []
+    rows = []
+    for franchise in franchises:
+        has_data = has_recent_performance_data(franchise.id, month, year, 3)
+        rows.append({
+            "franchise": franchise,
+            "has_recent_data": has_data,
+            "is_performance_active": is_franchise_performance_active(franchise),
+            "status": "active" if is_franchise_performance_active(franchise) else "hidden",
+            "reason": getattr(franchise, "performance_inactive_reason", "") or "No Cash, Sales, Insurance, Joinings or Funerals data in the last 3 months",
+        })
+    return rows
+
+
+def auto_hide_inactive_franchises(month, year, franchise_ids=None, changed_by_id=None):
+    ids = franchise_ids if franchise_ids is not None else accessible_franchise_ids(include_inactive=True)
+    changed = 0
+    for item in inactive_franchise_candidates(month, year, ids):
+        franchise = item["franchise"]
+        if item["has_recent_data"]:
+            continue
+        if not is_franchise_performance_active(franchise):
+            continue
+        franchise.is_performance_active = False
+        franchise.performance_inactive_at = datetime.now(timezone.utc)
+        franchise.performance_inactive_reason = f"Auto-hidden: no imported KPI data for the 3 months ending {month_label(month, year)}."
+        changed += 1
+    if changed:
+        db.session.commit()
+    return changed
+
+
+def reactivate_franchise_performance(franchise_id, user_id=None):
+    franchise = Franchise.query.get(franchise_id)
+    if not franchise:
+        return None
+    franchise.is_performance_active = True
+    franchise.performance_reactivated_at = datetime.now(timezone.utc)
+    franchise.performance_reactivated_by_id = user_id
+    franchise.performance_inactive_reason = ""
+    db.session.commit()
+    return franchise
 
 
 def selected_period_from_request(args):
@@ -293,6 +380,7 @@ def metric_field(metric_key):
 
 
 def period_actuals(month, year, franchise_ids, metric_keys=None):
+    franchise_ids = filter_active_franchise_ids(franchise_ids)
     metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
     if not franchise_ids:
         return {}
@@ -353,6 +441,7 @@ def auto_target_for(franchise_id, metric_key, month, year, mode="previous_year_g
 
 
 def targets_for_period(month, year, franchise_ids, mode="manual", growth_percent=DEFAULT_GROWTH_PERCENT, metric_keys=None):
+    franchise_ids = filter_active_franchise_ids(franchise_ids)
     metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
     manual = stored_targets(month, year, franchise_ids, metric_keys)
     result = {}
@@ -444,6 +533,7 @@ def performance_score(actuals, targets):
 
 
 def ranked_performance(month, year, franchise_ids, mode="manual", growth_percent=DEFAULT_GROWTH_PERCENT, metric_key="overall"):
+    franchise_ids = filter_active_franchise_ids(franchise_ids)
     franchises = Franchise.query.filter(Franchise.id.in_(franchise_ids)).order_by(Franchise.business_name.asc()).all() if franchise_ids else []
     actuals_by = period_actuals(month, year, franchise_ids)
     targets_by = targets_for_period(month, year, franchise_ids, mode, growth_percent)
@@ -554,7 +644,7 @@ def forecast_value(franchise_id, metric_key, month, year):
 
 
 def rebuild_performance_results(month, year, franchise_ids=None, mode="growth_bracket"):
-    franchise_ids = franchise_ids or accessible_franchise_ids()
+    franchise_ids = filter_active_franchise_ids(franchise_ids or accessible_franchise_ids())
     actuals_by = period_actuals(month, year, franchise_ids)
     targets_by = targets_for_period(month, year, franchise_ids, mode, DEFAULT_GROWTH_PERCENT)
     saved = 0

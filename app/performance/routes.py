@@ -44,6 +44,9 @@ from app.performance.service import (
     performance_history,
     performance_history_periods,
     user_access_summary,
+    inactive_franchise_candidates,
+    auto_hide_inactive_franchises,
+    reactivate_franchise_performance,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -487,9 +490,10 @@ def growth_brackets():
 @permission_required("performance:manage_targets")
 def recalculate():
     month, year = selected_period_from_request(request.form)
+    hidden = auto_hide_inactive_franchises(month, year, accessible_franchise_ids(include_inactive=True), current_user.id)
     saved = rebuild_performance_results(month, year, accessible_franchise_ids(), "growth_bracket")
-    log_action("Performance", "Recalculated performance results", f"Rows saved: {saved}; Period: {month_label(month, year)}")
-    flash(f"Performance results recalculated for {month_label(month, year)}.", "success")
+    log_action("Performance", "Recalculated performance results", f"Rows saved: {saved}; Hidden inactive: {hidden}; Period: {month_label(month, year)}")
+    flash(f"Performance results recalculated for {month_label(month, year)}. Hidden inactive franchises: {hidden}.", "success")
     return redirect(url_for("performance.index", month=month, year=year, target_mode="growth_bracket"))
 
 
@@ -535,6 +539,53 @@ def capture_history():
     log_action("Performance", "Captured performance history", f"Snapshots saved: {saved}; Period: {month_label(month, year)}")
     flash(f"Captured {saved} performance history snapshots for {month_label(month, year)}.", "success")
     return redirect(url_for("performance.history", month=month, year=year))
+
+
+@performance_bp.route("/inactive-franchises")
+@login_required
+@permission_required("performance:manage_inactive")
+def inactive_franchises():
+    month, year = selected_period_from_request(request.args)
+    ids = accessible_franchise_ids(include_inactive=True)
+    rows = inactive_franchise_candidates(month, year, ids)
+    active_count = sum(1 for row in rows if row["is_performance_active"])
+    hidden_count = sum(1 for row in rows if not row["is_performance_active"])
+    return render_template(
+        "performance/inactive_franchises.html",
+        rows=rows,
+        active_count=active_count,
+        hidden_count=hidden_count,
+        month_options=MONTHS,
+        year_options=reporting_years(),
+        selected_month=month,
+        selected_year=year,
+        selected_period_label=month_label(month, year),
+    )
+
+
+@performance_bp.route("/inactive-franchises/scan", methods=["POST"])
+@login_required
+@permission_required("performance:manage_inactive")
+def scan_inactive_franchises():
+    month, year = selected_period_from_request(request.form)
+    changed = auto_hide_inactive_franchises(month, year, accessible_franchise_ids(include_inactive=True), current_user.id)
+    log_action("Performance", "Auto-hidden inactive franchises", f"Franchises hidden: {changed}; Period: {month_label(month, year)}")
+    flash(f"Hidden {changed} franchise(s) with no KPI data for the last 3 months.", "success")
+    return redirect(url_for("performance.inactive_franchises", month=month, year=year))
+
+
+@performance_bp.route("/inactive-franchises/<int:franchise_id>/reactivate", methods=["POST"])
+@login_required
+@permission_required("performance:manage_inactive")
+def reactivate_inactive_franchise(franchise_id):
+    month, year = selected_period_from_request(request.form)
+    if franchise_id not in accessible_franchise_ids(include_inactive=True):
+        abort(403)
+    franchise = reactivate_franchise_performance(franchise_id, current_user.id)
+    if franchise:
+        log_action("Performance", "Reactivated franchise performance", f"Franchise: {franchise.business_name}; ID: {franchise.id}")
+        flash(f"{franchise.business_name} is active again and will be included in targets, graphs and leaderboards.", "success")
+    return redirect(url_for("performance.inactive_franchises", month=month, year=year))
 
 
 @performance_bp.route("/access-overview")
