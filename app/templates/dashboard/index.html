@@ -125,7 +125,6 @@
           <span class="leaderboard-movement {{ leaderboard_snapshot.movement_class }}">
             {{ leaderboard_snapshot.movement_label }}{% if leaderboard_snapshot.movement_delta %} {{ leaderboard_snapshot.movement_delta|abs }}{% endif %}
           </span>
-          <span class="badge success">Target {{ '%.1f'|format(leaderboard_snapshot.gross_target_percent) }}%</span>
           <a class="btn secondary button-auto" href="{{ url_for('leaderboard.index') }}">Open Leaderboard</a>
         </div>
       </div>

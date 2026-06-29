@@ -380,72 +380,103 @@ def _parse_royalty_scale_text(raw_text):
     return rows
 
 
-def get_royalty_scales_for_franchise(franchise):
-    """Return usable royalty scale rows for a franchise.
+def _normalise_royalty_scale_rows(scales):
+    """Return usable royalty brackets, keeping open-ended final brackets.
 
-    The calculation uses the structured RoyaltyScale rows from the Franchise
-    Details page first.  If those rows are missing, it falls back to the raw
-    imported contract-summary scale text.  It also searches for the same branch
-    without/with '(F)' and by a safe fuzzy match, because imported branch names
-    often differ slightly from franchise records.
+    Amount To of 0/blank is treated as open-ended.  This is important because
+    several franchise scale sheets use the last row as "and above" and older
+    imports sometimes saved that final Amount To as 0.
+    """
+    rows = []
+    for index, scale in enumerate(scales or [], start=1):
+        amount_from = Decimal(getattr(scale, "amount_from", 0) or 0)
+        amount_to = Decimal(getattr(scale, "amount_to", 0) or 0)
+        percentage = Decimal(getattr(scale, "percentage", 0) or 0)
+        if percentage <= 0:
+            continue
+        if amount_to <= 0:
+            amount_to = Decimal("999999999999")
+        if amount_to < amount_from:
+            continue
+        rows.append(SimpleNamespace(
+            row_number=getattr(scale, "row_number", index) or index,
+            amount_from=amount_from,
+            amount_to=amount_to,
+            percentage=percentage,
+        ))
+    return sorted(rows, key=lambda item: (item.amount_from, item.amount_to, item.row_number))
+
+
+def get_royalty_scales_for_franchise(franchise):
+    """Return the bracket scale that belongs to the selected franchise.
+
+    Priority is now:
+    1. This franchise user's structured RoyaltyScale rows.
+    2. This franchise user's imported raw scale text.
+    3. A matching franchise record's structured/raw scale rows.
+    4. This franchise user's imported single percentage as a last resort.
+
+    The previous fallback could use imported_royalty_percentage before checking
+    matching structured brackets, which caused some franchise users to calculate
+    one flat percentage instead of the correct bracket percentage.
     """
     if not franchise:
         return []
 
-    scales = RoyaltyScale.query.filter_by(franchise_id=franchise.id).order_by(RoyaltyScale.row_number).all()
-    valid_scales = [
-        scale for scale in scales
-        if Decimal(scale.amount_to or 0) > Decimal(scale.amount_from or 0)
-        and Decimal(scale.percentage or 0) > 0
-    ]
-    if valid_scales:
-        return valid_scales
+    own_scales = RoyaltyScale.query.filter_by(franchise_id=franchise.id).order_by(
+        RoyaltyScale.row_number,
+        RoyaltyScale.amount_from,
+        RoyaltyScale.id,
+    ).all()
+    own_valid_scales = _normalise_royalty_scale_rows(own_scales)
+    if own_valid_scales:
+        return own_valid_scales
 
-    parsed_raw = _parse_royalty_scale_text(getattr(franchise, "imported_royalty_scale_text", ""))
+    parsed_raw = _normalise_royalty_scale_rows(
+        _parse_royalty_scale_text(getattr(franchise, "imported_royalty_scale_text", ""))
+    )
     if parsed_raw:
         return parsed_raw
 
-    # Last resort from contract import: some older imports saved only the
-    # percentage field and not the structured bracket rows.  Use it as one
-    # open-ended bracket so the royalty does not remain 0.00% when a valid
-    # percentage exists on the Franchise Details record.
+    wanted = normalize_franchise_name_for_royalties(getattr(franchise, "business_name", ""))
+    if wanted:
+        candidates = []
+        for candidate in Franchise.query.all():
+            if candidate.id == franchise.id:
+                continue
+            key = normalize_franchise_name_for_royalties(candidate.business_name)
+            if not key:
+                continue
+            ratio = SequenceMatcher(None, wanted, key).ratio()
+            if key == wanted or wanted in key or key in wanted or ratio >= 0.84:
+                candidates.append((ratio, candidate))
+
+        for _ratio, candidate in sorted(candidates, key=lambda item: item[0], reverse=True):
+            candidate_scales = RoyaltyScale.query.filter_by(franchise_id=candidate.id).order_by(
+                RoyaltyScale.row_number,
+                RoyaltyScale.amount_from,
+                RoyaltyScale.id,
+            ).all()
+            valid_candidate_scales = _normalise_royalty_scale_rows(candidate_scales)
+            if valid_candidate_scales:
+                return valid_candidate_scales
+
+            parsed_candidate_raw = _normalise_royalty_scale_rows(
+                _parse_royalty_scale_text(getattr(candidate, "imported_royalty_scale_text", ""))
+            )
+            if parsed_candidate_raw:
+                return parsed_candidate_raw
+
     imported_percentage = Decimal(getattr(franchise, "imported_royalty_percentage", 0) or 0)
     if imported_percentage > 0:
-        return [SimpleNamespace(row_number=1, amount_from=Decimal("0"), amount_to=Decimal("999999999"), percentage=imported_percentage)]
+        return [SimpleNamespace(
+            row_number=1,
+            amount_from=Decimal("0"),
+            amount_to=Decimal("999999999999"),
+            percentage=imported_percentage,
+        )]
 
-    wanted = normalize_franchise_name_for_royalties(getattr(franchise, "business_name", ""))
-    if not wanted:
-        return []
-
-    candidates = []
-    for candidate in Franchise.query.all():
-        if candidate.id == franchise.id:
-            continue
-        key = normalize_franchise_name_for_royalties(candidate.business_name)
-        if not key:
-            continue
-        ratio = SequenceMatcher(None, wanted, key).ratio()
-        if key == wanted or wanted in key or key in wanted or ratio >= 0.84:
-            candidates.append((ratio, candidate))
-
-    for _ratio, candidate in sorted(candidates, key=lambda item: item[0], reverse=True):
-        candidate_scales = RoyaltyScale.query.filter_by(franchise_id=candidate.id).order_by(RoyaltyScale.row_number).all()
-        valid_candidate_scales = [
-            scale for scale in candidate_scales
-            if Decimal(scale.amount_to or 0) > Decimal(scale.amount_from or 0)
-            and Decimal(scale.percentage or 0) > 0
-        ]
-        if valid_candidate_scales:
-            return valid_candidate_scales
-        parsed_candidate_raw = _parse_royalty_scale_text(getattr(candidate, "imported_royalty_scale_text", ""))
-        if parsed_candidate_raw:
-            return parsed_candidate_raw
-
-    # No usable scale was found for this franchise. Return no rows instead of
-    # applying a hard-coded default scale, because each franchise can now have
-    # its own custom number of brackets.
     return []
-
 
 def calculate_royalty(franchise, royalty_base):
     if royalty_base < 0:
@@ -453,31 +484,30 @@ def calculate_royalty(franchise, royalty_base):
 
     scales = get_royalty_scales_for_franchise(franchise)
     percentage = Decimal("0")
+
     for scale in scales:
-        amount_from = Decimal(scale.amount_from or 0)
-        amount_to = Decimal(scale.amount_to or 0)
+        amount_from = Decimal(getattr(scale, "amount_from", 0) or 0)
+        amount_to = Decimal(getattr(scale, "amount_to", 0) or 0)
         if amount_to <= 0:
-            continue
+            amount_to = Decimal("999999999999")
+
         if royalty_base >= amount_from and royalty_base <= amount_to:
-            percentage = Decimal(scale.percentage or 0)
+            percentage = Decimal(getattr(scale, "percentage", 0) or 0)
             break
 
-    # If the base is above the highest configured bracket, use the last bracket
-    # instead of returning 0%. This protects older imported scales where the
-    # final "or more" bracket was not saved with a very high Amount To.
+    # If the base is above the highest configured bracket, use the final bracket
+    # instead of returning 0%. This protects imported scales where the last
+    # "or more" row was saved without a high Amount To.
     if percentage == 0 and scales:
-        valid_scales = [s for s in scales if Decimal(s.amount_to or 0) > 0]
-        if valid_scales:
-            highest = max(valid_scales, key=lambda s: Decimal(s.amount_to or 0))
-            if royalty_base >= Decimal(highest.amount_from or 0):
-                percentage = Decimal(highest.percentage or 0)
+        highest = max(scales, key=lambda s: Decimal(getattr(s, "amount_to", 0) or 0))
+        if royalty_base >= Decimal(getattr(highest, "amount_from", 0) or 0):
+            percentage = Decimal(getattr(highest, "percentage", 0) or 0)
 
     calculated_royalty = (royalty_base * percentage) / Decimal("100")
     minimum = Decimal(getattr(franchise, "minimum_royalty_amount", 0) or 0)
     minimum_applied = minimum > 0 and calculated_royalty < minimum
     royalty_amount = minimum if minimum_applied else calculated_royalty
     return royalty_base, percentage, royalty_amount, minimum_applied
-
 
 def recalculate_monthly_figure(monthly_figure):
     franchise = monthly_figure.franchise or Franchise.query.get(monthly_figure.franchise_id) or get_or_create_franchise()

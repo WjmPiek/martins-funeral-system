@@ -3,7 +3,7 @@
 <div class="section-header">
   <div>
     <h1>Franchise Leaderboard</h1>
-    <p class="muted">Ranking for {{ selected_period_label }} compared to {{ comparison_period_label }}.</p>
+    <p class="muted">Rank movement for {{ selected_period_label }} compared to {{ comparison_period_label }}.</p>
   </div>
   <div class="button-row">
     {% if show_manage_targets %}
@@ -36,65 +36,41 @@
 </div>
 
 {% if my_row %}
-<div class="leaderboard-my-position form-section-card">
+<div class="leaderboard-my-position form-section-card movement-{{ my_row.movement_class }}">
   <div>
     <span class="muted">Your franchise position</span>
     <h2>#{{ my_row.rank }} - {{ my_row.franchise_name }}</h2>
   </div>
-  <span class="leaderboard-movement {{ my_row.movement_class }}">{{ my_row.movement_label }}{% if my_row.movement_delta %} {{ my_row.movement_delta|abs }}{% endif %}</span>
-  <div>
-    <span class="muted">Target achievement</span>
-    <strong>{{ '%.1f'|format(my_row.gross_target_percent|float) }}%</strong>
-  </div>
+  <span class="leaderboard-movement {{ my_row.movement_class }}">
+    {{ my_row.movement_label }}{% if my_row.movement_delta %} by {{ my_row.movement_delta|abs }}{% endif %}
+  </span>
 </div>
 {% endif %}
 
 <div class="table-responsive">
-  <table class="system-report-table leaderboard-table">
+  <table class="system-report-table leaderboard-table simple-leaderboard-table">
     <thead>
       <tr>
-        <th>Rank</th>
-        <th>Franchise</th>
+        <th>Number</th>
+        <th>Franchise Name</th>
         <th>Movement</th>
-        <th>Score</th>
-        <th>Gross Turnover</th>
-        <th>Gross Target</th>
-        <th>Target %</th>
-        <th>Sales</th>
-        <th>Joinings</th>
-        <th>MF Files</th>
-        <th>Royalty</th>
       </tr>
     </thead>
     <tbody>
       {% for row in rows %}
-      <tr class="{% if my_row and my_row.franchise_id == row.franchise_id %}highlight-row{% endif %}">
+      <tr class="leaderboard-row movement-{{ row.movement_class }} {% if my_row and my_row.franchise_id == row.franchise_id %}highlight-row{% endif %}">
         <td><strong>#{{ row.rank }}</strong></td>
         <td>{{ row.franchise_name }}</td>
-        <td><span class="leaderboard-movement {{ row.movement_class }}">{{ row.movement_label }}{% if row.movement_delta %} {{ row.movement_delta|abs }}{% endif %}</span></td>
-        <td>{{ '%.1f'|format(row.score|float) }}</td>
-        <td>R {{ '%.2f'|format(row.actuals.gross_turnover|float) }}</td>
-        <td>R {{ '%.2f'|format(row.gross_target|float) }}</td>
-        <td>{{ '%.1f'|format(row.gross_target_percent|float) }}%</td>
-        <td>R {{ '%.2f'|format(row.actuals.sales|float) }}</td>
-        <td>{{ row.actuals.insurance_joinings|int }}</td>
-        <td>{{ row.actuals.mf_files|int }}</td>
-        <td>R {{ '%.2f'|format(row.actuals.royalty_amount|float) }}</td>
+        <td>
+          <span class="leaderboard-movement {{ row.movement_class }}">
+            {{ row.movement_label }}{% if row.movement_delta %} by {{ row.movement_delta|abs }}{% endif %}
+          </span>
+        </td>
       </tr>
       {% else %}
-      <tr><td colspan="11" class="center-cell">No leaderboard data found for this period.</td></tr>
+      <tr><td colspan="3" class="center-cell">No leaderboard data found for this period.</td></tr>
       {% endfor %}
     </tbody>
   </table>
-</div>
-
-<div class="form-section-card">
-  <h2>How the score works</h2>
-  <p class="muted">The leaderboard uses weighted target achievement when targets are captured. If no targets exist yet, it falls back to gross turnover so the leaderboard still works immediately.</p>
-  <div class="leaderboard-weight-grid">
-    {% for metric_key, config in metrics.items() %}
-      <div><strong>{{ config.label }}</strong><span>{{ '%.0f'|format((config.weight * 100)|float) }}%</span></div>
-    {% endfor %}
-  </div>
 </div>
 {% endblock %}
