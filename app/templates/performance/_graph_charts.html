@@ -1,0 +1,77 @@
+{% macro chart_card(title, description, points, series, value_prefix='', value_suffix='', chart_kind='line') %}
+<div class="panel-card mfs-chart-card">
+    <div class="mfs-chart-header">
+        <div>
+            <h3>{{ title }}</h3>
+            {% if description %}<p class="muted">{{ description }}</p>{% endif %}
+        </div>
+    </div>
+    <div class="mfs-svg-chart"
+         data-points='{{ points|tojson }}'
+         data-series='{{ series|tojson }}'
+         data-prefix="{{ value_prefix }}"
+         data-suffix="{{ value_suffix }}"
+         data-kind="{{ chart_kind }}">
+        <div class="mfs-chart-empty">Loading graph...</div>
+    </div>
+    <details class="mfs-chart-data">
+        <summary>View graph data</summary>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        {% for item in series %}<th>{{ item.label }}</th>{% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                {% for point in points %}
+                    <tr>
+                        <td>{{ point.label }}</td>
+                        {% for item in series %}<td>{{ point.get(item.key, 0) }}</td>{% endfor %}
+                    </tr>
+                {% else %}
+                    <tr><td colspan="{{ series|length + 1 }}">No chart data available.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
+</div>
+{% endmacro %}
+
+{% macro graph_assets() %}
+<style>
+.mfs-chart-card{overflow:hidden}.mfs-chart-header{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start}.mfs-svg-chart{width:100%;min-height:320px;border:1px solid #e5e7eb;border-radius:14px;background:linear-gradient(180deg,#fff,#f8fafc);padding:.5rem}.mfs-svg-chart svg{width:100%;height:320px;display:block}.mfs-chart-empty{height:300px;display:flex;align-items:center;justify-content:center;color:#6c757d}.mfs-chart-data{margin-top:.75rem}.mfs-chart-data summary{cursor:pointer;color:#475569;font-weight:600}.mfs-axis-label{font-size:11px;fill:#64748b}.mfs-grid-line{stroke:#e5e7eb;stroke-width:1}.mfs-axis-line{stroke:#94a3b8;stroke-width:1}.mfs-line-actual{stroke:#198754}.mfs-line-target{stroke:#6c757d;stroke-dasharray:6 5}.mfs-line-forecast{stroke:#0d6efd}.mfs-line-previous{stroke:#f59f00}.mfs-line-growth{stroke:#7c3aed}.mfs-series-line{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.mfs-point{stroke:#fff;stroke-width:2}.mfs-legend{display:flex;gap:1rem;flex-wrap:wrap;margin:.5rem 0 0 .25rem;font-size:.85rem;color:#475569}.mfs-legend-item{display:flex;align-items:center;gap:.35rem}.mfs-legend-swatch{width:18px;height:4px;border-radius:999px;background:#198754}.mfs-swatch-target{background:#6c757d}.mfs-swatch-forecast{background:#0d6efd}.mfs-swatch-previous{background:#f59f00}.mfs-swatch-growth{background:#7c3aed}.mfs-tooltip{position:fixed;z-index:9999;background:#111827;color:#fff;padding:.45rem .6rem;border-radius:8px;font-size:.8rem;box-shadow:0 8px 24px rgba(0,0,0,.22);pointer-events:none;display:none;max-width:260px}@media(max-width:700px){.mfs-svg-chart svg{height:260px}.mfs-svg-chart{min-height:260px}}
+</style>
+<script>
+(function(){
+  function num(v){var n=Number(v);return Number.isFinite(n)?n:0;}
+  function fmt(v,prefix,suffix){var n=num(v);var abs=Math.abs(n);var out;if(abs>=1000000){out=(n/1000000).toFixed(1)+'m'}else if(abs>=1000){out=(n/1000).toFixed(1)+'k'}else{out=n.toFixed(abs%1===0?0:2)}return (prefix||'')+out+(suffix||'');}
+  function cls(key){if(key==='target')return'mfs-line-target';if(key==='forecast')return'mfs-line-forecast';if(key==='previous_year')return'mfs-line-previous';if(key==='growth_percent')return'mfs-line-growth';return'mfs-line-actual';}
+  function render(el){
+    var points=[];var series=[];
+    try{points=JSON.parse(el.dataset.points||'[]');series=JSON.parse(el.dataset.series||'[]');}catch(e){el.innerHTML='<div class="mfs-chart-empty">Graph data could not be loaded.</div>';return;}
+    if(!points.length||!series.length){el.innerHTML='<div class="mfs-chart-empty">No graph data available yet.</div>';return;}
+    var prefix=el.dataset.prefix||'';var suffix=el.dataset.suffix||'';
+    var w=900,h=320,p={l:62,r:24,t:28,b:54};
+    var values=[];points.forEach(function(pt){series.forEach(function(s){values.push(num(pt[s.key]));});});
+    var min=Math.min.apply(null,values.concat([0]));var max=Math.max.apply(null,values.concat([0]));
+    if(max===min){max=max+1;min=0;} if(min>0)min=0; var pad=(max-min)*0.08;max+=pad;min-=pad;
+    var innerW=w-p.l-p.r,innerH=h-p.t-p.b;
+    function x(i){return p.l+(points.length===1?innerW/2:(i/(points.length-1))*innerW);}
+    function y(v){return p.t+innerH-((num(v)-min)/(max-min))*innerH;}
+    var parts=['<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="Performance graph">'];
+    for(var g=0;g<=4;g++){var yy=p.t+(innerH/4)*g;var val=max-((max-min)/4)*g;parts.push('<line class="mfs-grid-line" x1="'+p.l+'" y1="'+yy+'" x2="'+(w-p.r)+'" y2="'+yy+'"></line>');parts.push('<text class="mfs-axis-label" x="8" y="'+(yy+4)+'">'+fmt(val,prefix,suffix)+'</text>');}
+    parts.push('<line class="mfs-axis-line" x1="'+p.l+'" y1="'+(h-p.b)+'" x2="'+(w-p.r)+'" y2="'+(h-p.b)+'"></line>');
+    points.forEach(function(pt,i){if(i%Math.ceil(points.length/6)===0||i===points.length-1){parts.push('<text class="mfs-axis-label" text-anchor="middle" x="'+x(i)+'" y="'+(h-20)+'">'+String(pt.label||'')+'</text>');}});
+    series.forEach(function(s){var d='';points.forEach(function(pt,i){d+=(i?' L ':'M ')+x(i)+' '+y(pt[s.key]);});parts.push('<path class="mfs-series-line '+cls(s.key)+'" d="'+d+'"></path>');points.forEach(function(pt,i){parts.push('<circle class="mfs-point '+cls(s.key)+'" cx="'+x(i)+'" cy="'+y(pt[s.key])+'" r="4" data-label="'+String(pt.label||'').replace(/"/g,'&quot;')+'" data-series="'+String(s.label||s.key).replace(/"/g,'&quot;')+'" data-value="'+fmt(pt[s.key],prefix,suffix)+'"></circle>');});});
+    parts.push('</svg><div class="mfs-legend">');
+    series.forEach(function(s){var sw=''; if(s.key==='target')sw=' mfs-swatch-target'; else if(s.key==='forecast')sw=' mfs-swatch-forecast'; else if(s.key==='previous_year')sw=' mfs-swatch-previous'; else if(s.key==='growth_percent')sw=' mfs-swatch-growth'; parts.push('<span class="mfs-legend-item"><span class="mfs-legend-swatch'+sw+'"></span>'+String(s.label||s.key)+'</span>');});
+    parts.push('</div>');el.innerHTML=parts.join('');
+  }
+  function init(){var tip=document.querySelector('.mfs-tooltip');if(!tip){tip=document.createElement('div');tip.className='mfs-tooltip';document.body.appendChild(tip);}document.querySelectorAll('.mfs-svg-chart').forEach(render);document.addEventListener('mousemove',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('mfs-point')){tip.innerHTML='<strong>'+t.dataset.label+'</strong><br>'+t.dataset.series+': '+t.dataset.value;tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY+12)+'px';tip.style.display='block';}else{tip.style.display='none';}});}
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
+})();
+</script>
+{% endmacro %}
