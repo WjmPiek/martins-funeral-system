@@ -1,0 +1,45 @@
+{% extends 'base.html' %}{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-0">Telesales Lead Queue</h3>
+    <small class="text-muted">Phase 2 pipeline, callbacks and client timeline</small>
+  </div>
+  <div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-danger btn-lg" href="{{ url_for('recovery.suspense') }}">Suspense</a><a class="btn btn-outline-primary btn-lg" href="{{ url_for('recovery.callbacks') }}">Callbacks</a><a class="btn btn-success btn-lg" href="{{ url_for('recovery.next_client') }}">Next Client</a></div>
+</div>
+
+<form class="mb-3" method="post" action="{{url_for('recovery.import_lapsed')}}" enctype="multipart/form-data">
+  <input type="file" name="file" accept=".xlsx" required>
+  <button class="btn btn-primary btn-sm">Import Lapsed Policies</button>
+</form>
+
+<div class="mb-3">
+  <a class="btn btn-sm {% if not active_status %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ url_for('recovery.queue') }}">All Open</a>
+  {% for s in open_statuses %}
+    <a class="btn btn-sm {% if active_status == s %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="{{ url_for('recovery.queue', status=s) }}">{{ s }} <span class="badge bg-light text-dark">{{ status_counts.get(s, 0) }}</span></a>
+  {% endfor %}
+</div>
+
+<div class="table-responsive"><table class="table table-sm table-striped align-middle responsive-table">
+  <tr>
+    <th>Policy</th><th>Client</th><th>Cell</th><th>Total</th><th>Status</th><th>Next Action</th><th>Actions</th>
+  </tr>
+  {% for p in policies %}
+  <tr class="{% if p.next_action_date and p.next_action_date <= today %}table-warning{% endif %}">
+    <td data-label="Policy">{{p.policy_number}}</td>
+    <td data-label="Client">{{p.initials}} {{p.surname}}</td>
+    <td data-label="Cell">{{p.cell_number}}</td>
+    <td data-label="Total">{{p.total}}</td>
+    <td data-label="Status"><span class="badge bg-secondary">{{p.recovery_status}}</span></td>
+    <td data-label="Next Action">{{p.next_action_date or ''}}</td>
+    <td data-label="Actions">
+      <a class="btn btn-sm btn-outline-primary" href="{{url_for('recovery.log_call',policy_id=p.id)}}">Call / Update</a>
+      <a class="btn btn-sm btn-outline-dark" href="{{url_for('recovery.client_timeline', policy_id=p.id)}}">Timeline</a>
+      <a class="btn btn-sm btn-success" href="{{url_for('recovery.start_script', policy_id=p.id, app_type='reinstatement')}}">Reinstate</a>
+      <a class="btn btn-sm btn-secondary" href="{{url_for('recovery.start_script', policy_id=p.id, app_type='new')}}">New Policy</a>
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7" class="text-muted">No leads found for this view.</td></tr>
+  {% endfor %}
+</table></div>
+{% endblock %}

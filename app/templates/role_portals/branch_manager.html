@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block content %}
+<h1>Branch Manager Portal</h1><h4>{{ branch or 'My Branch' }}</h4>
+{% set branch_args = {'branch': branch} if branch else {} %}
+{% set card_links = {
+  'leads': url_for('recovery.queue', **branch_args),
+  'calls_today': url_for('reports.index', **branch_args),
+  'sales_today': url_for('applications.list_applications', **branch_args),
+  'callbacks_today': url_for('recovery.callbacks', **branch_args),
+  'callbacks_overdue': url_for('recovery.callbacks', **branch_args),
+  'pending_signatures': url_for('applications.list_applications', status='unsigned', **branch_args),
+  'fica_outstanding': url_for('documents.document_dashboard', status='outstanding', **branch_args),
+  'qa_pending': url_for('qa.qa_dashboard', **branch_args)
+} %}
+{% set card_titles = {
+  'leads': 'Leads',
+  'calls_today': 'Calls Today',
+  'sales_today': 'Sales Today',
+  'callbacks_today': 'Callbacks Today',
+  'callbacks_overdue': 'Callbacks Overdue',
+  'pending_signatures': 'Pending Signatures',
+  'fica_outstanding': 'FICA Outstanding',
+  'qa_pending': 'QA Pending'
+} %}
+<div class="row g-3">
+  {% for k,v in stats.items() %}
+  <div class="col-md-3 col-sm-6">
+    <a class="portal-card-link text-decoration-none text-reset" href="{{ card_links.get(k, '#') }}" aria-label="Open {{ card_titles.get(k, k.replace('_',' ').title()) }}">
+      <div class="card action-card h-100 portal-stat-card">
+        <div class="card-body">
+          <div class="text-muted">{{ card_titles.get(k, k.replace('_',' ').title()) }}</div>
+          <h2>{{ v }}</h2>
+          <div class="small text-primary fw-semibold">Open details →</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+<div class="d-flex flex-wrap gap-2 my-4"><a class="btn btn-primary" href="{{ url_for('role_portals.workspace', **branch_args) }}">CRM Workspace</a><a class="btn btn-outline-primary" href="{{ url_for('recovery.queue', **branch_args) }}">Import / Lead Queue</a><a class="btn btn-outline-primary" href="{{ url_for('applications.list_applications', **branch_args) }}">Applications</a><a class="btn btn-outline-primary" href="{{ url_for('documents.document_dashboard', **branch_args) }}">Documents</a><a class="btn btn-outline-primary" href="{{ url_for('auth.users_manage') }}">Branch Agents</a></div>
+<hr><h3>Agent Performance Today</h3><div class="table-responsive"><table class="table responsive-table"><tr><th>Agent</th><th>Calls</th><th>Sales</th><th>Conversion</th></tr>{% for r in agent_rows %}<tr><td data-label="Agent">{{r.agent.name}}</td><td data-label="Calls">{{r.calls}}</td><td data-label="Sales">{{r.sales}}</td><td data-label="Conversion">{{r.conversion}}%</td></tr>{% endfor %}</table></div>
+<h3>Pending Callbacks</h3><div class="table-responsive"><table class="table table-sm responsive-table"><tr><th>Date</th><th>Client</th><th>Policy</th><th>Status</th><th></th></tr>{% for p in pending_callbacks %}<tr><td data-label="Date">{{p.next_action_date}}</td><td data-label="Client">{{p.surname}} {{p.initials}}</td><td data-label="Policy">{{p.policy_number}}</td><td data-label="Status">{{p.recovery_status}}</td><td data-label="Open"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('recovery.log_call', policy_id=p.id) }}">Open</a></td></tr>{% endfor %}</table></div>
+{% endblock %}

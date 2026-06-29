@@ -1,290 +1,265 @@
-# Martins Direct Basic Portal
+# Martin's Funerals Web System Starter
 
-Basic Flask starter system with:
+Flask + PostgreSQL + Render starter for:
+- Client applications
+- Policy product admin and audit logs
+- Email signing links
+- Electronic signature using drawn signature + typed name + OTP
+- Signed application PDF and welcome pack PDF
+- Lapsed policy import and recovery call logging
+- Default linked roles and permissions
 
-- PostgreSQL database
-- User registration
-- Login/logout
-- Multiple users
-- Forgot password with secure reset token
-- Dashboard placeholder for future modules
-
-## 1. Create PostgreSQL database
-
-```sql
-CREATE DATABASE martins_basic_portal;
-```
-
-## 2. Create virtual environment
+## Local setup
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-```
-
-On Windows:
-
-```bash
-venv\Scripts\activate
-```
-
-## 3. Install requirements
-
-```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-## 4. Create environment file
-
-Copy `.env.example` to `.env` and update your PostgreSQL username/password.
-
-```bash
 cp .env.example .env
-```
-
-Example:
-
-```env
-DATABASE_URL=postgresql://postgres:password@localhost:5432/martins_basic_portal
-SECRET_KEY=change-this-secret-key
-```
-
-## 5. Initialize database migrations
-
-```bash
-flask --app run.py db init
-flask --app run.py db migrate -m "Initial users table"
-flask --app run.py db upgrade
-```
-
-## 6. Run the system
-
-```bash
+python seed.py
 python run.py
 ```
 
-Open:
+First production admin user:
+
+Run `python seed.py` once. You can set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`; otherwise a temporary password is printed. Change the seeded password immediately in production. Do not commit real passwords to GitHub or documentation.
+
+## Render deployment
+
+1. Push this folder to GitHub.
+2. In Render, create a Blueprint from `render.yaml`.
+3. Add Gmail SMTP app password variables.
+4. Set `BASE_URL` to your Render web URL.
+5. Run `python seed.py` once in Render Shell.
+
+## Gmail SMTP
+
+Use a Gmail App Password, not your normal Gmail password.
+
+## Important production upgrades
+
+- Move uploaded files to S3/Google Drive when volume grows.
+- Add proper SMS OTP provider.
+- Add migrations with `flask db init`, `flask db migrate`, `flask db upgrade`.
+- Add daily report scheduler worker or Render cron job.
+
+
+## Script Flow Readability Update
+- Sales script now runs in shorter human-speaking steps instead of large paragraphs.
+- Each screen shows one conversation point or confirmation.
+- Agent text is split into separate speech blocks.
+- Progress counter now reflects the expanded guided flow.
+
+
+## SVG Document Templates
+
+The system now includes the CorelDRAW-exported SVG document templates in `app/static/svg_templates/` and converted PDF backgrounds in `app/static/pdf_templates/`.
+
+Application template selection:
+- Family / standard applications: `family_application.svg` -> `application_single_family.pdf`
+- Member + Product applications: `member_product_application.svg` -> `application_member_product.pdf`
+
+Terms template selection:
+- Family / standard applications: `family_terms.svg` -> `family_terms.pdf`
+- Member + Product applications: `member_product_terms.svg` -> `member_product_terms.pdf`
+
+The PDF overlay engine scales legacy field coordinates to A4 so values stay aligned next to headings on the new SVG-derived templates.
+
+## Phase 1 telesales workflow
+
+This build adds the first proper call-centre workflow layer:
+
+- Agent dashboard with a **Next Client** button.
+- Due-now queue for clients that must be called today.
+- Callback tracking through `next_action_date`.
+- Required call outcomes.
+- Lead status pipeline using `lapsed_policies.recovery_status`.
+- Call notes/history from `recovery_call_logs`.
+
+Phase 1 uses existing database columns only. No database migration is required for these changes.
+
+Pipeline statuses used in Phase 1:
 
 ```text
-http://127.0.0.1:5000
+New
+Imported
+Called
+No Answer
+Callback
+Interested
+Application Started
+Signature Sent
+FICA Outstanding
+QA Review
+Approved
+Rejected
+Closed
+Reinstated
 ```
 
-## Password reset email
 
-To send real reset emails, configure SMTP details in `.env`.
+## Phase 2 - Callback + Client Timeline
 
-During development, if email is not configured, the reset link will be shown in the Flask terminal and also flashed on screen for testing.
+Added on top of Phase 1:
 
-## Future modules
+- Callback Worklist at `/recovery/callbacks`
+- Overdue, today, upcoming and unscheduled callback sections
+- Client Timeline page for every lead
+- Timeline records call logs, script sessions, applications, signing links, signatures and FICA uploads
+- Callback link added to the top navigation
+- Agent dashboard callback card now opens the callback worklist and shows overdue count
 
-Add future modules as separate blueprints inside `app/`, for example:
+No new database columns were added in Phase 2. Existing tables are used so the Render PostgreSQL deployment remains safer.
+
+
+## Phase 3 - Manager Dashboard
+
+Added manager reporting and worklist screens without adding database columns.
+
+- `/manager` Manager Dashboard
+- Agent performance today
+- Calls, open leads, callbacks, conversion and pending-work metrics
+- Branch filter
+- Lead status breakdown
+- Pending callbacks, pending signatures, FICA review and QA pending panels
+
+Only Admin, Manager and Branch Manager roles see the Manager link.
+
+
+## Phase 4 - QA / Compliance
+
+Adds QA/compliance dashboard, application review checklist, approval/rejection decisions, FICA document review, review history, and audit logging. See `PHASE4_NOTES.txt`.
+
+
+## Phase 5 - Document Tracking
+
+Added document tracking for applications:
+
+- Document dashboard at `/documents`
+- Application document status panel
+- Required signature document tracking
+- Required FICA document tracking
+- Missing/rejected document filters
+- Pending review filter
+- Completion percentage per application
+- Staff FICA upload
+- Missing-document resend by Email or WhatsApp
+
+No new database columns or tables were added in Phase 5.
+
+## Branch Access Control Update
+
+This package adds branch-level data isolation:
+- Agents can only see their assigned branch data.
+- Branch Managers/Managers/QA/Compliance can only see their assigned branch data.
+- Admin can view all branches or filter by branch.
+- Admin can assign branches from **User Approvals / User Branch Access**.
+
+Before going live, make sure every Agent and Branch Manager has a branch value that exactly matches the branch names used in imported leads and applications.
+
+
+## Phase 15 - Protected User / Agent Management
+
+- Admin and Branch Manager user management added at `/auth/users`.
+- Admin can create Branch Managers and Agents and allocate any branch.
+- Branch Managers can create/manage Agents only for their own branch.
+- Admin users are protected and cannot be edited or deleted.
+- User actions are audit logged.
+
+## Role & User Management Phase
+
+This package makes `wjm@martinsdirect.com` the protected Super Admin. Admin can add/view/permanently delete any non-admin user. Branch Managers can add and view Agents only in their own branch. Agents only see their own allocated records. Super Admin/Admin accounts are protected from edit, delete, downgrade and reassignment. When a non-admin user is permanently deleted, linked history is reassigned to the Super Admin before the user row is removed.
+
+
+## Phase 15 - CRM Workspace Redesign
+
+This package adds a unified CRM workspace at `/workspace` so the dashboard/agent workspace no longer disappears when users move between tabs. Admin can select any branch/agent, Branch Managers are locked to their own branch, and Agents are locked to their own data. No database schema changes are required.
+
+## Upload & System Fix Package
+
+This build fixes the external client FICA upload flow for ID copy and Proof of Address from email signing links.
+
+Key fixes:
+- Uses a robust reflected insert for `client_fica_documents`, so older Render/PostgreSQL schemas with legacy columns do not block uploads.
+- Runs the FICA document schema guard on startup even when `AUTO_CREATE_TABLES` is disabled.
+- Keeps upload history and marks the newest document as active/Received.
+- Keeps Super Admin access working for QA, Reports and Settings.
+- Improves permanent user deletion by reassigning user history to the protected Super Admin before deleting the user.
+
+Tested locally:
+- App loads and registers routes.
+- Client email signing link accepts ID copy upload.
+- Client email signing link accepts Proof of Address upload.
+- Application status changes from FICA Outstanding to Documents Received after required documents are uploaded.
+- Key admin pages render after login.
+- User deletion reassigns lapsed policy history to Super Admin before permanent delete.
+
+
+## Production safety defaults added
+
+This cleaned package removes bundled Git history, Python bytecode caches and sample upload files from the distributable zip.
+
+Recommended Render environment variables:
 
 ```text
-app/users/
-app/claims/
-app/reports/
-app/analytics/
+AUTO_CREATE_TABLES=0      # after migrations are in place
+UPLOAD_FOLDER=/var/data/uploads  # only if you add a Render persistent disk
 ```
 
-## Dashboard layout update
+For long-term document storage, use Google Drive, S3, Supabase Storage or another persistent storage provider instead of Render's normal application filesystem.
 
-The dashboard now includes:
+Daily workflow priority:
 
-- Left sidebar with module tabs
-- Logo area at the top-left of the sidebar
-- Top-right user area showing `Logged in as Name Surname`
-- Module cards ready to be connected to future routes
+1. Workspace
+2. Next Client
+3. My Clients / Import Leads
+4. Callbacks
+5. Applications
+6. Documents
+7. QA / Reports / Wallboard / Targets
+8. Admin, Security and Settings
 
-To replace the placeholder logo, save your company logo as:
+## 2026 CRM Production Improvements Added
 
-```text
-app/static/img/logo-placeholder.svg
-```
+This package includes the first production-ready CRM improvements:
 
-Or update the image filename in:
+- Lead Pipeline Kanban board at `/recovery/pipeline`.
+- Drag-and-drop lead status updates with audit logging.
+- Dark mode toggle saved in the browser.
+- Mobile-friendly pipeline and existing responsive tables.
+- Login brute-force protection for repeated failed attempts.
+- Health check endpoint at `/healthz` for Render monitoring.
+- PostgreSQL backup helper: `scripts/backup_postgres.ps1`.
+- Migration helper: `scripts/create_migration.ps1`.
+- Safer Git flow: deploy/test from `develop`, merge to `main` only after approval.
 
-```text
-app/templates/base.html
-```
+### Render Deployment Notes
 
-## Layout and PDF/Print Standards
-
-The portal now includes global CSS rules for readable text, aligned forms, responsive tables, and PDF/print output.
-
-Use these helper classes when adding modules:
-
-- Wrap wide tables in `<div class="table-responsive">...</div>`.
-- Add `class="table-compact"` to tables with many columns.
-- Add `class="pdf-landscape"` to the report/table container when the page has many columns and should print/export as landscape.
-- Use `class="form-grid"` for aligned label/input form rows.
-- Use `class="form-actions"` for aligned form buttons.
-
-For future automatic PDF export, the backend can count table columns and apply `pdf-landscape` when the column count is high.
-
-## Role and Permission Engine
-
-This version includes a configurable role-management foundation.
-
-Admin menu:
-
-```text
-Users
-User Roles
-```
-
-Default role templates included:
-
-```text
-Admin
-Regional Manager
-Finance Manager
-Finance Assistant
-Franchise Manager
-Franchise User
-Read Only User
-```
-
-Each role can be configured with checkbox permissions per module/page:
-
-```text
-View
-Add
-Edit
-Delete
-Export
-Approve
-Import
-Manage
-```
-
-Modules currently included in the permission matrix:
-
-```text
-Dashboard
-Franchise Settings
-Franchise Details
-Joinings
-Funeral Services
-Insurance Claims
-Heat Map
-Royalties
-Monthly Figures
-Finance
-Users
-User Roles
-Franchise Management
-Imports & Data
-Audit Logs
-System Administration
-PDF Templates
-Email Templates
-Backup Management
-```
-
-### First admin user
-
-The first registered user automatically becomes `Admin` so that the system can be configured.
-
-After logging in as the first user, go to:
-
-```text
-Admin > User Roles > Create/Update Default Roles
-```
-
-This creates/updates the default permission matrix.
-
-### Sidebar permissions
-
-The sidebar now hides/shows module tabs based on the logged-in user's permissions. Admin users see everything.
-
-### Database migration note
-
-Because this version adds roles and permissions, create a new migration if you already initialized the previous database:
+Current safe start command:
 
 ```bash
-flask --app run.py db migrate -m "Add roles and permissions"
-flask --app run.py db upgrade
+gunicorn run:app
 ```
 
-For a fresh database, run the normal migration steps from this README.
-
-## Franchise Details Module
-
-The `Franchise Settings > Franchise Details` page now contains a professional franchise profile form with:
-
-- Business/franchise name
-- PTY number
-- VAT number
-- Office address
-- Office number
-- 24-hour number
-- Franchisee name and surname
-- Franchisee cell phone number
-- Franchisee email address
-- Facebook, Instagram, TikTok, website and public email fields
-- Franchise agreement from/to dates
-- Regional manager and finance manager reminder email fields
-- Five-row royalty scale with amount bands and percentages
-
-Agreement dates and royalty scale fields are protected. They can be adjusted by Admin users and users with `Franchise Agreement: Manage` / `Royalty Scale: Manage` permissions, which are included in the Finance Manager template.
-
-## Agreement Expiry Notifications
-
-The system includes a command for scheduled reminders:
-
-```bash
-flask check-franchise-expiry
-```
-
-Run this command daily from cron, Render cron jobs, or another scheduler. It sends reminder emails to the captured Regional Manager and Finance Manager email addresses when the agreement has 60 days or 30 days remaining.
-
-## Verification checklist - latest build
-
-This package has been checked against the current requested foundation. Included now:
-
-- Martins Funerals System naming across the app.
-- PostgreSQL-ready Flask application using SQLAlchemy and Flask-Migrate.
-- User registration with name, surname, email and password.
-- Login and logout.
-- Secure forgot-password flow using an email reset link with a temporary token.
-- Dashboard with left sidebar, logo area and top-right "Logged in as" user display.
-- Sidebar module structure for Dashboard, Franchise Settings, Joinings, Funeral Services, Insurance Claims, Heat Map, Royalties, Monthly Figures and Finance.
-- Admin section with Users, User Roles, Franchise Management, Finance, Imports & Data, Audit Logs and System Administration placeholders.
-- Role templates: Admin, Regional Manager, Finance Manager, Finance Assistant, Franchise Manager, Franchise User and Read Only User.
-- Checkbox permission matrix per role and module/action: view, add, edit, delete, export, approve, import and manage.
-- Admin has unrestricted access by design.
-- Sidebar visibility is controlled by role permissions.
-- Professional Franchise Details form with business name, franchise code, PTY number, VAT number, address, office number, 24-hour number, franchisee details, social media, website and public email.
-- Franchise agreement from/to dates with 60-day and 30-day reminder email logic.
-- Agreement dates and royalty scale are restricted to Admin / Finance Manager permissions.
-- Five royalty scale rows with amount-from, amount-to and percentage.
-- Audit log foundation for important changes and PDF exports.
-- Global PDF report utility with cover page, franchise name, logo placeholder/path support, address, contact details, generated-by details, bold headings and confidentiality notice.
-- PDF table rules include automatic text wrapping, repeating table headers and automatic landscape orientation when there are more than 8 columns.
-- Franchise Details PDF export button.
-
-Important setup notes:
-
-- Run the default role/permission seeding after installation from the Admin role screen, or visit `/admin/seed` as Admin.
-- Configure email settings in `.env` before password reset emails and agreement expiry reminders can send in production.
-- Add a cron job or scheduled task to run `flask check-franchise-expiry` daily for the 60-day and 30-day agreement reminder emails.
-- The first registered user becomes Admin automatically.
-
-
-## Heat Map Module
-
-The Martins Funerals System now includes an integrated Heat Map module at `/heat-map`.
-
-Required environment variable for map display:
-
-```env
-GOOGLE_MAPS_API_KEY=your_google_maps_browser_key
-```
-
-After deploying the updated code, run database migrations before using the module:
+Pre-deploy command should remain blank until a `migrations/` folder has been created and tested. After migrations are created, set Render Pre-Deploy Command to:
 
 ```bash
 flask db upgrade
 ```
 
-The Heat Map import accepts Excel files with columns such as MF File, Deceased Name, Deceased Surname, DOD, Address, City, Province, Country, Full Address, Latitude, Longitude, Weight, Next of Kin Name, Next of Kin Surname, Relationship, Relation, and Contact Number. If a `Relation` column exists, only `MEM` rows are imported for client-density accuracy.
+### Recommended Render Environment Variables
+
+```bash
+FLASK_ENV=production
+SECRET_KEY=<long random value>
+DATABASE_URL=<Render PostgreSQL internal connection string>
+BASE_URL=https://your-render-service.onrender.com
+UPLOAD_FOLDER=/var/data/uploads
+AUTO_CREATE_TABLES=1
+```
+
+After a proper migration workflow is confirmed, change:
+
+```bash
+AUTO_CREATE_TABLES=0
+```

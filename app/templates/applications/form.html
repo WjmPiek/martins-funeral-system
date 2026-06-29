@@ -1,0 +1,336 @@
+{% extends 'base.html' %}{% block content %}
+<h3>New Client Application</h3>
+
+<form method="post" class="row g-2">
+  <h5>Policy / Agent</h5>
+  <div class="col-md-5"><label>Product</label><select class="form-control" name="product_id" id="product_id" onchange="policyChanged()">
+      {% for p in products %}
+      <option value="{{p.id}}"
+        data-name="{{p.product_name}} {{p.plan_name}}"
+        data-premium="{{p.monthly_premium}}"
+        data-cover="{{p.cover_amount}}"
+        data-min-age="{{p.min_age if p.min_age is not none else ''}}"
+        data-max-age="{{p.max_age if p.max_age is not none else ''}}">
+        {{p.product_name}} - {{p.plan_name}} / R{{p.monthly_premium}}
+      </option>
+      {% endfor %}
+    </select></div>
+  <div class="col-md-3"><label>Policy No.</label><input class="form-control" name="policy_number"></div>
+  <div class="col-md-2"><label>Agent Name</label><input class="form-control" name="agent_name" value="{{ current_user.name }}"></div>
+  <div class="col-md-2"><label>Agent Code</label><input class="form-control" name="agent_code"></div>
+
+  <h5 class="mt-3">Principal Member / Policyholder</h5>
+  <div class="col-md-2"><label>Title</label><input class="form-control" name="title"></div>
+  <div class="col-md-5"><label>First Names</label><input class="form-control" name="first_names"></div>
+  <div class="col-md-5"><label>Surname</label><input class="form-control" name="surname"></div>
+  <div class="col-md-3"><label>ID Number</label><input class="form-control" name="id_number" id="id_number" maxlength="13" oninput="validateSaIdField(this); fillDobFromId('id_number','date_of_birth')"></div>
+  <div class="col-md-3"><label>Date of Birth</label><input class="form-control" name="date_of_birth" id="date_of_birth" placeholder="DD/MM/YYYY" oninput="formatDateInput(this)"></div>
+  <div class="col-md-3"><label>Cell Number</label><input class="form-control" name="cell_number"></div>
+  <div class="col-md-3"><label>Retail Premium</label><input class="form-control" id="display_premium" readonly></div>
+  <div class="col-md-3"><label>Cover Amount</label><input class="form-control" id="display_cover" readonly></div>
+  <div class="col-md-3"><label>Email</label><input class="form-control" name="email" type="email"></div>
+  <div class="col-md-4"><label>Home Tel</label><input class="form-control" name="home_tel"></div>
+  <div class="col-md-4"><label>Work Tel</label><input class="form-control" name="work_tel"></div>
+  <div class="col-md-4" id="plan_choice_block" style="display:none;"><label>Plan Choice (Member + Product)</label><input class="form-control" name="plan_choice" id="plan_choice" readonly></div>
+  <div class="col-md-6"><label>Residential Address</label><textarea class="form-control" id="residential_address" name="residential_address"></textarea><input type="hidden" name="address_place_id" id="address_place_id"><input type="hidden" name="address_lat" id="address_lat"><input type="hidden" name="address_lng" id="address_lng"></div>
+  <div class="col-md-2"><label>Residential Postal Code</label><input class="form-control" name="residential_postal_code" id="residential_postal_code"></div><div class="col-12"><div id="map" style="height:280px;border:1px solid #ccc;"></div></div>
+  <div class="col-md-6"><label>Postal Address</label><textarea class="form-control" name="postal_address"></textarea></div>
+  <div class="col-md-2"><label>Postal Code</label><input class="form-control" name="postal_code"></div>
+
+  <h5 class="mt-3">Spouse</h5>
+  <div class="col-md-2"><label>Title</label><input class="form-control" name="spouse_title"></div>
+  <div class="col-md-4"><label>Spouse First Names</label><input class="form-control" name="spouse_first_names"></div>
+  <div class="col-md-4"><label>Spouse Surname</label><input class="form-control" name="spouse_surname"></div>
+  <div class="col-md-3"><label>Spouse ID Number</label><input class="form-control" name="spouse_id_number" id="spouse_id_number" maxlength="13" oninput="validateSaIdField(this); fillDobFromId('spouse_id_number','spouse_date_of_birth')"></div>
+  <div class="col-md-3"><label>Spouse Date of Birth</label><input class="form-control" name="spouse_date_of_birth" id="spouse_date_of_birth" placeholder="DD/MM/YYYY" oninput="formatDateInput(this)"></div>
+
+  <h5 class="mt-3">Premiums</h5>
+  <div class="col-md-3"><label>Extended Premium B</label><input class="form-control premium-lock" name="extended_premium" id="extended_premium" type="number" step="0.01" {% if not (current_user.role and current_user.role.name|lower == 'admin') %}readonly{% endif %}></div>
+  <div class="col-md-3"><label>Total Payment A + B</label><input class="form-control premium-lock" name="total_payment" id="total_payment" type="number" step="0.01" {% if not (current_user.role and current_user.role.name|lower == 'admin') %}readonly{% endif %}></div>
+  <div class="col-md-3"><label>First Deduction Date</label><input class="form-control" name="first_deduction_date" id="first_deduction_date" placeholder="DD/MM/YYYY" oninput="formatDateInput(this)"></div>
+
+  <div id="family_fields"><h5 class="mt-3">Children / Dependents (Single and Family Form)</h5>
+  {% for i in range(1,7) %}
+    <div class="col-md-5"><input class="form-control" name="child_{{i}}_full_name" placeholder="{{i}}. Full names"></div>
+    <div class="col-md-3"><input class="form-control" name="child_{{i}}_relationship" placeholder="Relationship"></div>
+    <div class="col-md-4"><input class="form-control dependent-id-dob" name="child_{{i}}_id_or_dob" placeholder="ID number or DOB" oninput="formatIdOrDobInput(this)"></div>
+  {% endfor %}
+
+  </div><div id="member_product_fields"><h5 class="mt-3">Member + Product Dependents</h5>
+  {% for i in range(1,14) %}
+    <div class="col-md-5"><input class="form-control" name="productdep_{{i}}_full_name" placeholder="{{i}}. Full names"></div>
+    <div class="col-md-3"><input class="form-control" name="productdep_{{i}}_relationship" placeholder="Relationship"></div>
+    <div class="col-md-4"><input class="form-control dependent-id-dob" name="productdep_{{i}}_id_or_dob" placeholder="ID number or DOB" oninput="formatIdOrDobInput(this)"></div>
+  {% endfor %}
+
+  </div><div id="extended_family_fields"><h5 class="mt-3">Extended Family</h5>
+  {% for i in range(1,7) %}
+    <div class="col-md-4"><input class="form-control" name="extended_{{i}}_full_name" placeholder="{{i}}. Full names"></div>
+    <div class="col-md-2"><input class="form-control" name="extended_{{i}}_relationship" placeholder="Relationship"></div>
+    <div class="col-md-2"><input class="form-control dependent-id-dob" name="extended_{{i}}_id_or_dob" placeholder="ID/DOB" oninput="formatIdOrDobInput(this)"></div>
+    <div class="col-md-2"><input class="form-control" name="extended_{{i}}_cover" placeholder="Cover"></div>
+    <div class="col-md-2"><input class="form-control" name="extended_{{i}}_premium" placeholder="Premium"></div>
+  {% endfor %}
+
+  </div><h5 class="mt-3">Nominated Beneficiary</h5>
+  <div class="col-md-5"><label>Full Names</label><input class="form-control" name="beneficiary_full_names"></div>
+  <div class="col-md-2"><label>Title</label><input class="form-control" name="beneficiary_title"></div>
+  <div class="col-md-3"><label>ID Number</label><input class="form-control" name="beneficiary_id_number" id="beneficiary_id_number" maxlength="13" oninput="validateSaIdField(this); fillDobFromId('beneficiary_id_number','beneficiary_date_of_birth')"></div>
+  <div class="col-md-3"><label>Date of Birth</label><input class="form-control" name="beneficiary_date_of_birth" id="beneficiary_date_of_birth" placeholder="DD/MM/YYYY" oninput="formatDateInput(this)"></div>
+  <div class="col-md-3"><label>Relationship</label><input class="form-control" name="beneficiary_relationship"></div>
+
+  <h5 class="mt-3">Payment Details</h5>
+  <div class="col-12"><div id="bank_verification_note" class="alert alert-info py-2">Bank verification is only compulsory when Debit Order is selected.</div></div>
+  <div class="col-md-3"><label>Payment Method</label><select class="form-control" name="payment_method" id="payment_method" onchange="toggleBankRules()"><option>Cash</option><option>Debit Order</option><option>Persal</option><option>Salary Stop Order</option></select></div>
+  <div class="col-md-3"><label>Debit Day</label><select class="form-control" name="debit_day"><option>1st</option><option>5th</option><option>15th</option><option>20th</option><option>25th</option><option>30th</option></select></div>
+  <div class="col-md-4"><label>Bank Name</label><input class="form-control bank-field" name="bank_name"></div>
+  <div class="col-md-4"><label>Branch Name</label><input class="form-control bank-field" name="branch_name"></div>
+  <div class="col-md-2"><label>Branch Code</label><input class="form-control bank-field" name="branch_code"></div>
+  <div class="col-md-2"><label>Town</label><input class="form-control bank-field" name="bank_town"></div>
+  <div class="col-md-4"><label>Account Number</label><input class="form-control bank-field" name="account_number"></div>
+  <div class="col-md-3"><label>Account Type</label><input class="form-control bank-field" name="account_type"></div>
+  <div class="col-md-5"><label>Account Holder</label><input class="form-control bank-field" name="account_holder"></div>
+
+  <h5 class="mt-3">Employment / Salary Stop Order</h5>
+  <div class="col-md-4"><label>Employer</label><input class="form-control" name="employer"></div>
+  <div class="col-md-2"><label>Salary</label><input class="form-control" name="salary" type="number" step="0.01"></div>
+  <div class="col-md-3"><label>Persal No.</label><input class="form-control" name="persal_no"></div>
+  <div class="col-md-3"><label>Paypoint</label><input class="form-control" name="paypoint"></div>
+  <div class="col-md-3"><label>Department Code</label><input class="form-control" name="department_code"></div>
+  <div class="col-md-3"><label>Payroll Premium</label><input class="form-control" name="payroll_premium" type="number" step="0.01"></div>
+  <div class="col-md-4"><label>Personal Holder</label><input class="form-control" name="personal_holder"></div>
+
+  <div class="col-12 mt-3"><button class="btn btn-success">Create Application</button></div>
+</form>
+
+<script>
+const CURRENT_USER_IS_ADMIN = {{ "true" if current_user.role and current_user.role.name|lower == "admin" else "false" }};
+function formatDateDigits(digits){
+  digits = (digits || '').replace(/\D/g, '').slice(0, 8);
+  if(digits.length <= 2) return digits;
+  if(digits.length <= 4) return digits.slice(0,2) + '/' + digits.slice(2);
+  return digits.slice(0,2) + '/' + digits.slice(2,4) + '/' + digits.slice(4);
+}
+
+function formatDateInput(input){
+  input.value = formatDateDigits(input.value);
+}
+
+function dobFromIdDigits(v){
+  v = (v || '').replace(/\D/g,'');
+  if(v.length < 6) return '';
+  const yy = parseInt(v.substring(0,2),10);
+  const mm = v.substring(2,4);
+  const dd = v.substring(4,6);
+  const currentYY = new Date().getFullYear() % 100;
+  const century = yy > currentYY ? 1900 : 2000;
+  return dd + '/' + mm + '/' + (century + yy);
+}
+
+function fillDobFromId(idField, dobField){
+  const v = (document.getElementById(idField).value || '').replace(/\D/g,'');
+  if(v.length >= 6){
+    document.getElementById(dobField).value = dobFromIdDigits(v);
+  }
+}
+
+function isValidSaId(idNumber){
+  const digits = (idNumber || '').replace(/\D/g,'');
+  if(digits.length !== 13) return false;
+  const dob = dobFromIdDigits(digits);
+  const parts = dob.split('/');
+  const d = new Date(parseInt(parts[2],10), parseInt(parts[1],10)-1, parseInt(parts[0],10));
+  if(d.getFullYear() !== parseInt(parts[2],10) || d.getMonth() !== parseInt(parts[1],10)-1 || d.getDate() !== parseInt(parts[0],10)) return false;
+  let total = 0;
+  for(let i=0; i<13; i++){
+    let n = parseInt(digits[i], 10);
+    if(i % 2 === 0) total += n;
+    else { n *= 2; total += n > 9 ? n - 9 : n; }
+  }
+  return total % 10 === 0;
+}
+
+function validateSaIdField(input){
+  input.value = (input.value || '').replace(/\D/g,'').slice(0,13);
+  if(input.value.length === 13 && !isValidSaId(input.value)){
+    input.setCustomValidity('Invalid South African ID number');
+  } else {
+    input.setCustomValidity('');
+  }
+}
+
+function formatIdOrDobInput(input){
+  const digits = (input.value || '').replace(/\D/g,'');
+  if(digits.length === 13){
+    input.value = digits;
+    input.setCustomValidity(isValidSaId(digits) ? '' : 'Invalid South African ID number');
+  } else if(digits.length > 0 && digits.length <= 8){
+    input.value = formatDateDigits(digits);
+    input.setCustomValidity('');
+  } else {
+    input.setCustomValidity('');
+  }
+}
+
+function classifyPolicy(text){
+  text = (text || '').toLowerCase();
+  if(text.includes('member +') || (text.includes('product') && (text.includes('+') || text.includes('member')))) return 'member_product';
+  if(text.includes('single')) return 'single';
+  return 'family';
+}
+
+function setSectionEnabled(section, enabled){
+  section.style.display = enabled ? '' : 'none';
+  section.querySelectorAll('input, select, textarea').forEach(el => {
+    el.disabled = !enabled;
+    if(!enabled) el.value = '';
+  });
+}
+
+function ageFromDob(value){
+  const digits = (value || '').replace(/\D/g,'');
+  if(digits.length !== 8) return null;
+  const dd = parseInt(digits.slice(0,2), 10);
+  const mm = parseInt(digits.slice(2,4), 10) - 1;
+  const yyyy = parseInt(digits.slice(4,8), 10);
+  const born = new Date(yyyy, mm, dd);
+  if(born.getFullYear() !== yyyy || born.getMonth() !== mm || born.getDate() !== dd) return null;
+  const today = new Date();
+  let age = today.getFullYear() - yyyy;
+  if(today.getMonth() < mm || (today.getMonth() === mm && today.getDate() < dd)) age--;
+  return age;
+}
+
+function checkAgeLimits(){
+  const sel = document.getElementById('product_id');
+  const opt = sel.options[sel.selectedIndex];
+  const minAge = opt.dataset.minAge ? parseInt(opt.dataset.minAge, 10) : null;
+  const maxAge = opt.dataset.maxAge ? parseInt(opt.dataset.maxAge, 10) : null;
+  const fields = [document.getElementById('date_of_birth'), document.getElementById('spouse_date_of_birth')].filter(Boolean);
+  fields.forEach(field => {
+    const age = ageFromDob(field.value);
+    let msg = '';
+    if(age !== null && minAge !== null && age < minAge) msg = 'Age is below this policy minimum of ' + minAge;
+    if(age !== null && maxAge !== null && age > maxAge) msg = 'Age is above this policy maximum of ' + maxAge;
+    field.setCustomValidity(msg);
+  });
+}
+
+function policyChanged(){
+  const sel = document.getElementById('product_id');
+  const opt = sel.options[sel.selectedIndex];
+  const name = (opt.dataset.name || opt.textContent || '').trim();
+  const type = classifyPolicy(name);
+  const premium = opt.dataset.premium || '';
+  const cover = opt.dataset.cover || '';
+  document.getElementById('display_premium').value = premium;
+  document.getElementById('display_cover').value = cover;
+
+  const totalPayment = document.getElementById('total_payment');
+  const extendedPremium = document.getElementById('extended_premium');
+  if(totalPayment && !CURRENT_USER_IS_ADMIN){
+    const extra = parseFloat((extendedPremium && extendedPremium.value) || '0') || 0;
+    const base = parseFloat(premium || '0') || 0;
+    totalPayment.value = (base + extra).toFixed(2);
+  }
+
+  const isMemberProduct = type === 'member_product';
+  const planBlock = document.getElementById('plan_choice_block');
+  const planChoice = document.getElementById('plan_choice');
+  if(planBlock && planChoice){
+    planBlock.style.display = isMemberProduct ? '' : 'none';
+    planChoice.disabled = !isMemberProduct;
+    planChoice.value = isMemberProduct ? name : '';
+  }
+
+  setSectionEnabled(document.getElementById('family_fields'), !isMemberProduct && type === 'family');
+  setSectionEnabled(document.getElementById('extended_family_fields'), !isMemberProduct && type === 'family');
+  setSectionEnabled(document.getElementById('member_product_fields'), isMemberProduct);
+  checkAgeLimits();
+}
+
+document.addEventListener('input', function(e){
+  if(e.target && ['date_of_birth','spouse_date_of_birth'].includes(e.target.id)) checkAgeLimits();
+});
+
+let map, marker;
+function initMap(){
+  const defaultPos = {lat:-26.143, lng:27.775};
+  map = new google.maps.Map(document.getElementById('map'), {zoom:12, center: defaultPos});
+  marker = new google.maps.Marker({map, position: defaultPos});
+  const input = document.getElementById('residential_address');
+  const autocomplete = new google.maps.places.Autocomplete(input, {componentRestrictions:{country:'za'}, fields:['formatted_address','geometry','place_id','address_components']});
+  autocomplete.addListener('place_changed', () => {
+    const place = autocomplete.getPlace();
+    if(!place.geometry) return;
+    input.value = place.formatted_address || input.value;
+    document.getElementById('address_place_id').value = place.place_id || '';
+    document.getElementById('address_lat').value = place.geometry.location.lat();
+    document.getElementById('address_lng').value = place.geometry.location.lng();
+    map.setCenter(place.geometry.location);
+    map.setZoom(15);
+    marker.setPosition(place.geometry.location);
+    let postal = '';
+    (place.address_components || []).forEach(c => {
+      if(c.types.includes('postal_code')) postal = c.long_name;
+    });
+    if(postal) document.getElementById('residential_postal_code').value = postal;
+  });
+}
+
+function saIdValid(value){
+  const d=(value||'').replace(/\D/g,'');
+  if(d.length!==13) return false;
+  const yy=parseInt(d.slice(0,2),10), mm=parseInt(d.slice(2,4),10), dd=parseInt(d.slice(4,6),10);
+  const currentYY=(new Date()).getFullYear()%100;
+  const yyyy=(yy>currentYY?1900:2000)+yy;
+  const date=new Date(yyyy, mm-1, dd);
+  if(date.getFullYear()!==yyyy || date.getMonth()!==mm-1 || date.getDate()!==dd) return false;
+  let odd=0; for(let i=0;i<12;i+=2) odd += parseInt(d[i],10);
+  const evenStr=d[1]+d[3]+d[5]+d[7]+d[9]+d[11];
+  const evenSum=String(parseInt(evenStr,10)*2).split('').reduce((a,b)=>a+parseInt(b,10),0);
+  const check=(10-((odd+evenSum)%10))%10;
+  return check===parseInt(d[12],10);
+}
+isValidSaId = saIdValid;
+function toggleBankRules(){
+  const pm=document.getElementById('payment_method');
+  const debit=pm && (pm.value||'').toLowerCase().includes('debit');
+  document.querySelectorAll('.bank-field').forEach(el=>{
+    el.required=!!debit;
+    el.closest('div').style.opacity=debit ? '1' : '0.65';
+  });
+  const note=document.getElementById('bank_verification_note');
+  if(note){ note.className='alert py-2 '+(debit?'alert-warning':'alert-info'); note.textContent=debit?'Debit Order selected: bank details and bank verification are compulsory.':'Bank verification is not required unless Debit Order is selected.'; }
+}
+function policyRulesBlock(){
+  const sel=document.getElementById('product_id');
+  if(!sel) return;
+  const opt=sel.options[sel.selectedIndex];
+  const text=(opt.dataset.name||opt.textContent||'').toLowerCase();
+  const memberProduct=text.includes('member +') || text.includes('member+') || (text.includes('product') && (text.includes('+') || text.includes('member')));
+  const family=document.getElementById('family_fields');
+  const extended=document.getElementById('extended_family_fields');
+  const productDeps=document.getElementById('member_product_fields');
+  if(family) setSectionEnabled(family, !memberProduct && !text.includes('single'));
+  if(extended) setSectionEnabled(extended, !memberProduct && !text.includes('single'));
+  if(productDeps) setSectionEnabled(productDeps, memberProduct);
+  const planBlock=document.getElementById('plan_choice_block');
+  const planChoice=document.getElementById('plan_choice');
+  if(planBlock && planChoice){ planBlock.style.display=memberProduct?'':'none'; planChoice.disabled=!memberProduct; planChoice.value=memberProduct?(opt.dataset.name||opt.textContent||'').trim():''; }
+}
+
+document.addEventListener('DOMContentLoaded', function(){ policyChanged(); toggleBankRules(); policyRulesBlock(); const ep=document.getElementById('extended_premium'); if(ep){ ep.addEventListener('input', policyChanged); } });
+</script>
+{% if google_maps_api_key %}
+<script async defer src="https://maps.googleapis.com/maps/api/js?key={{google_maps_api_key}}&libraries=places&callback=initMap"></script>
+{% else %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const m=document.getElementById('map');
+  if(m){m.innerHTML='<div class="p-3 text-muted">Google Maps disabled. Add GOOGLE_MAPS_API_KEY in Render to enable address autocomplete and heat point.</div>'}
+});
+</script>
+{% endif %}
+
+{% endblock %}

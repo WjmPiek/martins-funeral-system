@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div><h3 class="mb-0">QA / Compliance Dashboard</h3><small class="text-muted">Phase 4 approval queues, FICA review and recent QA decisions</small></div>
+  <form method="get" class="d-flex gap-2"><select name="branch" class="form-select"><option value="">All branches</option>{% for b in branches %}<option value="{{ b }}" {% if active_branch == b %}selected{% endif %}>{{ b }}</option>{% endfor %}</select><button class="btn btn-primary">Filter</button></form>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-md"><div class="card"><div class="card-body"><h6>QA Pending</h6><h2>{{ stats.qa_pending }}</h2></div></div></div>
+  <div class="col-md"><div class="card"><div class="card-body"><h6>Signed Pending</h6><h2>{{ stats.signed_pending }}</h2></div></div></div>
+  <div class="col-md"><div class="card"><div class="card-body"><h6>FICA To Review</h6><h2>{{ stats.fica_to_review }}</h2></div></div></div>
+  <div class="col-md"><div class="card"><div class="card-body"><h6>Approved Today</h6><h2>{{ stats.approved_today }}</h2></div></div></div>
+  <div class="col-md"><div class="card"><div class="card-body"><h6>Rejected Today</h6><h2>{{ stats.rejected_today }}</h2></div></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3"><div class="card-header"><strong>Applications needing QA</strong></div><div class="card-body p-0"><table class="table table-sm table-striped mb-0"><tr><th>Reference</th><th>Client</th><th>Branch</th><th>Status</th><th>Action</th></tr>{% for app in qa_apps %}<tr><td>{{ app.application_ref }}</td><td>{{ app.first_names }} {{ app.surname }}</td><td>{{ app.branch or '-' }}</td><td>{{ app.status }}</td><td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('qa.review_application', app_id=app.id) }}">Review</a></td></tr>{% else %}<tr><td colspan="5" class="text-muted">No QA applications found.</td></tr>{% endfor %}</table></div></div>
+    <div class="card"><div class="card-header"><strong>Signed applications awaiting final decision</strong></div><div class="card-body p-0"><table class="table table-sm mb-0"><tr><th>Reference</th><th>Client</th><th>Signed</th><th>Action</th></tr>{% for app in signed_apps %}<tr><td>{{ app.application_ref }}</td><td>{{ app.first_names }} {{ app.surname }}</td><td>{{ app.signed_at }}</td><td><a class="btn btn-sm btn-success" href="{{ url_for('qa.review_application', app_id=app.id) }}">Final QA</a></td></tr>{% else %}<tr><td colspan="4" class="text-muted">No signed applications waiting.</td></tr>{% endfor %}</table></div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card mb-3"><div class="card-header"><strong>FICA received</strong></div><ul class="list-group list-group-flush">{% for doc in fica_docs %}<li class="list-group-item"><div><a href="{{ url_for('qa.review_application', app_id=doc.application_id) }}">{{ doc.document_type|replace('_',' ')|title }}</a></div><small>{{ doc.original_filename }}</small><div class="mt-2 d-flex gap-2"><form method="post" action="{{ url_for('qa.review_fica', doc_id=doc.id, decision='approve') }}"><button class="btn btn-sm btn-outline-success">Approve</button></form><form method="post" action="{{ url_for('qa.review_fica', doc_id=doc.id, decision='reject') }}"><button class="btn btn-sm btn-outline-danger">Reject</button></form></div></li>{% else %}<li class="list-group-item text-muted">None</li>{% endfor %}</ul></div>
+    <div class="card"><div class="card-header"><strong>Recent reviews</strong></div><ul class="list-group list-group-flush">{% for r in recent_reviews %}<li class="list-group-item"><strong>{{ r.decision }}</strong> - {{ r.score }}%<br><small>{{ r.application.application_ref if r.application else '' }} by {{ r.reviewer.name if r.reviewer else '' }}</small></li>{% else %}<li class="list-group-item text-muted">No reviews yet.</li>{% endfor %}</ul></div>
+  </div>
+</div>
+{% endblock %}

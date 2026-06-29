@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+  <div>
+    <h2 class="mb-1">Security Center</h2>
+    <p class="text-muted mb-0">Production readiness, login activity, and inactive users.</p>
+  </div>
+</div>
+
+<div class="row g-4 align-items-start">
+  <div class="col-12 col-xl-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h4 class="mb-3">Production Checklist</h4>
+        <div class="security-checklist">
+          {% for item in checklist %}
+          <div class="checklist-row {% if item.done %}is-ok{% else %}needs-action{% endif %}">
+            <div class="checklist-main">
+              <div class="checklist-title">{{ item.label }}</div>
+              <div class="checklist-detail">{{ item.detail }}</div>
+            </div>
+            <div class="checklist-actions">
+              <span class="status-pill {% if item.done %}status-ok{% else %}status-warning{% endif %}">{{ 'OK' if item.done else 'Needs action' }}</span>
+              {% if item.actionable %}
+                {% if item.done %}
+                <form method="post" action="{{ url_for('security_center.reset_checklist_item', key=item.key) }}">
+                  <button class="btn btn-sm btn-outline-secondary" type="submit">Reset</button>
+                </form>
+                {% else %}
+                <form method="post" action="{{ url_for('security_center.complete_checklist_item', key=item.key) }}">
+                  <button class="btn btn-sm btn-primary" type="submit">Mark done</button>
+                </form>
+                {% endif %}
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h4 class="mb-3">Recent Login Attempts</h4>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle responsive-table">
+            <thead><tr><th>Date</th><th>Email</th><th>IP</th><th>Success</th><th>Reason</th></tr></thead>
+            <tbody>
+            {% for a in attempts %}
+              <tr><td data-label="Date">{{ a.created_at }}</td><td data-label="Email">{{ a.email }}</td><td data-label="IP">{{ a.ip_address }}</td><td data-label="Success">{{ 'Yes' if a.success else 'No' }}</td><td data-label="Reason">{{ a.reason }}</td></tr>
+            {% else %}
+              <tr><td colspan="5" class="text-muted">No login attempts found for the last 7 days.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mt-4">
+  <div class="card-body">
+    <h4 class="mb-3">Inactive Users</h4>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle responsive-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Branch</th></tr></thead>
+        <tbody>
+        {% for u in inactive_users %}
+          <tr><td data-label="Name">{{ u.name }}</td><td data-label="Email">{{ u.email }}</td><td data-label="Branch">{{ u.branch }}</td></tr>
+        {% else %}
+          <tr><td colspan="3" class="text-muted">No inactive users.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

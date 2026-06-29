@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>User / Agent Management</h3>
+<p class="text-muted">Super Admin is wjm@martinsdirect.com. Admin can add, view and permanently delete any non-admin user. Branch Managers can add and view Agents only in their own branch. Agents can only see their own allocated details.</p>
+<div class="alert alert-warning small mb-3"><strong>Protected rule:</strong> Super Admin and Admin accounts cannot be edited, deleted, downgraded, or reassigned from this screen. Permanent deletes reassign all linked history to Super Admin.</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-bold">Create new user</div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('auth.users_create') }}" class="row g-3">
+      <div class="col-md-2"><label class="form-label">Name</label><input class="form-control" name="name" required></div>
+      <div class="col-md-3"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required></div>
+      <div class="col-md-2"><label class="form-label">Phone</label><input class="form-control" name="phone"></div>
+      <div class="col-md-2"><label class="form-label">Role</label><select class="form-select" name="role_id" required>{% for role in allowed_roles %}<option value="{{ role.id }}">{{ role.name }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><label class="form-label">Branch</label>{% set role=(current_user.role.name|lower if current_user.role else '') %}{% if role in ['admin','super admin','super_admin'] %}<input class="form-control" name="branch" list="branches" required>{% else %}<input class="form-control" name="branch" value="{{ current_user.branch }}" readonly required>{% endif %}</div>
+      <div class="col-md-1"><label class="form-label">Password</label><input class="form-control" type="password" name="password" required></div>
+      <div class="col-12"><button class="btn btn-primary">Create user</button></div>
+    </form>
+  </div>
+</div>
+
+<datalist id="branches">{% for branch in branches %}<option value="{{ branch }}">{% endfor %}</datalist>
+
+<div class="card shadow-sm">
+  <div class="card-header fw-bold">Existing users</div>
+  <div class="table-responsive">
+    <table class="table table-striped table-hover mb-0 align-middle">
+      <thead><tr><th>Name</th><th>Email</th><th>Branch</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        {% set urole=(u.role.name|lower if u.role else '') %}
+        {% set protected=(urole in ['admin','super admin','super_admin'] or u.email|lower == 'wjm@martinsdirect.com') %}
+        <tr>
+          <td>{{ u.name }}</td>
+          <td>{{ u.email }}</td>
+          <td>{{ u.branch or '' }}</td>
+          <td>{% if protected %}<span class="badge bg-dark">{{ 'Super Admin' if u.email|lower == 'wjm@martinsdirect.com' else 'Admin' }} - protected</span>{% else %}{{ u.role.name if u.role else 'Pending' }}{% endif %}</td>
+          <td>{% if u.active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-warning text-dark">Inactive/Pending</span>{% endif %}</td>
+          <td style="min-width:620px">
+            {% if protected %}
+              <span class="text-muted small">Locked: Super Admin/Admin accounts cannot be edited or deleted.</span>
+            {% else %}
+              <form method="post" action="{{ url_for('auth.users_update', user_id=u.id) }}" class="row g-2 align-items-center">
+                <div class="col-md-2"><input name="name" class="form-control form-control-sm" value="{{ u.name }}" required></div>
+                <div class="col-md-2"><input name="phone" class="form-control form-control-sm" value="{{ u.work_tel or '' }}" placeholder="Phone"></div>
+                <div class="col-md-2"><select name="role_id" class="form-select form-select-sm" required>{% for role in allowed_roles %}<option value="{{ role.id }}" {% if u.role and u.role.id==role.id %}selected{% endif %}>{{ role.name }}</option>{% endfor %}</select></div>
+                <div class="col-md-2">{% if role in ['admin','super admin','super_admin'] %}<input name="branch" class="form-control form-control-sm" list="branches" value="{{ u.branch or '' }}" required>{% else %}<input name="branch" class="form-control form-control-sm" value="{{ current_user.branch }}" readonly required>{% endif %}</div>
+                <div class="col-md-1"><select name="active" class="form-select form-select-sm"><option value="1" {% if u.active %}selected{% endif %}>Active</option><option value="0" {% if not u.active %}selected{% endif %}>Inactive</option></select></div>
+                <div class="col-md-2"><input name="new_password" type="password" class="form-control form-control-sm" placeholder="New password"></div>
+                <div class="col-md-1"><button class="btn btn-success btn-sm w-100">Save</button></div>
+              </form>
+              {% if (current_user.role.name|lower if current_user.role else '') in ['admin','super admin','super_admin'] %}
+              <form method="post" action="{{ url_for('auth.users_delete', user_id=u.id) }}" class="d-inline" onsubmit="return confirm('Permanently delete this user? This cannot be undone. All linked history will move to Super Admin.')">
+                <button class="btn btn-outline-danger btn-sm mt-2">Permanent delete</button>
+              </form>
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="text-muted text-center py-4">No users found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

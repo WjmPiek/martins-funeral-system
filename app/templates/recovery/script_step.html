@@ -1,0 +1,226 @@
+{% extends 'base.html' %}{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>TELESALES FUNERAL COVER SALES SCRIPT</h3>
+  <span class="badge bg-primary">Step {{step.id}} of {{total_steps}}</span>
+</div>
+<div class="progress mb-3"><div class="progress-bar" style="width: {{progress}}%"></div></div>
+<div class="row">
+  <div class="col-md-4">
+    <div class="card mb-3"><div class="card-header"><b>Client Details</b></div><div class="card-body small">
+      <p><b>Client:</b> {{session.client_name}}</p>
+      <p><b>Cell:</b> {{session.client_cell}}</p>
+      <p><b>Old Policy:</b> {{session.policy_number}}</p>
+      <p><b>Agent:</b> {{current_user.name}}</p>
+      <p><b>ID Number:</b> {{client_id_number or 'Not captured yet'}}</p>
+      <p><b>Calculated Age:</b> {{client_age if client_age is not none else 'Not available'}}</p>
+      <p><b>QA Ref:</b> {{step.qa}}</p>
+      {% if selected_product and step.id in [17,18,24,25] %}
+      <hr>
+      <p><b>Selected Policy:</b><br>{{selected_product.product_name}} / {{selected_product.plan_name}}</p>
+      <p><b>Premium:</b> R {{'%.2f'|format(selected_product.monthly_premium or 0)}}</p>
+      <p><b>Cover:</b> R {{'%.2f'|format(selected_product.cover_amount or 0)}}</p>
+      {% endif %}
+      {% if selected_payment %}<p><b>Payment:</b> {{selected_payment}}</p>{% endif %}
+    </div></div>
+    <div class="card"><div class="card-header"><b>Agent Tip</b></div><div class="card-body small">
+      Read one block at a time. Pause for the client to answer before clicking the response button.
+    </div></div>
+  </div>
+  <div class="col-md-8">
+    <div class="card shadow-sm">
+      <div class="card-header bg-dark text-white"><b>{{step.id}}. {{step.title}}</b></div>
+      <div class="card-body">
+        <h5 class="mb-3">Agent must say:</h5>
+        <div class="mb-4">
+          {% for block in spoken_text.split('\n\n') %}
+            {% if block.strip() %}
+              <div class="p-3 mb-2 rounded border bg-light" style="font-size:1.08rem; line-height:1.55; white-space:pre-wrap;">{{ block.strip() }}</div>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        {% if step.id == 25 %}
+        <div class="card border-primary mb-3">
+          <div class="card-header bg-primary text-white"><b>Confirm client, members and selected policy</b></div>
+          <div class="card-body">
+            <h6>Client Details</h6>
+            <div class="row small">
+              <div class="col-md-6"><b>Full names / Surname:</b><br>{{session.client_name}}</div>
+              <div class="col-md-6"><b>ID Number:</b><br>{{client_id_number or 'Confirm on application screen'}}</div>
+              <div class="col-md-6 mt-2"><b>Date of birth / Age:</b><br>{{client_age if client_age is not none else 'Confirm on application screen'}}</div>
+              <div class="col-md-6 mt-2"><b>Contact number:</b><br>{{session.client_cell}}</div>
+              <div class="col-md-6 mt-2"><b>Old policy number:</b><br>{{session.policy_number}}</div>
+              <div class="col-md-6 mt-2"><b>Address:</b><br>{{session.lapsed_policy.address if session.lapsed_policy else ''}}</div>
+            </div>
+            <hr>
+            <h6>Members on Product</h6>
+            {% if existing_members %}
+              <ul class="small">{% for m in existing_members %}<li><b>{{m.role}}:</b> {{m.name}} {% if m.id %}({{m.id}}){% endif %}</li>{% endfor %}</ul>
+            {% else %}
+              <p class="small text-muted">No existing member rows were imported for this lapsed policy.</p>
+            {% endif %}
+            {% if selected_product %}
+              <hr>
+              <h6>Selected Product and Benefits</h6>
+              <p><b>Product:</b> {{selected_product.product_name}} / {{selected_product.plan_name}}</p>
+              <p><b>Premium:</b> R {{'%.2f'|format(selected_product.monthly_premium or 0)}} | <b>Cover:</b> R {{'%.2f'|format(selected_product.cover_amount or 0)}}</p>
+              {% if script_payload.additional_benefits %}<p><b>Additional Benefits:</b> {{script_payload.additional_benefits}}</p>{% endif %}
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if step.id == 26 %}
+        <div class="card border-info mb-3">
+          <div class="card-header bg-info text-white"><b>Beneficiary details to confirm</b></div>
+          <div class="card-body small">
+            <p><b>Beneficiary Name:</b> Capture/confirm on application screen if not available from lapse data.</p>
+            <p><b>Beneficiary Contact Number:</b> Capture/confirm on application screen.</p>
+            <p><b>Relationship:</b> Capture/confirm on application screen.</p>
+          </div>
+        </div>
+        {% endif %}
+        {% if step.id == 27 %}
+        <div class="card border-warning mb-3">
+          <div class="card-header bg-warning"><b>Debit order details</b></div>
+          <div class="card-body small">
+            {% if selected_payment == 'Debit Order' %}
+              <p>Confirm account holder, bank, account number, branch code, account type and debit date on the application screen.</p>
+            {% else %}
+              <p>Debit order details are not required because the selected payment method is {{selected_payment or 'not Debit Order'}}.</p>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+        <h5>Question / Confirmation</h5>
+        <div class="alert alert-info">{{step.question}}</div>
+        <form method="post">
+          {% if step.id == 9 %}
+            <div class="alert alert-light border">
+              <b>Product filtering:</b> the system uses the client's SA ID number to calculate age and only list products in the correct age range.
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">Client ID Number</label>
+                <input class="form-control" name="client_id_number" value="{{client_id_number or ''}}" maxlength="13" placeholder="Enter SA ID number if not imported">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Calculated Age</label>
+                <input class="form-control" type="number" name="client_age" value="{{client_age or ''}}" placeholder="Auto-calculated from ID where available" readonly>
+              </div>
+            </div>
+            <label class="form-label"><b>Who would the client like to cover?</b></label>
+            <div class="row g-2 mb-3">
+              <div class="col-md-6"><button class="btn btn-outline-primary w-100" name="coverage_choice" value="myself_only">Myself only</button></div>
+              <div class="col-md-6"><button class="btn btn-outline-primary w-100" name="coverage_choice" value="myself_spouse">Myself and spouse</button></div>
+              <div class="col-md-6"><button class="btn btn-outline-primary w-100" name="coverage_choice" value="myself_spouse_children">Myself, wife/spouse and children</button></div>
+              <div class="col-md-6"><button class="btn btn-outline-primary w-100" name="coverage_choice" value="extended_family">Extended family</button></div>
+            </div>
+            <textarea class="form-control mb-3" name="note" rows="2" placeholder="Optional notes / client comments"></textarea>
+            <input type="hidden" name="answer" value="yes">
+          {% elif step.id == 11 %}
+            <div class="alert alert-secondary">Available policies are filtered by the selected cover type and client age where available.</div>
+            <div class="list-group mb-3">
+              {% for prod in products %}
+              <label class="list-group-item">
+                <input class="form-check-input me-2" type="radio" name="product_id" value="{{prod.id}}" {% if selected_product and selected_product.id == prod.id %}checked{% endif %} required>
+                <b>{{prod.product_name}} / {{prod.plan_name}}</b><br>
+                <span class="small">Premium: R {{'%.2f'|format(prod.monthly_premium or 0)}} | Cover: R {{'%.2f'|format(prod.cover_amount or 0)}} | Age: {{prod.min_age or '0'}} - {{prod.max_age or 'No max'}} | Waiting: {{prod.waiting_period_months or 0}} months</span>
+              </label>
+              {% else %}
+              <div class="alert alert-warning">No active products matched the selected criteria. Check policy import/product rules.</div>
+              {% endfor %}
+            </div>
+            <textarea class="form-control mb-3" name="note" rows="2" placeholder="Optional notes / client comments"></textarea>
+            <button class="btn btn-success btn-lg" name="answer" value="yes">Select Policy and Continue</button>
+          {% elif step.id == 12 %}
+            {% if selected_product %}
+              <div class="alert alert-secondary">
+                <b>Premium to confirm:</b> R {{'%.2f'|format(selected_product.monthly_premium or 0)}}
+              </div>
+            {% endif %}
+            <textarea class="form-control mb-3" name="note" rows="2" placeholder="Optional notes / client comments"></textarea>
+            <button class="btn btn-success btn-lg" name="answer" value="yes">Yes - Affordable</button>
+            <button class="btn btn-warning btn-lg" name="answer" value="no">No - Show Other Products</button>
+          {% elif step.id == 16 %}
+            <label class="form-label"><b>Additional benefits selected, if any</b></label>
+            <textarea class="form-control mb-3" name="additional_benefits" rows="3" placeholder="Example: Repatriation, grocery benefit, airtime benefit. Leave blank if none."></textarea>
+            <textarea class="form-control mb-3" name="note" rows="2" placeholder="Optional notes / client comments"></textarea>
+            <button class="btn btn-success btn-lg" name="answer" value="yes">Continue</button>
+          {% elif step.id == 17 %}
+            <div class="card border-success mb-3">
+              <div class="card-header bg-success text-white"><b>Confirm selected cover with client</b></div>
+              <div class="card-body">
+                {% if selected_product %}
+                  <p><b>Plan:</b> {{selected_product.product_name}} / {{selected_product.plan_name}}</p>
+                  <p><b>Main Member Cover:</b> R {{'%.2f'|format(selected_product.cover_amount or 0)}}</p>
+                  <p><b>Monthly Premium:</b> R {{'%.2f'|format(selected_product.monthly_premium or 0)}}</p>
+                  <p><b>Waiting Period:</b> {{selected_product.waiting_period_months or 0}} months</p>
+                {% else %}
+                  <div class="alert alert-warning">No product selected yet.</div>
+                {% endif %}
+              </div>
+            </div>
+            <textarea class="form-control mb-3" name="note" rows="2" placeholder="Optional notes / client comments"></textarea>
+            <button class="btn btn-success btn-lg" name="answer" value="yes">Confirm and Continue</button>
+            <button class="btn btn-outline-secondary btn-lg" name="go_to_step" value="11">Edit Product</button>
+          {% elif step.id == 19 %}
+            <label class="form-label"><b>Select payment method</b></label>
+            <div class="row g-2 mb-3">
+              <div class="col-md-4"><button class="btn btn-outline-success w-100" name="payment_method" value="Cash">Cash</button></div>
+              <div class="col-md-4"><button class="btn btn-outline-success w-100" name="payment_method" value="Debit Order">Debit Order</button></div>
+              <div class="col-md-4"><button class="btn btn-outline-success w-100" name="payment_method" value="Stop Order">Stop Order</button></div>
+            </div>
+            <textarea class="form-control mb-3" name="note" rows="2" placeholder="Optional notes / client comments"></textarea>
+            <input type="hidden" name="answer" value="yes">
+          {% elif step.id == 26 %}
+            <div class="alert alert-light border">
+              <b>Confirm beneficiary details with the client.</b> These details will pull through to the application documents.
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-md-5"><label class="form-label">Beneficiary Name</label><input class="form-control" name="beneficiary_name" value="{{selected_beneficiary.name}}"></div>
+              <div class="col-md-4"><label class="form-label">Beneficiary Contact Number</label><input class="form-control" name="beneficiary_contact" value="{{selected_beneficiary.contact}}"></div>
+              <div class="col-md-3"><label class="form-label">Relationship</label><input class="form-control" name="beneficiary_relationship" value="{{selected_beneficiary.relationship}}"></div>
+            </div>
+            <textarea class="form-control mb-3" name="note" rows="2" placeholder="Optional notes / client comments"></textarea>
+            <button class="btn btn-success btn-lg" name="answer" value="yes">Beneficiary Confirmed</button>
+          {% elif step.id == 27 %}
+            {% if selected_payment == 'Debit Order' %}
+              <div class="alert alert-warning">Capture the debit order details that the agent must read back to the client.</div>
+              <div class="row g-2 mb-3">
+                <div class="col-md-4"><label class="form-label">Account Holder</label><input class="form-control" name="account_holder" value="{{selected_bank.account_holder}}"></div>
+                <div class="col-md-4"><label class="form-label">Bank Name</label><input class="form-control" name="bank_name" value="{{selected_bank.bank_name}}"></div>
+                <div class="col-md-4"><label class="form-label">Account Number</label><input class="form-control" name="account_number" value="{{selected_bank.account_number}}"></div>
+                <div class="col-md-4"><label class="form-label">Branch Code</label><input class="form-control" name="branch_code" value="{{selected_bank.branch_code}}"></div>
+                <div class="col-md-4"><label class="form-label">Account Type</label><input class="form-control" name="account_type" value="{{selected_bank.account_type}}"></div>
+                <div class="col-md-4"><label class="form-label">Debit Day</label><input class="form-control" name="debit_day" value="{{selected_bank.debit_day}}"></div>
+              </div>
+            {% else %}
+              <div class="alert alert-info">Debit order details are not required because payment method is {{selected_payment or 'not Debit Order'}}.</div>
+            {% endif %}
+            <textarea class="form-control mb-3" name="note" rows="2" placeholder="Optional notes / client comments"></textarea>
+            <button class="btn btn-success btn-lg" name="answer" value="yes">Continue</button>
+          {% elif step.id == 31 %}
+            <label class="form-label"><b>How must the signing documents be sent?</b></label>
+            <div class="row g-2 mb-3">
+              <div class="col-md-4"><button class="btn btn-outline-primary w-100" name="delivery_method" value="email">Email</button></div>
+              <div class="col-md-4"><button class="btn btn-outline-primary w-100" name="delivery_method" value="whatsapp">WhatsApp</button></div>
+              <div class="col-md-4"><button class="btn btn-outline-primary w-100" name="delivery_method" value="sms">SMS</button></div>
+            </div>
+            <textarea class="form-control mb-3" name="note" rows="2" placeholder="Optional notes / client comments"></textarea>
+            <input type="hidden" name="answer" value="yes">
+          {% else %}
+            <textarea class="form-control mb-3" name="note" rows="2" placeholder="Optional notes / client comments"></textarea>
+            <button class="btn btn-success btn-lg" name="answer" value="yes">Yes - Continue</button>
+            {% if step.block_on_no %}
+            <button class="btn btn-danger btn-lg" name="answer" value="no">No - Stop Call</button>
+            {% else %}
+            <button class="btn btn-warning btn-lg" name="answer" value="no">No / Not Applicable</button>
+            {% endif %}
+          {% endif %}
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block content %}
+<h1>Agent Portal</h1>
+<p class="text-muted">Your clients, callbacks and applications only.</p>
+{% set agent_args = {'agent_id': active_agent.id} if active_agent else {} %}
+<div class="d-grid gap-2 mb-3"><a class="btn btn-success btn-lg" href="{{ url_for('recovery.next_client') }}">NEXT CLIENT</a></div>
+{% set card_links = {
+  'leads': url_for('role_portals.agent_activity', view='leads', **agent_args),
+  'calls_today': url_for('role_portals.agent_activity', view='calls_today', **agent_args),
+  'sales_today': url_for('role_portals.agent_activity', view='sales_today', **agent_args),
+  'callbacks_today': url_for('role_portals.agent_activity', view='callbacks_today', **agent_args),
+  'callbacks_overdue': url_for('role_portals.agent_activity', view='callbacks_overdue', **agent_args),
+  'pending_signatures': url_for('role_portals.agent_activity', view='pending_signatures', **agent_args),
+  'fica_outstanding': url_for('role_portals.agent_activity', view='fica_outstanding', **agent_args),
+  'qa_pending': url_for('role_portals.agent_activity', view='qa_pending', **agent_args)
+} %}
+{% set card_titles = {
+  'leads': 'Leads',
+  'calls_today': 'Calls Today',
+  'sales_today': 'Sales Today',
+  'callbacks_today': 'Callbacks Today',
+  'callbacks_overdue': 'Callbacks Overdue',
+  'pending_signatures': 'Pending Signatures',
+  'fica_outstanding': 'FICA Outstanding',
+  'qa_pending': 'QA Pending'
+} %}
+<div class="row g-3">
+  {% for k,v in stats.items() %}
+  <div class="col-md-3 col-sm-6">
+    <a class="portal-card-link text-decoration-none text-reset" href="{{ card_links.get(k, '#') }}" aria-label="Open {{ card_titles.get(k, k.replace('_',' ').title()) }}">
+      <div class="card action-card h-100 portal-stat-card">
+        <div class="card-body">
+          <div class="text-muted">{{ card_titles.get(k, k.replace('_',' ').title()) }}</div>
+          <h2>{{ v }}</h2>
+          <div class="small text-primary fw-semibold">Open details →</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+<hr><h3>My Callbacks</h3><div class="table-responsive"><table class="table table-sm responsive-table"><tr><th>Date</th><th>Client</th><th>Policy</th><th>Status</th><th></th></tr>{% for p in callbacks %}<tr><td data-label="Date">{{p.next_action_date}}</td><td data-label="Client">{{p.surname}} {{p.initials}}</td><td data-label="Policy">{{p.policy_number}}</td><td data-label="Status">{{p.recovery_status}}</td><td data-label="Open"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('recovery.log_call', policy_id=p.id) }}">Open</a></td></tr>{% endfor %}</table></div>
+<h3>My Applications</h3><div class="table-responsive"><table class="table table-sm responsive-table"><tr><th>Ref</th><th>Client</th><th>Status</th><th>Premium</th></tr>{% for a in my_apps %}<tr><td data-label="Ref"><a href="{{ url_for('applications.view_application', app_id=a.id) }}">{{a.application_ref}}</a></td><td data-label="Client">{{a.first_names}} {{a.surname}}</td><td data-label="Status">{{a.status}}</td><td data-label="Premium">{{a.monthly_premium}}</td></tr>{% endfor %}</table></div>
+{% endblock %}

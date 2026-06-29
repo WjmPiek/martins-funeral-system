@@ -1,0 +1,46 @@
+{% extends 'base.html' %}{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-0">Callback Worklist</h3>
+    <small class="text-muted">Phase 2: overdue, today and upcoming callbacks</small>
+  </div>
+  <a class="btn btn-success btn-lg" href="{{ url_for('recovery.next_client') }}">Next Client</a>
+</div>
+
+{% macro callback_table(title, policies, row_class='') %}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <b>{{ title }}</b>
+    <span class="badge bg-secondary">{{ policies|length }}</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm table-striped align-middle mb-0">
+      <tr>
+        <th>Due</th><th>Policy</th><th>Client</th><th>Cell</th><th>Branch</th><th>Status</th><th>Actions</th>
+      </tr>
+      {% for p in policies %}
+      <tr class="{{ row_class }}">
+        <td>{{ p.next_action_date or 'Not set' }}</td>
+        <td>{{ p.policy_number }}</td>
+        <td>{{ p.initials }} {{ p.surname }}</td>
+        <td>{{ p.cell_number }}</td>
+        <td>{{ p.branch or p.franchise }}</td>
+        <td><span class="badge bg-secondary">{{ p.recovery_status }}</span></td>
+        <td>
+          <a class="btn btn-sm btn-primary" href="{{ url_for('recovery.log_call', policy_id=p.id) }}">Call Now</a>
+          <a class="btn btn-sm btn-outline-dark" href="{{ url_for('recovery.client_timeline', policy_id=p.id) }}">Timeline</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-muted">Nothing in this section.</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endmacro %}
+
+{{ callback_table('Overdue callbacks', overdue, 'table-danger') }}
+{{ callback_table("Today's callbacks", due_today, 'table-warning') }}
+{{ callback_table('Upcoming callbacks', upcoming, '') }}
+{{ callback_table('Callbacks without a date', unscheduled, 'table-light') }}
+{% endblock %}

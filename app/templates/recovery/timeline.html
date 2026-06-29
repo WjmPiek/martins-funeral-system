@@ -1,0 +1,46 @@
+{% extends 'base.html' %}{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-0">Client Timeline</h3>
+    <small class="text-muted">{{ p.policy_number }} - {{ p.initials }} {{ p.surname }}</small>
+  </div>
+  <div>
+    <a class="btn btn-primary" href="{{ url_for('recovery.log_call', policy_id=p.id) }}">Call / Update</a>
+    <a class="btn btn-secondary" href="{{ url_for('recovery.queue') }}">Back to Queue</a>
+  </div>
+</div>
+
+<div class="row mb-3">
+  <div class="col-md-3"><div class="card"><div class="card-body"><b>Cell</b><br>{{ p.cell_number or '' }}</div></div></div>
+  <div class="col-md-3"><div class="card"><div class="card-body"><b>Status</b><br><span class="badge bg-secondary">{{ p.recovery_status }}</span></div></div></div>
+  <div class="col-md-3"><div class="card"><div class="card-body"><b>Next Action</b><br>{{ p.next_action_date or 'Not set' }}</div></div></div>
+  <div class="col-md-3"><div class="card"><div class="card-body"><b>Applications</b><br>{{ applications|length }}</div></div></div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header"><b>Client details</b></div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-4"><b>Branch / Franchise</b><br>{{ p.branch or p.franchise or '' }}</div>
+      <div class="col-md-4"><b>Premium Due</b><br>{{ p.premium_due }}</div>
+      <div class="col-md-4"><b>Total</b><br>{{ p.total }}</div>
+    </div>
+    {% if p.comments %}<hr><b>Original Comments</b><br>{{ p.comments }}{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><b>Full Timeline</b></div>
+  <div class="card-body">
+    {% for e in events %}
+      <div class="border-start border-3 ps-3 mb-3">
+        <div class="text-muted small">{{ e.when.strftime('%Y-%m-%d %H:%M') if e.when else '' }}{% if e.agent %} · {{ e.agent }}{% endif %}</div>
+        <div><span class="badge bg-dark">{{ e.type }}</span> <b>{{ e.title }}</b></div>
+        {% if e.details %}<div style="white-space: pre-line">{{ e.details }}</div>{% endif %}
+      </div>
+    {% else %}
+      <div class="text-muted">No timeline events found yet.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

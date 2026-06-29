@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1>{{ title }}</h1>
+    <p class="text-muted mb-0">Agent: {{ active_agent.name }}{% if active_agent.branch %} | Branch: {{ active_agent.branch }}{% endif %}</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('role_portals.agent_home', agent_id=active_agent.id) }}">Back to Agent Portal</a>
+</div>
+
+{% if leads %}
+<div class="table-responsive"><table class="table table-sm table-striped responsive-table">
+<tr><th>Policy</th><th>Client</th><th>Cell</th><th>Status</th><th>Next Action</th><th></th></tr>
+{% for p in leads %}<tr><td data-label="Policy">{{p.policy_number}}</td><td data-label="Client">{{p.initials}} {{p.surname}}</td><td data-label="Cell">{{p.cell_number}}</td><td data-label="Status">{{p.recovery_status}}</td><td data-label="Next Action">{{p.next_action_date or ''}}</td><td data-label="Open"><a class="btn btn-sm btn-primary" href="{{ url_for('recovery.log_call', policy_id=p.id) }}">Open</a></td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+{% if applications %}
+<div class="table-responsive"><table class="table table-sm table-striped responsive-table">
+<tr><th>Ref</th><th>Client</th><th>Status</th><th>Premium</th><th>Signed</th><th></th></tr>
+{% for a in applications %}<tr><td data-label="Ref">{{a.application_ref}}</td><td data-label="Client">{{a.first_names}} {{a.surname}}</td><td data-label="Status">{{a.status}}</td><td data-label="Premium">{{a.monthly_premium}}</td><td data-label="Signed">{{ 'Yes' if a.signed_at else 'No' }}</td><td data-label="Open"><a class="btn btn-sm btn-primary" href="{{ url_for('applications.view_application', app_id=a.id) }}">Open</a></td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+{% if calls %}
+<div class="table-responsive"><table class="table table-sm table-striped responsive-table">
+<tr><th>Date</th><th>Outcome</th><th>Notes</th><th>Next Action</th></tr>
+{% for c in calls %}<tr><td data-label="Date">{{c.created_at}}</td><td data-label="Outcome">{{c.outcome}}</td><td data-label="Notes">{{c.notes}}</td><td data-label="Next Action">{{c.next_action_date or ''}}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+{% if docs %}
+<div class="table-responsive"><table class="table table-sm table-striped responsive-table">
+<tr><th>Application</th><th>Document</th><th>Status</th><th>Uploaded</th><th></th></tr>
+{% for d in docs %}<tr><td data-label="Application">{{d.application.application_ref if d.application else ''}}</td><td data-label="Document">{{d.document_type}}</td><td data-label="Status">{{d.status}}</td><td data-label="Uploaded">{{d.uploaded_at}}</td><td data-label="Open">{% if d.application %}<a class="btn btn-sm btn-primary" href="{{ url_for('applications.view_application', app_id=d.application.id) }}">Open App</a>{% endif %}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+{% if scripts %}
+<div class="table-responsive"><table class="table table-sm table-striped responsive-table">
+<tr><th>Completed</th><th>Status</th><th>QA Result</th><th>Score</th><th></th></tr>
+{% for s in scripts %}<tr><td data-label="Completed">{{s.completed_at or s.created_at}}</td><td data-label="Status">{{s.status}}</td><td data-label="QA Result">{{s.qa_result or 'Pending'}}</td><td data-label="Score">{{s.qa_score if s.qa_score is not none else ''}}</td><td data-label="Open">{% if s.application_id %}<a class="btn btn-sm btn-primary" href="{{ url_for('applications.view_application', app_id=s.application_id) }}">Open App</a>{% elif s.lapsed_policy_id %}<a class="btn btn-sm btn-primary" href="{{ url_for('recovery.client_timeline', policy_id=s.lapsed_policy_id) }}">Timeline</a>{% endif %}</td></tr>{% endfor %}
+</table></div>
+{% endif %}
+
+{% if not leads and not applications and not calls and not docs and not scripts %}
+<div class="alert alert-info">No records found for this card.</div>
+{% endif %}
+{% endblock %}

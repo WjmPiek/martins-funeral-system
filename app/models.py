@@ -1,9 +1,7 @@
-from datetime import datetime, timezone
+from datetime import datetime, date
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-from flask import current_app
-from app.extensions import db, login_manager
+from app import db
 
 role_permissions = db.Table(
     "role_permissions",
@@ -11,730 +9,673 @@ role_permissions = db.Table(
     db.Column("permission_id", db.Integer, db.ForeignKey("permissions.id"), primary_key=True),
 )
 
-user_roles = db.Table(
-    "user_roles",
-    db.Column("user_id", db.Integer, db.ForeignKey("users.id"), primary_key=True),
-    db.Column("role_id", db.Integer, db.ForeignKey("roles.id"), primary_key=True),
-)
-
-
-user_franchises = db.Table(
-    "user_franchises",
-    db.Column("user_id", db.Integer, db.ForeignKey("users.id"), primary_key=True),
-    db.Column("franchise_id", db.Integer, db.ForeignKey("franchises.id"), primary_key=True),
-    db.Column("is_primary", db.Boolean, default=False, nullable=False),
-)
 class Role(db.Model):
     __tablename__ = "roles"
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), unique=True, nullable=False)
+    name = db.Column(db.String(80), unique=True, nullable=False)
     description = db.Column(db.String(255))
-    is_system_role = db.Column(db.Boolean, nullable=False, default=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    permissions = db.relationship("Permission", secondary=role_permissions, lazy="subquery", backref=db.backref("roles", lazy=True))
-
-    def has_permission(self, code):
-        # The Role Permissions screen is the single source of truth for every role,
-        # including Admin. If a permission is unticked, that role no longer has it.
-        return any(permission.code == code for permission in self.permissions)
+    permissions = db.relationship("Permission", secondary=role_permissions, backref="roles")
 
 class Permission(db.Model):
     __tablename__ = "permissions"
     id = db.Column(db.Integer, primary_key=True)
-    module = db.Column(db.String(120), nullable=False, index=True)
-    action = db.Column(db.String(50), nullable=False, index=True)
-    code = db.Column(db.String(160), unique=True, nullable=False, index=True)
-    label = db.Column(db.String(160), nullable=False)
-    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    code = db.Column(db.String(120), unique=True, nullable=False)
+    description = db.Column(db.String(255))
 
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
-    surname = db.Column(db.String(120), nullable=False)
-    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    email = db.Column(db.String(255), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    is_active_account = db.Column(db.Boolean, nullable=False, default=True)
-    last_login_at = db.Column(db.DateTime)
-    deactivated_at = db.Column(db.DateTime)
-    deactivation_reason = db.Column(db.String(255), default="")
-    parent_franchise_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    roles = db.relationship("Role", secondary=user_roles, lazy="subquery", backref=db.backref("users", lazy=True))
-    assigned_franchises = db.relationship("Franchise", secondary=user_franchises, lazy="subquery", backref=db.backref("assigned_users", lazy=True))
-    franchise_employees = db.relationship(
-        "User",
-        foreign_keys="User.parent_franchise_user_id",
-        backref=db.backref("parent_franchise_user", remote_side=[id]),
-        lazy=True,
-    )
-    created_users = db.relationship(
-        "User",
-        foreign_keys="User.created_by_user_id",
-        backref=db.backref("created_by_user", remote_side=[id]),
-        lazy=True,
-    )
+    role_id = db.Column(db.Integer, db.ForeignKey("roles.id"), nullable=False)
+    branch = db.Column(db.String(120))
+    active = db.Column(db.Boolean, default=True)
 
-    @property
-    def full_name(self):
-        return f"{self.name} {self.surname}".strip()
+    # Full application form fields
+    agent_name = db.Column(db.String(150))
+    agent_code = db.Column(db.String(80))
+    title = db.Column(db.String(30))
+    date_of_birth = db.Column(db.String(30))
+    spouse_title = db.Column(db.String(30))
+    spouse_first_names = db.Column(db.String(150))
+    spouse_surname = db.Column(db.String(150))
+    spouse_id_number = db.Column(db.String(30))
+    spouse_date_of_birth = db.Column(db.String(30))
+    residential_address = db.Column(db.Text)
+    residential_postal_code = db.Column(db.String(20))
+    postal_address = db.Column(db.Text)
+    postal_code = db.Column(db.String(20))
+    home_tel = db.Column(db.String(50))
+    work_tel = db.Column(db.String(50))
+    plan_choice = db.Column(db.String(50))
+    extended_premium = db.Column(db.Numeric(12,2), default=0)
+    total_payment = db.Column(db.Numeric(12,2), default=0)
 
-    @property
-    def primary_role_name(self):
-        return self.roles[0].name if self.roles else "No Role"
+    dependents_json = db.Column(db.Text)       # children/family dependents as JSON
+    extended_family_json = db.Column(db.Text)  # extended family rows as JSON
+    product_dependents_json = db.Column(db.Text)
 
-    @property
-    def is_protected_admin(self):
-        return self.email.lower() == "wjm@martinsdirect.com" or self.full_name.lower() == "wjm piek"
+    beneficiary_full_names = db.Column(db.String(200))
+    beneficiary_title = db.Column(db.String(30))
+    beneficiary_id_number = db.Column(db.String(30))
+    beneficiary_date_of_birth = db.Column(db.String(30))
+    beneficiary_relationship = db.Column(db.String(80))
 
-    def ensure_protected_admin_role(self):
-        if not self.is_protected_admin:
-            return
-        admin_role = Role.query.filter_by(name="Admin").first()
-        if admin_role and admin_role not in self.roles:
-            self.roles.append(admin_role)
+    payment_method = db.Column(db.String(80))
+    first_deduction_date = db.Column(db.String(30))
+    debit_day = db.Column(db.String(20))
+    bank_name = db.Column(db.String(120))
+    branch_name = db.Column(db.String(120))
+    branch_code = db.Column(db.String(50))
+    bank_town = db.Column(db.String(120))
+    account_number = db.Column(db.String(80))
+    account_type = db.Column(db.String(80))
+    account_holder = db.Column(db.String(180))
+
+    employer = db.Column(db.String(180))
+    salary = db.Column(db.Numeric(12,2), default=0)
+    persal_no = db.Column(db.String(80))
+    paypoint = db.Column(db.String(120))
+    payroll_premium = db.Column(db.Numeric(12,2), default=0)
+    personal_holder = db.Column(db.String(180))
+    department_code = db.Column(db.String(80))
+
+    form_template = db.Column(db.String(80))   # single_family or member_product
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    role = db.relationship("Role")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
-
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-
-    def accessible_franchises(self):
-        # Global franchise access is controlled by permissions, not hardcoded role names.
-        # Users with Franchise Management view/manage can see all franchises.
-        if self.has_permission("franchise_management:view") or self.has_permission("franchise_management:manage"):
-            return Franchise.query.order_by(Franchise.business_name).all()
-        if self.assigned_franchises:
-            return sorted(self.assigned_franchises, key=lambda item: item.business_name or "")
-        if getattr(self, "franchise", None):
-            return [self.franchise]
-        return []
-
-    def can_access_franchise(self, franchise_id):
-        # Access to an individual franchise follows the same permission model.
-        if self.has_permission("franchise_management:view") or self.has_permission("franchise_management:manage"):
-            return True
-        return any(franchise.id == franchise_id for franchise in self.accessible_franchises())
-
-    def has_role(self, role_name):
-        return any(role.name == role_name for role in self.roles)
-
     def has_permission(self, code):
-        return any(role.has_permission(code) for role in self.roles)
+        if not self.role:
+            return False
+        return any(p.code == code for p in self.role.permissions)
 
-    def get_reset_token(self):
-        serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
-        return serializer.dumps(self.email, salt="password-reset-salt")
-
-    @staticmethod
-    def verify_reset_token(token, max_age=1800):
-        serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
-        try:
-            email = serializer.loads(token, salt="password-reset-salt", max_age=max_age)
-        except (BadSignature, SignatureExpired):
-            return None
-        return User.query.filter_by(email=email).first()
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
-class Franchise(db.Model):
-    __tablename__ = "franchises"
+class PolicyProduct(db.Model):
+    __tablename__ = "policy_products"
     id = db.Column(db.Integer, primary_key=True)
-    business_name = db.Column(db.String(180), nullable=False, default="")
-    franchise_code = db.Column(db.String(80), default="")
-    ck_business_name = db.Column(db.String(255), default="")
-    ck_number = db.Column(db.String(80), default="")
-    pty_business_name = db.Column(db.String(255), default="")
-    pty_number = db.Column(db.String(80), default="")
-    vat_number = db.Column(db.String(80), default="")
-    office_address = db.Column(db.Text, default="")
-    office_number = db.Column(db.String(80), default="")
-    after_hours_number = db.Column(db.String(80), default="")
-    franchisee_name = db.Column(db.String(120), default="")
-    franchisee_surname = db.Column(db.String(120), default="")
-    franchisee_cell = db.Column(db.String(80), default="")
-    franchisee_email = db.Column(db.String(255), default="")
-    facebook_url = db.Column(db.String(255), default="")
-    instagram_url = db.Column(db.String(255), default="")
-    tiktok_url = db.Column(db.String(255), default="")
-    website_url = db.Column(db.String(255), default="")
-    public_email = db.Column(db.String(255), default="")
-    agreement_start_date = db.Column(db.Date)
-    agreement_end_date = db.Column(db.Date)
-    minimum_royalty_amount = db.Column(db.Numeric(12, 2), default=0, nullable=False)
-    royalty_gross_method = db.Column(db.String(20), nullable=False, default="old")
-    imported_royalty_scale_text = db.Column(db.Text, default="")
-    imported_royalty_percentage = db.Column(db.Numeric(5, 2), default=0)
-    regional_manager_email = db.Column(db.String(255), default="")
-    finance_manager_email = db.Column(db.String(255), default="")
-    notification_60_sent_at = db.Column(db.DateTime)
-    notification_30_sent_at = db.Column(db.DateTime)
-    is_performance_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
-    performance_inactive_at = db.Column(db.DateTime)
-    performance_inactive_reason = db.Column(db.String(255), default="")
-    performance_reactivated_at = db.Column(db.DateTime)
-    performance_reactivated_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    product_name = db.Column(db.String(150), nullable=False)
+    plan_name = db.Column(db.String(150), nullable=False)
+    cover_amount = db.Column(db.Numeric(12,2), default=0)
+    monthly_premium = db.Column(db.Numeric(12,2), default=0)
+    waiting_period_months = db.Column(db.Integer, default=0)
+    min_age = db.Column(db.Integer)
+    max_age = db.Column(db.Integer)
+    active = db.Column(db.Boolean, default=True)
 
-    @property
-    def franchisee_full_name(self):
-        return f"{self.franchisee_name} {self.franchisee_surname}".strip()
+    # Full application form fields
+    agent_name = db.Column(db.String(150))
+    agent_code = db.Column(db.String(80))
+    title = db.Column(db.String(30))
+    date_of_birth = db.Column(db.String(30))
+    spouse_title = db.Column(db.String(30))
+    spouse_first_names = db.Column(db.String(150))
+    spouse_surname = db.Column(db.String(150))
+    spouse_id_number = db.Column(db.String(30))
+    spouse_date_of_birth = db.Column(db.String(30))
+    residential_address = db.Column(db.Text)
+    residential_postal_code = db.Column(db.String(20))
+    postal_address = db.Column(db.Text)
+    postal_code = db.Column(db.String(20))
+    home_tel = db.Column(db.String(50))
+    work_tel = db.Column(db.String(50))
+    plan_choice = db.Column(db.String(50))
+    extended_premium = db.Column(db.Numeric(12,2), default=0)
+    total_payment = db.Column(db.Numeric(12,2), default=0)
+
+    dependents_json = db.Column(db.Text)       # children/family dependents as JSON
+    extended_family_json = db.Column(db.Text)  # extended family rows as JSON
+    product_dependents_json = db.Column(db.Text)
+
+    beneficiary_full_names = db.Column(db.String(200))
+    beneficiary_title = db.Column(db.String(30))
+    beneficiary_id_number = db.Column(db.String(30))
+    beneficiary_date_of_birth = db.Column(db.String(30))
+    beneficiary_relationship = db.Column(db.String(80))
+
+    payment_method = db.Column(db.String(80))
+    first_deduction_date = db.Column(db.String(30))
+    debit_day = db.Column(db.String(20))
+    bank_name = db.Column(db.String(120))
+    branch_name = db.Column(db.String(120))
+    branch_code = db.Column(db.String(50))
+    bank_town = db.Column(db.String(120))
+    account_number = db.Column(db.String(80))
+    account_type = db.Column(db.String(80))
+    account_holder = db.Column(db.String(180))
+
+    employer = db.Column(db.String(180))
+    salary = db.Column(db.Numeric(12,2), default=0)
+    persal_no = db.Column(db.String(80))
+    paypoint = db.Column(db.String(120))
+    payroll_premium = db.Column(db.Numeric(12,2), default=0)
+    personal_holder = db.Column(db.String(180))
+    department_code = db.Column(db.String(80))
+
+    form_template = db.Column(db.String(80))   # single_family or member_product
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class PolicyChangeLog(db.Model):
+    __tablename__ = "policy_change_logs"
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("policy_products.id"))
+    changed_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    field_name = db.Column(db.String(120))
+    old_value = db.Column(db.Text)
+    new_value = db.Column(db.Text)
+    reason = db.Column(db.Text)
+    changed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class PolicyProductRule(db.Model):
+    __tablename__ = "policy_product_rules"
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("policy_products.id"), nullable=False, unique=True)
+    qty_cover = db.Column(db.String(80))
+    workers_policy_premium_per_1000 = db.Column(db.Numeric(12,2), default=0)
+    suicide_waiting_period = db.Column(db.String(120))
+    age_limit = db.Column(db.String(120))
+    joining_fee = db.Column(db.Numeric(12,2), default=0)
+    workers_policy_cover = db.Column(db.Numeric(12,2), default=0)
+    main_member_cover = db.Column(db.Numeric(12,2), default=0)
+    spouse_cover = db.Column(db.Numeric(12,2), default=0)
+    extended_cover = db.Column(db.Numeric(12,2), default=0)
+    member_0_5_product_only = db.Column(db.Numeric(12,2), default=0)
+    member_6_70_product_only = db.Column(db.Numeric(12,2), default=0)
+    stillborn_cover = db.Column(db.Numeric(12,2), default=0)
+    family_0_11 = db.Column(db.Numeric(12,2), default=0)
+    family_1_5 = db.Column(db.Numeric(12,2), default=0)
+    family_6_13 = db.Column(db.Numeric(12,2), default=0)
+    family_14_21 = db.Column(db.Numeric(12,2), default=0)
+    reinstatement_rules = db.Column(db.Text)
+    email_rule = db.Column(db.String(255))
+    sms_whatsapp_rule = db.Column(db.String(255))
+    require_draw_signature = db.Column(db.Boolean, default=True)
+    require_typed_signature = db.Column(db.Boolean, default=True)
+    require_otp = db.Column(db.Boolean, default=True)
+    document_storage = db.Column(db.String(255))
+    source_file = db.Column(db.String(255))
+    imported_at = db.Column(db.DateTime, default=datetime.utcnow)
+    product = db.relationship("PolicyProduct", backref=db.backref("rules", uselist=False))
+
+class ClientApplication(db.Model):
+    __tablename__ = "client_applications"
+    id = db.Column(db.Integer, primary_key=True)
+    application_ref = db.Column(db.String(50), unique=True, nullable=False)
+    policy_number = db.Column(db.String(80))
+    product_id = db.Column(db.Integer, db.ForeignKey("policy_products.id"))
+    branch = db.Column(db.String(120))
+    agent_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    status = db.Column(db.String(50), default="Draft")
+    application_type = db.Column(db.String(50), default="New Policy")  # New Policy, Reinstatement, Lapsed New Policy
+    lapsed_policy_id = db.Column(db.Integer, db.ForeignKey("lapsed_policies.id"))
+    original_policy_number = db.Column(db.String(80))
+    joining_fee = db.Column(db.Numeric(12,2), default=0)
+    joining_fee_waived = db.Column(db.Boolean, default=False)
+    joining_fee_waiver_reason = db.Column(db.String(255))
+
+    first_names = db.Column(db.String(150))
+    surname = db.Column(db.String(150))
+    id_number = db.Column(db.String(30))
+    cell_number = db.Column(db.String(30))
+    email = db.Column(db.String(255))
+    address = db.Column(db.Text)
+    inception_date = db.Column(db.Date)
+    cover_amount = db.Column(db.Numeric(12,2), default=0)
+    monthly_premium = db.Column(db.Numeric(12,2), default=0)
+    waiting_period = db.Column(db.String(120))
+
+
+    # Full application form fields
+    agent_name = db.Column(db.String(150))
+    agent_code = db.Column(db.String(80))
+    title = db.Column(db.String(30))
+    date_of_birth = db.Column(db.String(30))
+    spouse_title = db.Column(db.String(30))
+    spouse_first_names = db.Column(db.String(150))
+    spouse_surname = db.Column(db.String(150))
+    spouse_id_number = db.Column(db.String(30))
+    spouse_date_of_birth = db.Column(db.String(30))
+    residential_address = db.Column(db.Text)
+    residential_postal_code = db.Column(db.String(20))
+    postal_address = db.Column(db.Text)
+    postal_code = db.Column(db.String(20))
+    home_tel = db.Column(db.String(50))
+    work_tel = db.Column(db.String(50))
+    plan_choice = db.Column(db.String(50))
+    extended_premium = db.Column(db.Numeric(12,2), default=0)
+    total_payment = db.Column(db.Numeric(12,2), default=0)
+
+    dependents_json = db.Column(db.Text)       # children/family dependents as JSON
+    extended_family_json = db.Column(db.Text)  # extended family rows as JSON
+    product_dependents_json = db.Column(db.Text)
+
+    beneficiary_full_names = db.Column(db.String(200))
+    beneficiary_title = db.Column(db.String(30))
+    beneficiary_id_number = db.Column(db.String(30))
+    beneficiary_date_of_birth = db.Column(db.String(30))
+    beneficiary_relationship = db.Column(db.String(80))
+
+    payment_method = db.Column(db.String(80))
+    first_deduction_date = db.Column(db.String(30))
+    debit_day = db.Column(db.String(20))
+    bank_name = db.Column(db.String(120))
+    branch_name = db.Column(db.String(120))
+    branch_code = db.Column(db.String(50))
+    bank_town = db.Column(db.String(120))
+    account_number = db.Column(db.String(80))
+    account_type = db.Column(db.String(80))
+    account_holder = db.Column(db.String(180))
+
+    employer = db.Column(db.String(180))
+    salary = db.Column(db.Numeric(12,2), default=0)
+    persal_no = db.Column(db.String(80))
+    paypoint = db.Column(db.String(120))
+    payroll_premium = db.Column(db.Numeric(12,2), default=0)
+    personal_holder = db.Column(db.String(180))
+    department_code = db.Column(db.String(80))
+
+    form_template = db.Column(db.String(80))   # single_family or member_product
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    signed_at = db.Column(db.DateTime)
+    signed_pdf_path = db.Column(db.String(500))
+    welcome_pack_path = db.Column(db.String(500))
+
+    # Address/geolocation and one-time signing link fields
+    address_place_id = db.Column(db.String(255))
+    address_lat = db.Column(db.Numeric(12,8))
+    address_lng = db.Column(db.Numeric(12,8))
+    sign_token = db.Column(db.String(255), unique=True)
+    sign_token_created_at = db.Column(db.DateTime)
+    sign_token_used_at = db.Column(db.DateTime)
+    sign_token_revoked = db.Column(db.Boolean, default=False)
+    popia_pdf_path = db.Column(db.String(500))
+    disclosure_pdf_path = db.Column(db.String(500))
+
+    product = db.relationship("PolicyProduct")
+    agent = db.relationship("User")
+    lapsed_policy = db.relationship("LapsedPolicy")
+    signatures = db.relationship("ApplicationSignature", backref="application", lazy=True)
+
+class ApplicationSignature(db.Model):
+    __tablename__ = "application_signatures"
+    id = db.Column(db.Integer, primary_key=True)
+    application_id = db.Column(db.Integer, db.ForeignKey("client_applications.id"), nullable=False)
+    typed_name = db.Column(db.String(180))
+    otp_code = db.Column(db.String(12))
+    otp_verified = db.Column(db.Boolean, default=False)
+    signature_image_path = db.Column(db.String(500))
+    ip_address = db.Column(db.String(80))
+    user_agent = db.Column(db.String(500))
+    consent_popia = db.Column(db.Boolean, default=False)
+    consent_marketing = db.Column(db.Boolean, default=False)
+    consent_disclosure = db.Column(db.Boolean, default=False)
+    signed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+
+class ClientFicaDocument(db.Model):
+    __tablename__ = "client_fica_documents"
+    id = db.Column(db.Integer, primary_key=True)
+    application_id = db.Column(db.Integer, db.ForeignKey("client_applications.id"), nullable=False, index=True)
+    document_type = db.Column(db.String(80), nullable=False)  # id_copy, proof_of_address, bank_statement, passport, permit_visa
+    original_filename = db.Column(db.String(255))
+    file_path = db.Column(db.String(500), nullable=False)
+    status = db.Column(db.String(40), default="Needs Review")  # Needs Review, Reviewed, Rejected
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    uploaded_ip = db.Column(db.String(80))
+    user_agent = db.Column(db.String(500))
+    application = db.relationship("ClientApplication", backref=db.backref("fica_documents", lazy=True))
+
+class DocumentSignature(db.Model):
+    __tablename__ = "document_signatures"
+    id = db.Column(db.Integer, primary_key=True)
+    application_id = db.Column(db.Integer, db.ForeignKey("client_applications.id"), nullable=False, index=True)
+    document_type = db.Column(db.String(80), nullable=False)  # application, popia, disclosure, welcome, fica
+    typed_name = db.Column(db.String(180))
+    signature_image_path = db.Column(db.String(500), nullable=False)
+    ip_address = db.Column(db.String(80))
+    user_agent = db.Column(db.String(500))
+    signed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    application = db.relationship("ClientApplication", backref=db.backref("document_signatures", lazy=True))
+
+class LapsedPolicy(db.Model):
+    __tablename__ = "lapsed_policies"
+    id = db.Column(db.Integer, primary_key=True)
+    franchise = db.Column(db.String(160))
+    member_id = db.Column(db.String(50))
+    policy_number = db.Column(db.String(80), index=True)
+    surname = db.Column(db.String(120))
+    initials = db.Column(db.String(50))
+    cell_number = db.Column(db.String(50))
+    home_tel = db.Column(db.String(50))
+    address = db.Column(db.Text)
+    last_date_paid = db.Column(db.Date)
+    premium_due = db.Column(db.Numeric(12,2), default=0)
+    total = db.Column(db.Numeric(12,2), default=0)
+    payment_method = db.Column(db.String(50))
+    branch = db.Column(db.String(120))
+    company_name = db.Column(db.String(160))
+    id_number = db.Column(db.String(30))
+    email_address = db.Column(db.String(255))
+    suspense_reason = db.Column(db.Text)
+    comments = db.Column(db.Text)
+    assigned_agent_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    recovery_status = db.Column(db.String(80), default="Imported")
+    next_action_date = db.Column(db.Date, default=date.today)
+    imported_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class RecoveryCallLog(db.Model):
+    __tablename__ = "recovery_call_logs"
+    id = db.Column(db.Integer, primary_key=True)
+    lapsed_policy_id = db.Column(db.Integer, db.ForeignKey("lapsed_policies.id"), nullable=False)
+    agent_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    outcome = db.Column(db.String(120), nullable=False)
+    notes = db.Column(db.Text)
+    promise_to_pay_date = db.Column(db.Date)
+    promise_to_pay_amount = db.Column(db.Numeric(12,2))
+    follow_up_date = db.Column(db.Date)
+    next_action_date = db.Column(db.Date)
+
+    # Full application form fields
+    agent_name = db.Column(db.String(150))
+    agent_code = db.Column(db.String(80))
+    title = db.Column(db.String(30))
+    date_of_birth = db.Column(db.String(30))
+    spouse_title = db.Column(db.String(30))
+    spouse_first_names = db.Column(db.String(150))
+    spouse_surname = db.Column(db.String(150))
+    spouse_id_number = db.Column(db.String(30))
+    spouse_date_of_birth = db.Column(db.String(30))
+    residential_address = db.Column(db.Text)
+    residential_postal_code = db.Column(db.String(20))
+    postal_address = db.Column(db.Text)
+    postal_code = db.Column(db.String(20))
+    home_tel = db.Column(db.String(50))
+    work_tel = db.Column(db.String(50))
+    plan_choice = db.Column(db.String(50))
+    extended_premium = db.Column(db.Numeric(12,2), default=0)
+    total_payment = db.Column(db.Numeric(12,2), default=0)
+
+    dependents_json = db.Column(db.Text)       # children/family dependents as JSON
+    extended_family_json = db.Column(db.Text)  # extended family rows as JSON
+    product_dependents_json = db.Column(db.Text)
+
+    beneficiary_full_names = db.Column(db.String(200))
+    beneficiary_title = db.Column(db.String(30))
+    beneficiary_id_number = db.Column(db.String(30))
+    beneficiary_date_of_birth = db.Column(db.String(30))
+    beneficiary_relationship = db.Column(db.String(80))
+
+    payment_method = db.Column(db.String(80))
+    first_deduction_date = db.Column(db.String(30))
+    debit_day = db.Column(db.String(20))
+    bank_name = db.Column(db.String(120))
+    branch_name = db.Column(db.String(120))
+    branch_code = db.Column(db.String(50))
+    bank_town = db.Column(db.String(120))
+    account_number = db.Column(db.String(80))
+    account_type = db.Column(db.String(80))
+    account_holder = db.Column(db.String(180))
+
+    employer = db.Column(db.String(180))
+    salary = db.Column(db.Numeric(12,2), default=0)
+    persal_no = db.Column(db.String(80))
+    paypoint = db.Column(db.String(120))
+    payroll_premium = db.Column(db.Numeric(12,2), default=0)
+    personal_holder = db.Column(db.String(180))
+    department_code = db.Column(db.String(80))
+
+    form_template = db.Column(db.String(80))   # single_family or member_product
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    policy = db.relationship("LapsedPolicy")
+    agent = db.relationship("User")
 
 class AuditLog(db.Model):
     __tablename__ = "audit_logs"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
-    action = db.Column(db.String(160), nullable=False)
-    module = db.Column(db.String(120), nullable=False, index=True)
-    details = db.Column(db.Text, default="")
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
-    user = db.relationship("User", backref=db.backref("audit_logs", lazy=True))
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    action = db.Column(db.String(150))
+    entity_type = db.Column(db.String(100))
+    entity_id = db.Column(db.String(100))
+    details = db.Column(db.Text)
 
-class RoyaltyScale(db.Model):
-    __tablename__ = "royalty_scales"
+    # Full application form fields
+    agent_name = db.Column(db.String(150))
+    agent_code = db.Column(db.String(80))
+    title = db.Column(db.String(30))
+    date_of_birth = db.Column(db.String(30))
+    spouse_title = db.Column(db.String(30))
+    spouse_first_names = db.Column(db.String(150))
+    spouse_surname = db.Column(db.String(150))
+    spouse_id_number = db.Column(db.String(30))
+    spouse_date_of_birth = db.Column(db.String(30))
+    residential_address = db.Column(db.Text)
+    residential_postal_code = db.Column(db.String(20))
+    postal_address = db.Column(db.Text)
+    postal_code = db.Column(db.String(20))
+    home_tel = db.Column(db.String(50))
+    work_tel = db.Column(db.String(50))
+    plan_choice = db.Column(db.String(50))
+    extended_premium = db.Column(db.Numeric(12,2), default=0)
+    total_payment = db.Column(db.Numeric(12,2), default=0)
+
+    dependents_json = db.Column(db.Text)       # children/family dependents as JSON
+    extended_family_json = db.Column(db.Text)  # extended family rows as JSON
+    product_dependents_json = db.Column(db.Text)
+
+    beneficiary_full_names = db.Column(db.String(200))
+    beneficiary_title = db.Column(db.String(30))
+    beneficiary_id_number = db.Column(db.String(30))
+    beneficiary_date_of_birth = db.Column(db.String(30))
+    beneficiary_relationship = db.Column(db.String(80))
+
+    payment_method = db.Column(db.String(80))
+    first_deduction_date = db.Column(db.String(30))
+    debit_day = db.Column(db.String(20))
+    bank_name = db.Column(db.String(120))
+    branch_name = db.Column(db.String(120))
+    branch_code = db.Column(db.String(50))
+    bank_town = db.Column(db.String(120))
+    account_number = db.Column(db.String(80))
+    account_type = db.Column(db.String(80))
+    account_holder = db.Column(db.String(180))
+
+    employer = db.Column(db.String(180))
+    salary = db.Column(db.Numeric(12,2), default=0)
+    persal_no = db.Column(db.String(80))
+    paypoint = db.Column(db.String(120))
+    payroll_premium = db.Column(db.Numeric(12,2), default=0)
+    personal_holder = db.Column(db.String(180))
+    department_code = db.Column(db.String(80))
+
+    form_template = db.Column(db.String(80))   # single_family or member_product
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+
+class ComplianceReview(db.Model):
+    __tablename__ = "compliance_reviews"
     id = db.Column(db.Integer, primary_key=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
-    row_number = db.Column(db.Integer, nullable=False, default=1)
-    amount_from = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    amount_to = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    percentage = db.Column(db.Numeric(5, 2), nullable=False, default=0)
-    franchise = db.relationship("Franchise", backref=db.backref("royalty_scales", lazy=True, cascade="all, delete-orphan"))
+    application_id = db.Column(db.Integer, db.ForeignKey("client_applications.id"), nullable=False, index=True)
+    lapsed_policy_id = db.Column(db.Integer, db.ForeignKey("lapsed_policies.id"), index=True)
+    reviewer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    decision = db.Column(db.String(40), nullable=False)
+    checklist_json = db.Column(db.Text, default="{}")
+    score = db.Column(db.Integer, default=0)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
+    application = db.relationship("ClientApplication", backref=db.backref("compliance_reviews", lazy=True, order_by="ComplianceReview.created_at.desc()"))
+    lapsed_policy = db.relationship("LapsedPolicy", backref=db.backref("compliance_reviews", lazy=True, order_by="ComplianceReview.created_at.desc()"))
+    reviewer = db.relationship("User")
 
-class MonthlyFigure(db.Model):
-    __tablename__ = "monthly_figures"
+class QRTrustedDevice(db.Model):
+    __tablename__ = "qr_trusted_devices"
     id = db.Column(db.Integer, primary_key=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
-    month = db.Column(db.Integer, nullable=False, index=True)
-    year = db.Column(db.Integer, nullable=False, index=True)
-    gross_turnover = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    cash = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    funeral_receipts = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    claim_receipts = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    society_receipts = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    cash_sales = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    tombstone_receipts = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    obo_service_receipts = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    sales = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    insurance_receipts = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    insurance_payover = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    admin_fee = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    insurance_joinings = db.Column(db.Integer, nullable=False, default=0)
-    mf_files = db.Column(db.Integer, nullable=False, default=0)
-    cash_received = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    insurance_received = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    payover = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    other_income = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    number_of_funerals = db.Column(db.Integer, nullable=False, default=0)
-    number_of_policies = db.Column(db.Integer, nullable=False, default=0)
-    number_of_claims = db.Column(db.Integer, nullable=False, default=0)
-    gross_revenue = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    royalty_percentage = db.Column(db.Numeric(5, 2), nullable=False, default=0)
-    royalty_amount = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    minimum_royalty_applied = db.Column(db.Boolean, nullable=False, default=False)
-    status = db.Column(db.String(30), nullable=False, default="Draft", index=True)
-    notes = db.Column(db.Text, default="")
-    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
-    submitted_at = db.Column(db.DateTime)
-    approved_at = db.Column(db.DateTime)
-    locked_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-    franchise = db.relationship("Franchise", backref=db.backref("monthly_figures", lazy=True, cascade="all, delete-orphan"))
-    created_by = db.relationship("User", backref=db.backref("monthly_figures_created", lazy=True))
-
-    @property
-    def period_label(self):
-        return f"{self.year}-{self.month:02d}"
-
-
-class FranchiseTarget(db.Model):
-    __tablename__ = "franchise_targets"
-    id = db.Column(db.Integer, primary_key=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
-    metric = db.Column(db.String(80), nullable=False, index=True)
-    year = db.Column(db.Integer, nullable=False, index=True)
-    month = db.Column(db.Integer, nullable=False, index=True)
-    target_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-    franchise = db.relationship("Franchise", backref=db.backref("targets", lazy=True, cascade="all, delete-orphan"))
-    __table_args__ = (
-        db.UniqueConstraint("franchise_id", "metric", "year", "month", name="uq_franchise_target_period_metric"),
-    )
-
-
-class PerformanceGrowthBracket(db.Model):
-    __tablename__ = "performance_growth_brackets"
-    id = db.Column(db.Integer, primary_key=True)
-    metric = db.Column(db.String(80), nullable=False, index=True)
-    amount_from = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    amount_to = db.Column(db.Numeric(14, 2), nullable=True)
-    growth_percent = db.Column(db.Numeric(6, 2), nullable=False, default=0)
-    basis_metric = db.Column(db.String(80), nullable=False, default="cash")
-    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-    __table_args__ = (
-        db.UniqueConstraint("metric", "amount_from", "amount_to", "basis_metric", name="uq_performance_growth_bracket"),
-    )
-
-
-class PerformanceResult(db.Model):
-    __tablename__ = "performance_results"
-    id = db.Column(db.Integer, primary_key=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
-    metric = db.Column(db.String(80), nullable=False, index=True)
-    year = db.Column(db.Integer, nullable=False, index=True)
-    month = db.Column(db.Integer, nullable=False, index=True)
-    actual_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    target_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    achievement_percent = db.Column(db.Numeric(8, 2), nullable=False, default=0)
-    growth_percent = db.Column(db.Numeric(8, 2), nullable=False, default=0)
-    previous_month_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    same_month_last_year_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    three_year_average_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    forecast_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    source = db.Column(db.String(80), nullable=False, default="monthly_figures")
-    calculated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-
-    franchise = db.relationship("Franchise", backref=db.backref("performance_results", lazy=True, cascade="all, delete-orphan"))
-    __table_args__ = (
-        db.UniqueConstraint("franchise_id", "metric", "year", "month", name="uq_performance_result_period_metric"),
-    )
-
-
-class HeatmapRecord(db.Model):
-    __tablename__ = "heatmap_records"
-    id = db.Column(db.Integer, primary_key=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
-    mf_file = db.Column(db.String(120), default="", index=True)
-    deceased_name = db.Column(db.String(120), default="")
-    deceased_surname = db.Column(db.String(120), default="")
-    dod = db.Column(db.String(50), default="")
-    address = db.Column(db.String(255), default="")
-    city = db.Column(db.String(120), default="", index=True)
-    province = db.Column(db.String(120), default="", index=True)
-    country = db.Column(db.String(120), default="South Africa")
-    full_address = db.Column(db.String(512), default="")
-    latitude = db.Column(db.Float)
-    longitude = db.Column(db.Float)
-    weight = db.Column(db.Float, default=1.0)
-    next_of_kin_name = db.Column(db.String(120), default="")
-    next_of_kin_surname = db.Column(db.String(120), default="")
-    relationship = db.Column(db.String(120), default="")
-    relation = db.Column(db.String(50), default="")
-    contact_number = db.Column(db.String(120), default="")
-    source_filename = db.Column(db.String(255), default="")
-    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-    franchise = db.relationship("Franchise", backref=db.backref("heatmap_records", lazy=True, cascade="all, delete-orphan"))
-    created_by = db.relationship("User", backref=db.backref("heatmap_records_created", lazy=True))
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "franchiseId": self.franchise_id,
-            "franchiseName": self.franchise.business_name if self.franchise else "Unassigned",
-            "mfFile": self.mf_file or "",
-            "deceasedName": self.deceased_name or "",
-            "deceasedSurname": self.deceased_surname or "",
-            "dod": self.dod or "",
-            "address": self.address or "",
-            "city": self.city or "",
-            "province": self.province or "",
-            "country": self.country or "South Africa",
-            "fullAddress": self.full_address or "",
-            "latitude": self.latitude,
-            "longitude": self.longitude,
-            "weight": self.weight if self.weight is not None else 1,
-            "nextOfKinName": self.next_of_kin_name or "",
-            "nextOfKinSurname": self.next_of_kin_surname or "",
-            "relationship": self.relationship or "",
-            "relation": self.relation or "",
-            "contactNumber": self.contact_number or "",
-            "sourceFilename": self.source_filename or "",
-            "updatedAt": self.updated_at.isoformat() if self.updated_at else "",
-        }
-
-
-
-class AttendanceStaff(db.Model):
-    __tablename__ = "attendance_staff"
-    id = db.Column(db.Integer, primary_key=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
-    first_name = db.Column(db.String(120), nullable=False, default="")
-    surname = db.Column(db.String(120), nullable=False, default="")
-    email = db.Column(db.String(255), default="", index=True)
-    phone = db.Column(db.String(80), default="")
-    id_number = db.Column(db.String(80), default="")
-    employee_number = db.Column(db.String(80), default="", index=True)
-    position = db.Column(db.String(120), default="")
-    staff_type = db.Column(db.String(40), default="Employee", index=True)
-    website_url = db.Column(db.String(255), default="")
-    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
-    notes = db.Column(db.Text, default="")
-    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-    franchise = db.relationship("Franchise", backref=db.backref("attendance_staff", lazy=True, cascade="all, delete-orphan"))
-    created_by = db.relationship("User", backref=db.backref("attendance_staff_created", lazy=True))
-
-    @property
-    def full_name(self):
-        return f"{self.first_name} {self.surname}".strip()
-
-
-class AttendanceOffice(db.Model):
-    __tablename__ = "attendance_offices"
-    id = db.Column(db.Integer, primary_key=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
-    name = db.Column(db.String(160), nullable=False, default="Office")
-    address = db.Column(db.String(255), default="")
-    latitude = db.Column(db.Float)
-    longitude = db.Column(db.Float)
-    allowed_radius_m = db.Column(db.Integer, nullable=False, default=100)
-    qr_token = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
-    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-    franchise = db.relationship("Franchise", backref=db.backref("attendance_offices", lazy=True, cascade="all, delete-orphan"))
-
-
-class AttendanceEvent(db.Model):
-    __tablename__ = "attendance_events"
-    id = db.Column(db.Integer, primary_key=True)
-    staff_id = db.Column(db.Integer, db.ForeignKey("attendance_staff.id"), nullable=False, index=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
-    office_id = db.Column(db.Integer, db.ForeignKey("attendance_offices.id"), nullable=True, index=True)
-    action = db.Column(db.String(20), nullable=False, index=True)  # sign_in or sign_out
-    event_time = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
-    latitude = db.Column(db.Float)
-    longitude = db.Column(db.Float)
-    accuracy_meters = db.Column(db.Float)
-    distance_from_site_m = db.Column(db.Float)
-    gps_status = db.Column(db.String(50), default="")
-    work_location_type = db.Column(db.String(50), default="Office")
-    source = db.Column(db.String(50), default="web")
-    device_info = db.Column(db.Text, default="")
-    employee_note = db.Column(db.Text, default="")
-    manager_note = db.Column(db.Text, default="")
-    approval_status = db.Column(db.String(30), nullable=False, default="pending", index=True)
-    approved_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    approved_at = db.Column(db.DateTime)
-    rejected_reason = db.Column(db.Text, default="")
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-    staff = db.relationship("AttendanceStaff", backref=db.backref("attendance_events", lazy=True, cascade="all, delete-orphan"))
-    franchise = db.relationship("Franchise")
-    office = db.relationship("AttendanceOffice")
-    approved_by = db.relationship("User")
-
-
-class AttendanceLeaveRequest(db.Model):
-    __tablename__ = "attendance_leave_requests"
-    id = db.Column(db.Integer, primary_key=True)
-    staff_id = db.Column(db.Integer, db.ForeignKey("attendance_staff.id"), nullable=False, index=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
-    leave_type = db.Column(db.String(80), nullable=False, default="Annual Leave")
-    start_date = db.Column(db.Date, nullable=False)
-    end_date = db.Column(db.Date, nullable=False)
-    reason = db.Column(db.Text, default="")
-    status = db.Column(db.String(30), nullable=False, default="pending", index=True)
-    manager_note = db.Column(db.Text, default="")
-    decided_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    decided_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-
-    staff = db.relationship("AttendanceStaff", backref=db.backref("leave_requests", lazy=True, cascade="all, delete-orphan"))
-    franchise = db.relationship("Franchise")
-    decided_by = db.relationship("User")
-
-class MFFManual(db.Model):
-    __tablename__ = "mff_manuals"
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255), nullable=False, index=True)
-    confidentiality_note = db.Column(db.String(500), default="Confidential - internal use only")
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-
-class MFFManualVersion(db.Model):
-    __tablename__ = "mff_manual_versions"
-    id = db.Column(db.Integer, primary_key=True)
-    manual_id = db.Column(db.Integer, db.ForeignKey("mff_manuals.id"), nullable=False, index=True)
-    version_label = db.Column(db.String(80), nullable=False, default="v1.0")
-    filename = db.Column(db.String(255), nullable=False)
-    content_type = db.Column(db.String(100), nullable=False, default="application/pdf")
-    storage_path = db.Column(db.String(600), nullable=False, default="")
-    sha256 = db.Column(db.String(64), nullable=False, default="")
-    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    uploaded_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    is_published = db.Column(db.Boolean, nullable=False, default=True, index=True)
-    manual = db.relationship("MFFManual", backref=db.backref("versions", lazy=True, cascade="all, delete-orphan", order_by="desc(MFFManualVersion.uploaded_at)"))
-    uploaded_by = db.relationship("User")
-    __table_args__ = (db.UniqueConstraint("manual_id", "version_label", name="uq_mff_manual_version_label"),)
-
-class MFFIndexDocument(db.Model):
-    __tablename__ = "mff_index_documents"
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(255), nullable=False, index=True)
-    filename = db.Column(db.String(255), nullable=False)
-    storage_path = db.Column(db.String(600), nullable=False, default="")
-    content_type = db.Column(db.String(120), nullable=False, default="application/pdf")
-    manual_id = db.Column(db.Integer, db.ForeignKey("mff_manuals.id"), nullable=True, index=True)
-    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    uploaded_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
-    manual = db.relationship("MFFManual", backref=db.backref("index_documents", lazy=True))
-    uploaded_by = db.relationship("User")
-
-class MFFManualAcknowledgement(db.Model):
-    __tablename__ = "mff_manual_acknowledgements"
-    id = db.Column(db.Integer, primary_key=True)
-    manual_version_id = db.Column(db.Integer, db.ForeignKey("mff_manual_versions.id"), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
-    attested_name = db.Column(db.String(255), nullable=False)
-    attested_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    ip_address = db.Column(db.String(64), default="")
-    user_agent = db.Column(db.String(500), default="")
-    manual_version = db.relationship("MFFManualVersion")
-    user = db.relationship("User")
-    __table_args__ = (db.UniqueConstraint("manual_version_id", "user_id", name="uq_mff_ack_manual_user"),)
-
-
-
-class InsurancePolicyMonthlyRaw(db.Model):
-    __tablename__ = "insurance_policy_monthly_raw"
-    id = db.Column(db.Integer, primary_key=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
-    franchise_name = db.Column(db.String(255), nullable=False, index=True)
-    import_month = db.Column(db.Date, nullable=False, index=True)
-    retail_premium = db.Column(db.Numeric(18, 2), default=0)
-    risk_premium = db.Column(db.Numeric(18, 2), default=0)
-    claims = db.Column(db.Numeric(18, 2), default=0)
-    claim_count = db.Column(db.Numeric(18, 2), default=0)
-    claim_paid_franchise = db.Column(db.Numeric(18, 2), default=0)
-    claim_paid_client = db.Column(db.Numeric(18, 2), default=0)
-    repudiated_pending = db.Column(db.Numeric(18, 2), default=0)
-    grand_total_claims = db.Column(db.Numeric(18, 2), default=0)
-    policy_qty = db.Column(db.Numeric(18, 2), default=0)
-    original_risk_premium = db.Column(db.Numeric(18, 2), default=0)
-    r1_policy_fee = db.Column(db.Numeric(18, 2), default=0)
-    underwriter_2_1_fee = db.Column(db.Numeric(18, 2), default=0)
-    risk_after_r1 = db.Column(db.Numeric(18, 2), default=0)
-    single_monthly_premium_total = db.Column(db.Numeric(18, 2), default=0)
-    current_scenario = db.Column(db.String(120), default="100% Claim Ratio")
-    source_file = db.Column(db.String(255), default="")
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    franchise = db.relationship("Franchise")
-    __table_args__ = (db.UniqueConstraint("franchise_name", "import_month", name="uq_ins_policy_franchise_month"),)
-
-
-class InsuranceClaimsMonthlyRaw(db.Model):
-    __tablename__ = "insurance_claims_monthly_raw"
-    id = db.Column(db.Integer, primary_key=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
-    claim_key = db.Column(db.String(255), default="", index=True)
-    claims_franchise_name = db.Column(db.String(255), nullable=False, index=True)
-    claim_month = db.Column(db.Date, nullable=False, index=True)
-    claims_amount = db.Column(db.Numeric(18, 2), default=0)
-    claim_count = db.Column(db.Numeric(18, 2), default=0)
-    claim_paid_franchise = db.Column(db.Numeric(18, 2), default=0)
-    claim_paid_client = db.Column(db.Numeric(18, 2), default=0)
-    repudiated_pending = db.Column(db.Numeric(18, 2), default=0)
-    grand_total_claims = db.Column(db.Numeric(18, 2), default=0)
-    source_file = db.Column(db.String(255), default="")
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    franchise = db.relationship("Franchise")
-    __table_args__ = (db.UniqueConstraint("claim_key", "claims_franchise_name", "claim_month", name="uq_ins_claim_key_franchise_month"),)
-
-
-class InsurancePolicyDataDetailRaw(db.Model):
-    __tablename__ = "insurance_policydata_detail_raw"
-    id = db.Column(db.Integer, primary_key=True)
-    source_file = db.Column(db.String(255), nullable=False, index=True)
-    import_month = db.Column(db.Date, nullable=False, index=True)
-    row_number = db.Column(db.Integer, nullable=False)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
-    franchise_name = db.Column(db.String(255), nullable=False, index=True)
-    relation = db.Column(db.String(80), default="", index=True)
-    is_mem = db.Column(db.Boolean, nullable=False, default=False, index=True)
-    retail_premium = db.Column(db.Numeric(18, 2), default=0)
-    original_risk_premium = db.Column(db.Numeric(18, 2), default=0)
-    mpia = db.Column(db.Numeric(18, 2), default=0)
-    single_premium = db.Column(db.Numeric(18, 6), default=0)
-    r1_policy_fee = db.Column(db.Numeric(18, 2), default=0)
-    adv_fund_2_1_fee = db.Column(db.Numeric(18, 2), default=0)
-    risk_after_r1 = db.Column(db.Numeric(18, 2), default=0)
-    new_risk_premium = db.Column(db.Numeric(18, 2), default=0)
-    raw_data = db.Column(db.JSON)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    franchise = db.relationship("Franchise")
-    __table_args__ = (db.UniqueConstraint("source_file", "import_month", "row_number", name="uq_ins_policydata_source_month_row"),)
-
-
-class InsuranceImportHistory(db.Model):
-    __tablename__ = "insurance_import_history"
-    id = db.Column(db.Integer, primary_key=True)
-    import_type = db.Column(db.String(80), nullable=False, index=True)
-    source_file = db.Column(db.String(255), default="")
-    imported_months = db.Column(db.Text, default="")
-    row_count = db.Column(db.Integer, default=0)
-    status = db.Column(db.String(50), default="success", index=True)
-    message = db.Column(db.Text, default="")
-    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    created_by = db.relationship("User")
-
-
-class InsuranceFranchiseMapping(db.Model):
-    __tablename__ = "insurance_franchise_mapping"
-    id = db.Column(db.Integer, primary_key=True)
-    source_name = db.Column(db.String(255), nullable=False, unique=True, index=True)
-    mapped_name = db.Column(db.String(255), nullable=False, index=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
-    approved = db.Column(db.Boolean, nullable=False, default=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    franchise = db.relationship("Franchise")
-
-
-class InsuranceClaimCase(db.Model):
-    __tablename__ = "insurance_claim_cases"
-    id = db.Column(db.Integer, primary_key=True)
-    claim_ref = db.Column(db.String(120), nullable=False, unique=True, index=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
-    franchise_name = db.Column(db.String(255), default="", index=True)
-    claimant_name = db.Column(db.String(255), default="")
-    policy_number = db.Column(db.String(120), default="", index=True)
-    id_number = db.Column(db.String(80), default="")
-    claim_type = db.Column(db.String(120), default="Funeral Claim", index=True)
-    claim_date = db.Column(db.Date, nullable=True, index=True)
-    date_of_death = db.Column(db.Date, nullable=True)
-    claim_amount = db.Column(db.Numeric(18, 2), default=0)
-    status = db.Column(db.String(60), nullable=False, default="Open", index=True)
-    priority = db.Column(db.String(40), default="Normal")
-    assigned_to_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    archived = db.Column(db.Boolean, nullable=False, default=False, index=True)
-    notes = db.Column(db.Text, default="")
-    closed_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
-    franchise = db.relationship("Franchise")
-    assigned_to = db.relationship("User", foreign_keys=[assigned_to_id])
-    created_by = db.relationship("User", foreign_keys=[created_by_id])
-
-
-class InsuranceClaimNote(db.Model):
-    __tablename__ = "insurance_claim_notes"
-    id = db.Column(db.Integer, primary_key=True)
-    claim_id = db.Column(db.Integer, db.ForeignKey("insurance_claim_cases.id"), nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    user_email = db.Column(db.String(255), default="")
-    note = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
-    claim = db.relationship("InsuranceClaimCase", backref=db.backref("claim_notes", lazy=True, cascade="all, delete-orphan", order_by="desc(InsuranceClaimNote.created_at)"))
+    device_token_hash = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    device_name = db.Column(db.String(180))
+    first_ip = db.Column(db.String(80))
+    last_ip = db.Column(db.String(80))
+    user_agent = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    last_used_at = db.Column(db.DateTime)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    active = db.Column(db.Boolean, default=True, index=True)
     user = db.relationship("User")
 
+    @property
+    def is_expired(self):
+        return datetime.utcnow() > self.expires_at
 
-class InsuranceClaimAttachment(db.Model):
-    __tablename__ = "insurance_claim_attachments"
+class QRLoginToken(db.Model):
+    __tablename__ = "qr_login_tokens"
     id = db.Column(db.Integer, primary_key=True)
-    claim_id = db.Column(db.Integer, db.ForeignKey("insurance_claim_cases.id"), nullable=False, index=True)
-    filename = db.Column(db.String(255), nullable=False)
-    stored_filename = db.Column(db.String(255), nullable=False)
-    file_path = db.Column(db.String(600), nullable=False)
-    content_type = db.Column(db.String(120), default="")
-    size_bytes = db.Column(db.Integer, default=0)
-    uploaded_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
-    claim = db.relationship("InsuranceClaimCase", backref=db.backref("attachments", lazy=True, cascade="all, delete-orphan", order_by="desc(InsuranceClaimAttachment.created_at)"))
-    uploaded_by = db.relationship("User")
+    token = db.Column(db.String(128), unique=True, nullable=False, index=True)
+    status = db.Column(db.String(30), default="pending", index=True)  # pending, approved, rejected, expired, used
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    approved_at = db.Column(db.DateTime)
+    used_at = db.Column(db.DateTime)
+    approved_user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    desktop_ip = db.Column(db.String(80))
+    desktop_user_agent = db.Column(db.String(500))
+    approval_ip = db.Column(db.String(80))
+    approval_user_agent = db.Column(db.String(500))
+    user = db.relationship("User")
+
+    @property
+    def is_expired(self):
+        return datetime.utcnow() > self.expires_at
 
 
-class InsuranceClaimDocumentType(db.Model):
-    __tablename__ = "insurance_claim_document_types"
+class TelesalesScriptSession(db.Model):
+    __tablename__ = "telesales_script_sessions"
     id = db.Column(db.Integer, primary_key=True)
-    document_type = db.Column(db.String(160), nullable=False, unique=True)
-    claim_type = db.Column(db.String(120), default="Funeral Claim")
-    sort_order = db.Column(db.Integer, nullable=False, default=0)
-    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    lapsed_policy_id = db.Column(db.Integer, db.ForeignKey("lapsed_policies.id"), index=True)
+    application_id = db.Column(db.Integer, db.ForeignKey("client_applications.id"), index=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    branch = db.Column(db.String(120))
+    client_name = db.Column(db.String(220))
+    client_cell = db.Column(db.String(50))
+    client_email = db.Column(db.String(255))
+    policy_number = db.Column(db.String(80))
+    script_type = db.Column(db.String(50), default="new")  # new or reinstatement
+    current_step = db.Column(db.Integer, default=1)
+    status = db.Column(db.String(50), default="In Progress")  # In Progress, Completed, Blocked
+    blocked_reason = db.Column(db.Text)
+    answers_json = db.Column(db.Text, default="{}")
+    qa_score = db.Column(db.Integer, default=0)
+    qa_result = db.Column(db.String(20))
+    pdf_path = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
 
+    lapsed_policy = db.relationship("LapsedPolicy")
+    application = db.relationship("ClientApplication")
+    agent = db.relationship("User")
 
-class InsuranceClaimDocumentRule(db.Model):
-    __tablename__ = "insurance_claim_document_rules"
+class SystemSetting(db.Model):
+    __tablename__ = "system_settings"
     id = db.Column(db.Integer, primary_key=True)
-    document_type_id = db.Column(db.Integer, db.ForeignKey("insurance_claim_document_types.id"), nullable=False, index=True)
-    rule_key = db.Column(db.String(120), nullable=False)
-    rule_value = db.Column(db.Text, default="")
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    document_type = db.relationship("InsuranceClaimDocumentType", backref=db.backref("rules", lazy=True, cascade="all, delete-orphan"))
+    category = db.Column(db.String(80), nullable=False, index=True)
+    key = db.Column(db.String(120), nullable=False, index=True)
+    value = db.Column(db.Text, default="")
+    description = db.Column(db.Text)
+    active = db.Column(db.Boolean, default=True)
+    updated_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = db.relationship("User")
+    __table_args__ = (db.UniqueConstraint('category', 'key', name='uq_system_setting_category_key'),)
 
-
-class PerformanceSnapshot(db.Model):
-    """Frozen monthly performance history for audit/history views.
-
-    Unlike live dashboards, snapshot rows preserve the KPI/target/score values that
-    existed when Head Office captured the month.  This prevents old business
-    history from changing when brackets or formulas are adjusted later.
-    """
-    __tablename__ = "performance_snapshots"
+class LoginAttempt(db.Model):
+    __tablename__ = "login_attempts"
     id = db.Column(db.Integer, primary_key=True)
-    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
-    year = db.Column(db.Integer, nullable=False, index=True)
-    month = db.Column(db.Integer, nullable=False, index=True)
-    metric = db.Column(db.String(80), nullable=False, index=True)
-    actual_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    target_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    achievement_percent = db.Column(db.Numeric(8, 2), nullable=False, default=0)
-    growth_percent = db.Column(db.Numeric(8, 2), nullable=False, default=0)
-    forecast_value = db.Column(db.Numeric(14, 2), nullable=False, default=0)
-    rank = db.Column(db.Integer, nullable=False, default=0)
-    previous_rank = db.Column(db.Integer, nullable=False, default=0)
-    movement = db.Column(db.Integer, nullable=False, default=0)
-    health_score = db.Column(db.Numeric(8, 2), nullable=False, default=0)
-    source = db.Column(db.String(80), nullable=False, default="performance_results")
-    captured_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
-    captured_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    email = db.Column(db.String(255), index=True)
+    ip_address = db.Column(db.String(80), index=True)
+    success = db.Column(db.Boolean, default=False)
+    reason = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
-    franchise = db.relationship("Franchise", backref=db.backref("performance_snapshots", lazy=True, cascade="all, delete-orphan"))
-    captured_by = db.relationship("User", backref=db.backref("performance_snapshots_captured", lazy=True))
-
-    __table_args__ = (
-        db.UniqueConstraint("franchise_id", "metric", "year", "month", name="uq_perf_snapshot_period_metric"),
-    )
-
-
-class UserDashboardPreference(db.Model):
-    """Optional per-user dashboard preferences for a cleaner home screen."""
-    __tablename__ = "user_dashboard_preferences"
+class CallSummary(db.Model):
+    __tablename__ = "call_summaries"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, unique=True, index=True)
-    default_module = db.Column(db.String(80), nullable=False, default="dashboard")
-    default_metric = db.Column(db.String(80), nullable=False, default="cash")
-    default_date_range = db.Column(db.String(40), nullable=False, default="current_month")
-    show_graphs = db.Column(db.Boolean, nullable=False, default=True)
-    show_leaderboard = db.Column(db.Boolean, nullable=False, default=True)
-    show_insights = db.Column(db.Boolean, nullable=False, default=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    call_log_id = db.Column(db.Integer, db.ForeignKey("recovery_call_logs.id"), nullable=False, index=True)
+    summary = db.Column(db.Text)
+    next_best_action = db.Column(db.String(255))
+    risk_flags = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    call_log = db.relationship("RecoveryCallLog")
 
-    user = db.relationship("User", backref=db.backref("dashboard_preference", uselist=False, lazy=True, cascade="all, delete-orphan"))
+class LeadDistributionRule(db.Model):
+    __tablename__ = "lead_distribution_rules"
+    id = db.Column(db.Integer, primary_key=True)
+    branch = db.Column(db.String(120), index=True)
+    method = db.Column(db.String(40), default="round_robin")
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class AgentTarget(db.Model):
+    __tablename__ = "agent_targets"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    target_date = db.Column(db.Date, nullable=False, default=date.today)
+    calls_target = db.Column(db.Integer, default=0)
+    sales_target = db.Column(db.Integer, default=0)
+    premium_target = db.Column(db.Numeric(12,2), default=0)
+    user = db.relationship("User")
+
+class CommissionRule(db.Model):
+    __tablename__ = "commission_rules"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    role_name = db.Column(db.String(80), default="agent")
+    flat_amount_per_sale = db.Column(db.Numeric(12,2), default=0)
+    percentage_of_premium = db.Column(db.Numeric(6,2), default=0)
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class SalesTarget(db.Model):
+    __tablename__ = "sales_targets"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    branch = db.Column(db.String(120), index=True)
+    month = db.Column(db.String(7), index=True)  # YYYY-MM
+    calls_target = db.Column(db.Integer, default=0)
+    sales_target = db.Column(db.Integer, default=0)
+    premium_target = db.Column(db.Numeric(12,2), default=0)
+    user = db.relationship("User")
+
+class CallRecording(db.Model):
+    __tablename__ = "call_recordings"
+    id = db.Column(db.Integer, primary_key=True)
+    call_log_id = db.Column(db.Integer, db.ForeignKey("recovery_call_logs.id"), index=True)
+    lapsed_policy_id = db.Column(db.Integer, db.ForeignKey("lapsed_policies.id"), index=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    file_path = db.Column(db.String(500), nullable=False)
+    original_filename = db.Column(db.String(255))
+    duration_seconds = db.Column(db.Integer)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    call_log = db.relationship("RecoveryCallLog")
+    agent = db.relationship("User")
+
+class ComplianceFlag(db.Model):
+    __tablename__ = "compliance_flags"
+    id = db.Column(db.Integer, primary_key=True)
+    call_log_id = db.Column(db.Integer, db.ForeignKey("recovery_call_logs.id"), index=True)
+    severity = db.Column(db.String(30), default="medium")
+    flag_type = db.Column(db.String(120))
+    details = db.Column(db.Text)
+    resolved = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    call_log = db.relationship("RecoveryCallLog")

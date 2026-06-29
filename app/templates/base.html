@@ -1,241 +1,68 @@
 <!doctype html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Martins Funerals System</title>
-
-    <link rel="preload" href="{{ url_for('static', filename='img/logo.png') }}" as="image" fetchpriority="high">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v66-user-friendly-sidebar') }}">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Martin's TeleSales</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+:root{--brand:#6B4AA0;--brand-dark:#583b88;--soft-border:#dde3ea;--muted:#667085;--sidebar-w:280px;}
+*{box-sizing:border-box}body{background:#f7f8fb;color:#101828;overflow-x:hidden}.card{border-radius:.85rem}.btn{border-radius:.55rem}.table{margin-bottom:0}.table th{white-space:nowrap}.table td{vertical-align:middle}.nav-badge{display:inline-flex;align-items:center;justify-content:center;min-width:1.25rem;height:1.25rem;border-radius:999px;background:#dc2626;color:#fff;font-size:.72rem;font-weight:800;margin-left:.35rem;padding:0 .35rem}
+.app-shell{display:flex;min-height:100vh}.app-sidebar{width:var(--sidebar-w);background:var(--brand);color:#fff;position:fixed;inset:0 auto 0 0;z-index:1040;overflow-y:auto;box-shadow:4px 0 18px rgba(16,24,40,.14)}.sidebar-brand{display:block;color:#fff;text-decoration:none;font-size:1.25rem;font-weight:800;padding:1rem 1.1rem;border-bottom:1px solid rgba(255,255,255,.16)}.sidebar-section{padding:.7rem}.side-link,.side-toggle{display:flex;align-items:center;justify-content:space-between;gap:.5rem;width:100%;color:#fff;text-decoration:none;border:0;background:transparent;border-radius:.65rem;padding:.62rem .75rem;margin:.12rem 0;text-align:left}.side-link:hover,.side-toggle:hover,.side-link.active{background:rgba(255,255,255,.14);color:#fff}.side-group[open]>.side-toggle{background:rgba(255,255,255,.18)}.side-toggle::-webkit-details-marker{display:none}.side-submenu{background:#fff;color:#101828;border-radius:.7rem;margin:.25rem 0 .45rem 0;padding:.35rem}.side-submenu a{display:block;color:#101828;text-decoration:none;padding:.55rem .65rem;border-radius:.5rem}.side-submenu a:hover{background:#f0eafa;color:var(--brand)}.sidebar-footer{padding:.7rem;border-top:1px solid rgba(255,255,255,.16)}.app-main{margin-left:var(--sidebar-w);width:calc(100% - var(--sidebar-w));min-height:100vh}.mobile-topbar{display:none;background:var(--brand);color:white;padding:.6rem .75rem;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1030}.mobile-topbar a{color:#fff;text-decoration:none;font-weight:800}.content-wrap{max-width:1320px;margin:0 auto;padding:1.25rem}.sidebar-backdrop{display:none}.portal-card-link{display:block;height:100%;cursor:pointer;text-decoration:none;color:inherit}.portal-card-link:hover .portal-stat-card{border-color:var(--brand);box-shadow:0 .5rem 1.2rem rgba(16,24,40,.12)}.portal-stat-card{min-height:118px}.action-card{transition:transform .12s ease,box-shadow .12s ease}.action-card:hover{transform:translateY(-2px);box-shadow:0 .5rem 1.2rem rgba(16,24,40,.12)}
+.security-checklist{border:1px solid var(--soft-border);border-radius:.75rem;overflow:hidden;background:white}.checklist-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;align-items:center;padding:1rem 1.1rem;border-bottom:1px solid var(--soft-border)}.checklist-row:last-child{border-bottom:0}.checklist-title{font-weight:600;line-height:1.35}.checklist-detail{font-size:.86rem;color:var(--muted);margin-top:.25rem}.checklist-actions{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap;min-width:190px}.status-pill{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:.28rem .7rem;font-size:.82rem;font-weight:700;white-space:nowrap}.status-ok{background:#dcfce7;color:#166534}.status-warning{background:#fef3c7;color:#92400e}.needs-action{background:#fffaf2}.is-ok{background:#fbfffd}
+.crm-breadcrumb{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;color:#667085}.crm-breadcrumb a{text-decoration:none}.crm-context-form{min-width:260px;max-width:360px;width:100%}.workspace-grid{display:grid;grid-template-columns:220px minmax(0,1fr);gap:1rem;align-items:start}.workspace-sidebar{position:sticky;top:1rem}.workspace-nav{display:block;text-decoration:none;color:#344054;padding:.55rem .65rem;border-radius:.55rem;margin-bottom:.2rem}.workspace-nav:hover,.workspace-nav.active{background:#f0eafa;color:var(--brand);font-weight:700}.stat-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.8rem}.stat-card{background:#fff;border:1px solid var(--soft-border);border-radius:.85rem;padding:1rem;box-shadow:0 1px 4px rgba(16,24,40,.04)}.stat-card div{font-size:.82rem;color:#667085}.stat-card strong{font-size:1.55rem}.summary-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.7rem}.summary-strip div,.client-meta div{background:#f9fafb;border:1px solid #edf1f5;border-radius:.65rem;padding:.65rem}.summary-strip span,.client-meta span{display:block;font-size:.75rem;color:#667085}.summary-strip b,.client-meta b{display:block}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.mini-row{display:flex;justify-content:space-between;gap:1rem;padding:.55rem 0;border-bottom:1px solid #edf1f5}.mini-row:last-child{border-bottom:0}.client-drawer{position:fixed;right:1rem;top:1rem;bottom:1rem;width:min(420px,calc(100vw - 2rem));z-index:20;overflow:auto}.client-meta{display:grid;grid-template-columns:1fr 1fr;gap:.55rem}.timeline-item{border-left:3px solid var(--brand);padding:.25rem 0 .7rem .7rem;margin-bottom:.45rem}
+.pipeline-board{display:grid;grid-template-columns:repeat(10,minmax(240px,1fr));gap:.85rem;overflow-x:auto;padding-bottom:1rem}.pipeline-column{background:#f8fafc;border:1px solid var(--soft-border);border-radius:.85rem;min-height:420px}.pipeline-header{display:flex;justify-content:space-between;align-items:center;padding:.8rem;border-bottom:1px solid var(--soft-border);position:sticky;top:0;background:#f8fafc;border-radius:.85rem .85rem 0 0}.pipeline-dropzone{min-height:340px;padding:.65rem}.pipeline-card{background:white;border:1px solid #e5e7eb;border-radius:.75rem;padding:.75rem;margin-bottom:.65rem;box-shadow:0 1px 4px rgba(16,24,40,.06);cursor:grab}.pipeline-card.dragging{opacity:.55}.pipeline-empty{border:1px dashed #cbd5e1;border-radius:.75rem;color:#667085;text-align:center;padding:1rem}.alert-tile{border-left:5px solid #f59e0b}.alert-tile.danger{border-left-color:#dc2626}.alert-tile.success{border-left-color:#16a34a}body.dark-mode{--bg:#0f172a;--text:#e5e7eb;--muted:#94a3b8;--soft-border:#334155;background:#0f172a;color:#e5e7eb}body.dark-mode .card,body.dark-mode .stat-card,body.dark-mode .pipeline-card,body.dark-mode .security-checklist{background:#111827;color:#e5e7eb;border-color:#334155}body.dark-mode .pipeline-column,body.dark-mode .pipeline-header,body.dark-mode .summary-strip div,body.dark-mode .client-meta div{background:#1f2937;border-color:#334155}body.dark-mode .table,body.dark-mode .form-control,body.dark-mode .form-select{color:#e5e7eb}
+@media (max-width:991.98px){.app-sidebar{transform:translateX(-100%);transition:transform .18s ease}.app-sidebar.show{transform:translateX(0)}.app-main{margin-left:0;width:100%}.mobile-topbar{display:flex}.content-wrap{padding:.9rem}.sidebar-backdrop.show{display:block;position:fixed;inset:0;background:rgba(16,24,40,.35);z-index:1035}.client-drawer{position:static;width:100%;margin-top:1rem}.workspace-grid{grid-template-columns:1fr}.workspace-sidebar{position:static}.workspace-sidebar .card-body{display:flex;overflow-x:auto;gap:.25rem}.workspace-nav{white-space:nowrap}}
+@media (max-width:767.98px){h1{font-size:2rem}h2,h3{font-size:1.45rem}.checklist-row{grid-template-columns:1fr;gap:.75rem;padding:.9rem}.checklist-actions{justify-content:space-between;min-width:0;width:100%}.status-pill{min-width:104px}.card-body{padding:1rem}.responsive-table thead{display:none}.responsive-table,.responsive-table tbody,.responsive-table tr,.responsive-table td{display:block;width:100%}.responsive-table tr{border:1px solid var(--soft-border);border-radius:.65rem;margin-bottom:.75rem;padding:.65rem;background:white}.responsive-table td{border:0!important;padding:.35rem 0!important;display:flex;gap:1rem;justify-content:space-between;align-items:flex-start;word-break:break-word}.responsive-table td::before{content:attr(data-label);font-weight:700;color:#475467;min-width:110px}.table-responsive{overflow:visible}.two-col{grid-template-columns:1fr}.stat-grid{grid-template-columns:repeat(2,1fr)}.summary-strip,.client-meta{grid-template-columns:1fr}}
+@media (max-width:575px){.stat-card{padding:.75rem}.stat-card strong{font-size:1.25rem}}
+</style>
 </head>
-<body class="app-body">
-    {% if current_user.is_authenticated %}
-        <div class="app-shell">
-            <aside class="sidebar">
-                <a class="sidebar-logo" href="{{ url_for('dashboard.index') }}">
-                    <img
-                        src="{{ url_for('static', filename='img/logo.png') }}"
-                        alt="System Logo"
-                        width="180"
-                        height="81"
-                        loading="eager"
-                        decoding="async"
-                        fetchpriority="high"
-                    >
-                    <span>Martins Funerals System</span>
-                </a>
+<body>
+{% if current_user.is_authenticated %}
+{% set role=(current_user.role.name|lower if current_user.role else '') %}{% set admin_role = role in ['admin','super admin','super_admin'] %}{% set manager_role = role in ['branch manager','branch_manager','manager','supervisor'] %}
+<div class="app-shell">
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar(false)"></div>
+  <aside class="app-sidebar" id="appSidebar">
+    <a class="sidebar-brand" href="{{ url_for('role_portals.home') }}">Martin's TeleSales</a>
+    <div class="sidebar-section">
+      <a class="side-link" href="{{ url_for('role_portals.workspace') }}"><span>Workspace</span></a>
+      <a class="side-link" href="{{ url_for('recovery.next_client') }}"><span>Next Client</span></a>
+      <a class="side-link" href="{{ url_for('recovery.queue') }}"><span>{{ 'My Clients' if not (admin_role or manager_role) else 'Import / Leads' }}</span></a>
+      <a class="side-link" href="{{ url_for('recovery.callbacks') }}"><span>Callbacks</span></a>
+      <a class="side-link" href="{{ url_for('recovery.pipeline') }}"><span>Pipeline</span></a>
+      <a class="side-link" href="{{ url_for('applications.list_applications') }}"><span>Applications</span></a>
+      <a class="side-link" href="{{ url_for('documents.document_dashboard') }}"><span>Documents</span></a>
+      {% if admin_role %}<a class="side-link" href="{{ url_for('policies.import_policies') }}"><span>Import Policies</span></a><a class="side-link" href="{{ url_for('policies.list_products') }}"><span>Policy Data</span></a>{% endif %}
+      {% if admin_role or manager_role %}<a class="side-link" href="{{ url_for('qa.qa_dashboard') }}"><span>QA</span></a><a class="side-link" href="{{ url_for('reports.index') }}"><span>Reports</span></a><a class="side-link" href="{{ url_for('allocation.index') }}"><span>Allocation</span></a>{% endif %}
+      {% if admin_role %}<a class="side-link" href="{{ url_for('wallboard.index') }}"><span>Wallboard</span></a><a class="side-link" href="{{ url_for('recovery.suspense') }}"><span>Suspense</span></a><a class="side-link" href="{{ url_for('targets.index') }}"><span>Targets</span></a>{% endif %}
+      {% if admin_role %}<a class="side-link" href="{{ url_for('role_portals.admin_home') }}"><span>Admin Portal</span></a>{% endif %}
+      {% if manager_role %}<a class="side-link" href="{{ url_for('role_portals.branch_manager_home') }}"><span>Branch Portal</span></a>{% endif %}
+      {% if not (admin_role or manager_role) %}<a class="side-link" href="{{ url_for('role_portals.agent_home') }}"><span>Agent Portal</span></a>{% endif %}
+      {% if admin_role %}
+      <details class="side-group"><summary class="side-toggle"><span>Users</span><span class="nav-badge">4</span></summary><div class="side-submenu"><a href="{{ url_for('auth.users_manage') }}">Users</a><a href="{{ url_for('auth.users_employees') }}">Employees</a><a href="{{ url_for('auth.users_roles') }}">User Roles</a><a href="{{ url_for('auth.old_franchises') }}">Old Franchises</a></div></details>
+      {% endif %}
+      {% if admin_role or manager_role %}
+      <details class="side-group"><summary class="side-toggle"><span>Company Details</span><span class="nav-badge">2</span></summary><div class="side-submenu"><a href="{{ url_for('main.franchise_details') }}">Company Details</a><a href="{{ url_for('main.franchise_employees') }}">Employees</a></div></details>
+      {% endif %}
+      {% if admin_role %}<a class="side-link" href="{{ url_for('security_center.index') }}"><span>Security Center</span></a><a class="side-link" href="{{ url_for('settings.index') }}"><span>Settings</span></a>{% endif %}
+    </div>
+    <div class="sidebar-footer"><button class="btn btn-outline-light btn-sm w-100 mb-2" type="button" onclick="toggleDarkMode()">Dark mode</button><div class="small mb-2">{{ current_user.name }}<br><span style="opacity:.8">{{ current_user.email }}</span></div><a class="btn btn-light btn-sm w-100" href="{{ url_for('auth.logout') }}">Logout</a></div>
+  </aside>
+  <main class="app-main">
+    <div class="mobile-topbar"><a href="{{ url_for('role_portals.home') }}">Martin's TeleSales</a><button class="btn btn-light btn-sm" onclick="toggleSidebar(true)">Menu</button></div>
+    <div class="content-wrap">
+{% else %}
+  <main class="container mt-4">
+{% endif %}
+      {% with messages=get_flashed_messages(with_categories=true) %}{% for cat,msg in messages %}<div class="alert alert-{{cat}}">{{msg}}</div>{% endfor %}{% endwith %}
+      {% block content %}{% endblock %}
+{% if current_user.is_authenticated %}
+    </div>
+  </main>
+</div>
+{% else %}
+  </main>
+{% endif %}
 
-                <nav class="sidebar-nav">
-                    {% set nav_role_names = current_user.roles|map(attribute='name')|list %}
-                    {% set is_franchise_user = 'Franchise User' in nav_role_names or 'Manager' in nav_role_names or 'Employee' in nav_role_names or 'Agent' in nav_role_names %}
-                    {% set is_admin_user = 'Admin' in nav_role_names or 'Super Admin' in nav_role_names %}
-                    {% set is_finance_user = 'Finance Manager' in nav_role_names or 'Finance Assistant' in nav_role_names %}
-
-                    {# Menu order: lower-priority/admin setup first, daily important work lower in the sidebar. #}
-                    {% if privileged_user and franchise_view_mode %}
-                        <div class="nav-group-title">Admin</div>
-                        <a href="{{ url_for('dashboard.main_dashboard') }}">Back to Main Dashboard</a>
-
-                        {% if current_user.has_permission('manuals:view') %}<a href="{{ url_for('manuals.index') }}">Manuals</a>{% endif %}
-                        {% if current_user.has_permission('heat_map:view') %}<a href="{{ url_for('heatmap.index') }}">Heat Map</a>{% endif %}
-                        {% if current_user.has_permission('attendance:view') %}<a href="{{ url_for('attendance.index') }}">Attendance</a>{% endif %}
-
-                        <div class="nav-group-title">Selected Franchise</div>
-
-                        <details class="nav-section" open>
-                            <summary>Franchise Details <span class="nav-count-badge">2</span></summary>
-                            <div class="nav-subtabs">
-                                <a href="{{ url_for('franchise.details') }}">Franchise Details</a>
-                                {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}<a href="{{ url_for('franchise.employees') }}">Employees</a>{% endif %}
-                            </div>
-                        </details>
-
-                        <details class="nav-section" open>
-                            <summary>Monthly Figures <span class="nav-count-badge">4</span></summary>
-                            <div class="nav-subtabs">
-                                <a href="{{ url_for('performance.index') }}">Performance</a>
-                                <a href="{{ url_for('monthly.index') }}">Monthly Figures</a>
-                                <a href="{{ url_for('royalties.index') }}">Royalties</a>
-                                {% if current_user.has_permission('finance:view') %}<a href="#">Finance</a>{% endif %}
-                            </div>
-                        </details>
-                    {% else %}
-                        {# Low-priority/admin and setup areas at the top. #}
-                        {% if current_user.has_permission('users:view') or current_user.has_permission('user_roles:view') or current_user.has_permission('performance:manage_inactive') or is_admin_user or is_finance_user %}
-                            <div class="nav-group-title">Admin</div>
-                            <details class="nav-section" open>
-                                <summary>Users <span class="nav-count-badge">4</span></summary>
-                                <div class="nav-subtabs">
-                                    {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.users') }}">Users</a>{% endif %}
-                                    {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.franchise_employees') }}">Employees</a>{% endif %}
-                                    {% if current_user.has_permission('user_roles:view') %}<a href="{{ url_for('admin.roles') }}">User Roles</a>{% endif %}
-                                    {% if current_user.has_permission('performance:manage_inactive') or is_admin_user or 'Finance Manager' in nav_role_names %}<a href="{{ url_for('performance.inactive_franchises') }}">Old Franchises</a>{% endif %}
-                                </div>
-                            </details>
-
-                            {% if current_user.has_permission('franchise_management:view') %}<a href="#">Franchise Management</a>{% endif %}
-                            {% if current_user.has_permission('audit_logs:view') %}<a href="{{ url_for('admin.audit_logs') }}">Audit Logs</a>{% endif %}
-                            {% if current_user.has_permission('system_administration:view') %}<a href="#">System Administration</a>{% endif %}
-                            {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.imports_data') }}">Imports & Data</a>{% endif %}
-                        {% endif %}
-
-                        {# Operational/support modules in the middle. #}
-                        {% if current_user.has_permission('manuals:view') %}<a href="{{ url_for('manuals.index') }}">Manuals</a>{% endif %}
-                        {% if current_user.has_permission('heat_map:view') %}<a href="{{ url_for('heatmap.index') }}">Heat Map</a>{% endif %}
-                        {% if current_user.has_permission('insurance_claims:view') and not is_franchise_user %}<a href="{{ url_for('insurance_claims.index') }}">Insurance Claims</a>{% endif %}
-                        {% if current_user.has_permission('joinings:view') and not is_franchise_user %}<a href="#">Joinings</a>{% endif %}
-                        {% if current_user.has_permission('funeral_services:view') and not is_franchise_user %}<a href="#">Funeral Services</a>{% endif %}
-                        {% if current_user.has_permission('attendance:view') %}<a href="{{ url_for('attendance.index') }}">Attendance</a>{% endif %}
-
-                        {# Important daily franchise and performance work lower in the sidebar. #}
-                        {% if current_user.has_permission('franchise_details:view') or current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}
-                            <details class="nav-section" open>
-                                <summary>Franchise Details <span class="nav-count-badge">2</span></summary>
-                                <div class="nav-subtabs">
-                                    {% if current_user.has_permission('franchise_details:view') %}<a href="{{ url_for('franchise.details') }}">Franchise Details</a>{% endif %}
-                                    {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}<a href="{{ url_for('franchise.employees') }}">Employees</a>{% endif %}
-                                </div>
-                            </details>
-                        {% endif %}
-
-                        {% if current_user.has_permission('performance:view') or current_user.has_permission('monthly_figures:view') or current_user.has_permission('royalties:view') or current_user.has_permission('finance:view') %}
-                            <details class="nav-section" open>
-                                <summary>Monthly Figures <span class="nav-count-badge">4</span></summary>
-                                <div class="nav-subtabs">
-                                    {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.index') }}">Performance</a>{% endif %}
-                                    {% if current_user.has_permission('monthly_figures:view') %}<a href="{{ url_for('monthly.index') }}">Monthly Figures</a>{% endif %}
-                                    {% if current_user.has_permission('royalties:view') %}<a href="{{ url_for('royalties.index') }}">Royalties</a>{% endif %}
-                                    {% if current_user.has_permission('finance:view') %}<a href="#">Finance</a>{% endif %}
-                                </div>
-                            </details>
-                        {% endif %}
-
-                        {% if current_user.has_permission('dashboard:view') and not is_franchise_user %}
-                            <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
-                        {% endif %}
-                    {% endif %}
-                </nav>
-            </aside>
-
-            <div class="main-panel">
-                <header class="topbar">
-                    <div class="page-title">
-                        Martins Funerals System
-                        {% if franchise_view_mode and selected_franchise %}
-                            <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
-                        {% endif %}
-                    </div>
-                    <div class="topbar-user">
-                        <span>Logged in as</span>
-                        <strong>{{ current_user.full_name }}</strong>
-                        <small>{{ current_user.roles|map(attribute='name')|join(', ') or 'No Role' }}</small>
-                        {% if privileged_user and franchise_view_mode %}
-                            <a class="logout-link secondary-link" href="{{ url_for('dashboard.main_dashboard') }}">Main Dashboard</a>
-                        {% endif %}
-                        <a class="logout-link" href="{{ url_for('auth.logout') }}">Logout</a>
-                    </div>
-                </header>
-
-                <main class="content-area">
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            <div class="messages">
-                                {% for category, message in messages %}
-                                    <div class="alert {{ category }}">{{ message }}</div>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    {% endwith %}
-                    {% block app_content %}{% endblock %}
-                </main>
-            </div>
-        </div>
-    {% else %}
-        <nav class="nav">
-            <div class="brand">Martins Funerals System</div>
-            <div>
-                <a href="{{ url_for('auth.login') }}">Login</a>
-                <a href="{{ url_for('auth.register') }}">Register</a>
-            </div>
-        </nav>
-        <main class="container">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <div class="messages">
-                        {% for category, message in messages %}
-                            <div class="alert {{ category }}">{{ message }}</div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
-            {% block auth_content %}{% endblock %}
-        </main>
-    {% endif %}
-
-<script>
-// V3.5: hold mouse button and drag tables left/right or up/down.
-document.addEventListener('DOMContentLoaded', function () {
-  document.querySelectorAll('.table-responsive, .system-report-wrap').forEach(function (wrap) {
-    if (wrap.dataset.dragScrollReady === '1') return;
-    wrap.dataset.dragScrollReady = '1';
-
-    var isDown = false;
-    var startX = 0;
-    var startY = 0;
-    var scrollLeft = 0;
-    var scrollTop = 0;
-
-    wrap.addEventListener('mousedown', function (event) {
-      if (event.button !== 0) return;
-      if (event.target.closest('a, button, input, select, textarea, label')) return;
-      isDown = true;
-      wrap.classList.add('is-dragging');
-      startX = event.pageX - wrap.offsetLeft;
-      startY = event.pageY - wrap.offsetTop;
-      scrollLeft = wrap.scrollLeft;
-      scrollTop = wrap.scrollTop;
-    });
-
-    wrap.addEventListener('mouseleave', function () {
-      isDown = false;
-      wrap.classList.remove('is-dragging');
-    });
-
-    wrap.addEventListener('mouseup', function () {
-      isDown = false;
-      wrap.classList.remove('is-dragging');
-    });
-
-    wrap.addEventListener('mousemove', function (event) {
-      if (!isDown) return;
-      event.preventDefault();
-      var x = event.pageX - wrap.offsetLeft;
-      var y = event.pageY - wrap.offsetTop;
-      wrap.scrollLeft = scrollLeft - (x - startX);
-      wrap.scrollTop = scrollTop - (y - startY);
-    });
-  });
-});
-</script>
-
-
-<script>
-// Preserve the sidebar scroll position between normal Flask page loads.
-(function () {
-  var key = 'martins-sidebar-scroll-top';
-  var sidebar = document.querySelector('.sidebar');
-  if (!sidebar) return;
-
-  var saved = sessionStorage.getItem(key);
-  if (saved !== null) {
-    sidebar.scrollTop = parseInt(saved, 10) || 0;
-  }
-
-  sidebar.addEventListener('scroll', function () {
-    sessionStorage.setItem(key, String(sidebar.scrollTop));
-  }, { passive: true });
-})();
-</script>
-
-</body>
-</html>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>function toggleSidebar(show){const s=document.getElementById('appSidebar');const b=document.getElementById('sidebarBackdrop');if(!s||!b)return;s.classList.toggle('show',show);b.classList.toggle('show',show);}function toggleDarkMode(){document.body.classList.toggle('dark-mode');localStorage.setItem('telesalesDarkMode',document.body.classList.contains('dark-mode')?'1':'0');}if(localStorage.getItem('telesalesDarkMode')==='1'){document.body.classList.add('dark-mode');}</script>
+</body></html>
