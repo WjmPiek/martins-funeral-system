@@ -1248,3 +1248,106 @@ def executive_insights(month, year, franchise_ids, mode='growth_bracket', growth
             'good': sum(1 for item in insights if item['severity'] == 'good'),
         },
     }
+
+
+# Phase 10: Decision Centre
+
+def _decision_priority(item):
+    order = {'danger': 0, 'warning': 1, 'good': 2}
+    return order.get(item.get('severity'), 9)
+
+
+def decision_centre(month, year, franchise_ids, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    """Combine executive KPIs, leaderboards, health and insights into one action centre.
+
+    Phase 10 is intentionally a read-only decision layer. It does not create new
+    tables; it reuses the Phase 1-9 engine so Head Office has one place to see
+    what needs action after every monthly PDF/import cycle.
+    """
+    executive = executive_dashboard(month, year, franchise_ids, mode, growth_percent)
+    insights = executive_insights(month, year, franchise_ids, mode, growth_percent)
+    boards = leaderboard_decision_centre(month, year, franchise_ids, mode, growth_percent)
+
+    urgent_actions = []
+    for item in insights.get('items', []):
+        if item.get('severity') in ('danger', 'warning'):
+            urgent_actions.append({
+                'severity': item.get('severity'),
+                'franchise_id': item.get('franchise_id'),
+                'franchise_name': item.get('franchise_name') or 'Group',
+                'metric_label': item.get('metric_label') or 'Overall',
+                'title': item.get('title'),
+                'message': item.get('message'),
+                'action': item.get('action') or 'Review',
+            })
+
+    watchlist = []
+    for row in executive.get('needs_attention', [])[:15]:
+        status = 'danger' if to_decimal(row.get('health_score')) < Decimal('75') else 'warning'
+        watchlist.append({
+            'severity': status,
+            'franchise_id': row['franchise_id'],
+            'franchise_name': row['franchise_name'],
+            'rank': row.get('rank'),
+            'health_score': row.get('health_score'),
+            'health_label': row.get('health_label'),
+            'below_target_count': row.get('below_target_count'),
+            'below_target_labels': row.get('below_target_labels'),
+        })
+
+    wins = []
+    for row in executive.get('biggest_climbers', [])[:5]:
+        wins.append({
+            'type': 'Movement',
+            'franchise_id': row['franchise_id'],
+            'franchise_name': row['franchise_name'],
+            'title': f"{row['franchise_name']} moved up",
+            'message': row.get('movement_text') or 'Up',
+        })
+    for row in executive.get('top_performers', [])[:5]:
+        wins.append({
+            'type': 'Performance',
+            'franchise_id': row['franchise_id'],
+            'franchise_name': row['franchise_name'],
+            'title': f"#{row.get('rank')} {row['franchise_name']}",
+            'message': f"Overall score {row.get('score')}%",
+        })
+
+    kpi_focus = []
+    for summary in executive.get('kpi_summaries', []):
+        target_percent = to_decimal(summary.get('target_percent'))
+        if target_percent < Decimal('90'):
+            decision = 'Immediate attention'
+        elif target_percent < Decimal('100'):
+            decision = 'Watch closely'
+        else:
+            decision = 'On track'
+        kpi_focus.append({
+            'key': summary['key'],
+            'label': summary['label'],
+            'status': summary['status'],
+            'target_percent': summary['target_percent'],
+            'previous_month_growth': summary['previous_month_growth'],
+            'last_year_growth': summary['last_year_growth'],
+            'decision': decision,
+        })
+
+    urgent_actions.sort(key=_decision_priority)
+    watchlist.sort(key=lambda item: to_decimal(item.get('health_score')))
+
+    return {
+        'period_label': month_label(month, year),
+        'executive': executive,
+        'leaderboards': boards,
+        'insights': insights,
+        'urgent_actions': urgent_actions[:20],
+        'watchlist': watchlist[:15],
+        'wins': wins[:10],
+        'kpi_focus': kpi_focus,
+        'counts': {
+            'urgent': len([item for item in urgent_actions if item.get('severity') == 'danger']),
+            'watch': len([item for item in urgent_actions if item.get('severity') == 'warning']),
+            'wins': len(wins),
+            'franchises': executive.get('total_franchises', 0),
+        },
+    }

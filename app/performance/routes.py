@@ -39,6 +39,7 @@ from app.performance.service import (
     executive_dashboard,
     executive_insights,
     franchise_insights,
+    decision_centre,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -222,6 +223,30 @@ def franchise(franchise_id):
 
 
 
+
+
+@performance_bp.route("/decision-centre")
+@login_required
+@permission_required("performance:view")
+def decision_centre_view():
+    month, year = selected_period_from_request(request.args)
+    mode = request_mode()
+    growth = request_growth()
+    ids = accessible_franchise_ids()
+    centre = decision_centre(month, year, ids, mode, growth)
+    return render_template(
+        "performance/decision_centre.html",
+        centre=centre,
+        metrics=PERFORMANCE_METRICS,
+        target_modes=TARGET_MODES,
+        target_mode=mode,
+        growth=growth,
+        month_options=MONTHS,
+        year_options=reporting_years(),
+        selected_month=month,
+        selected_year=year,
+        selected_period_label=month_label(month, year),
+    )
 
 
 @performance_bp.route("/executive")

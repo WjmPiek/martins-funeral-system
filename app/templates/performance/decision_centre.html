@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block app_content %}
+<style>
+.dc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1rem 0}.dc-card,.dc-panel{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}.dc-number{font-size:2.1rem;font-weight:800}.dc-section{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:1rem;margin-top:1rem}.dc-row{display:grid;grid-template-columns:90px 1fr auto;gap:.75rem;align-items:center;border:1px solid #edf0f3;border-radius:10px;padding:.75rem;margin:.5rem 0}.dc-pill{border-radius:999px;padding:.25rem .6rem;font-weight:800;display:inline-block}.dc-danger{background:#f8d7da;color:#842029}.dc-warning{background:#fff3cd;color:#664d03}.dc-good{background:#d1e7dd;color:#0f5132}.dc-muted{color:#6c757d}.dc-status-good{border-left:6px solid #198754}.dc-status-warning{border-left:6px solid #f59f00}.dc-status-danger{border-left:6px solid #dc3545}.dc-actions{display:flex;gap:.5rem;flex-wrap:wrap}.leaderboard-move{padding:.25rem .55rem;border-radius:999px;font-weight:700;display:inline-block}.leaderboard-move.up{background:#d1e7dd;color:#0f5132}.leaderboard-move.down{background:#f8d7da;color:#842029}.leaderboard-move.same{background:#fff3cd;color:#664d03}.progress-track{height:10px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:.5rem 0}.progress-fill{height:100%;background:#198754}.dc-status-warning .progress-fill{background:#f59f00}.dc-status-danger .progress-fill{background:#dc3545}@media(max-width:720px){.dc-row{grid-template-columns:1fr}.dc-row>*{text-align:left}}
+</style>
+
+<div class="page-header">
+    <div>
+        <h1>Decision Centre</h1>
+        <p class="dc-muted">Phase 10: one screen for Head Office decisions after each monthly PDF/import cycle. Period: {{ selected_period_label }}.</p>
+    </div>
+    <div class="dc-actions">
+        <a class="btn secondary" href="{{ url_for('performance.executive', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Executive Dashboard</a>
+        <a class="btn secondary" href="{{ url_for('performance.insights', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Insights</a>
+        <a class="btn secondary" href="{{ url_for('performance.leaderboards', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Leaderboards</a>
+    </div>
+</div>
+
+<form class="filter-bar" method="get">
+    <label>Month
+        <select name="month">
+            {% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Year
+        <select name="year">
+            {% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Target Mode
+        <select name="target_mode">
+            {% for key, label in target_modes.items() %}<option value="{{ key }}" {% if key == target_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+    </label>
+    <label>Growth % <input type="number" step="0.01" name="growth" value="{{ growth }}"></label>
+    <button class="btn" type="submit">Update</button>
+</form>
+
+<div class="dc-grid">
+    <div class="dc-card"><div class="dc-muted">Franchises measured</div><div class="dc-number">{{ centre.counts.franchises }}</div></div>
+    <div class="dc-card"><div class="dc-muted">Urgent actions</div><div class="dc-number">{{ centre.counts.urgent }}</div><span class="dc-pill dc-danger">Red</span></div>
+    <div class="dc-card"><div class="dc-muted">Watch items</div><div class="dc-number">{{ centre.counts.watch }}</div><span class="dc-pill dc-warning">Amber</span></div>
+    <div class="dc-card"><div class="dc-muted">Wins to recognise</div><div class="dc-number">{{ centre.counts.wins }}</div><span class="dc-pill dc-good">Green</span></div>
+</div>
+
+<section class="dc-panel">
+    <h2>KPI Focus</h2>
+    <div class="dc-grid">
+        {% for item in centre.kpi_focus %}
+        <div class="dc-card dc-status-{{ item.status }}">
+            <strong>{{ item.label }}</strong>
+            <div class="dc-number">{{ item.target_percent }}%</div>
+            <div class="progress-track"><div class="progress-fill" style="width: {{ [item.target_percent, 120]|min }}%"></div></div>
+            <div class="dc-muted">{{ item.decision }} · Last month {{ item.previous_month_growth }}% · Last year {{ item.last_year_growth }}%</div>
+            <a href="{{ url_for('performance.kpi', metric_key=item.key, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open KPI</a>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<div class="dc-section">
+    <section class="dc-panel">
+        <h2>Action List</h2>
+        <p class="dc-muted">What management should look at first.</p>
+        {% for item in centre.urgent_actions %}
+        <div class="dc-row">
+            <span class="dc-pill dc-{{ item.severity }}">{{ item.severity|title }}</span>
+            <div><strong>{{ item.title }}</strong><br><span class="dc-muted">{{ item.message }} · {{ item.action }}</span></div>
+            {% if item.franchise_id %}<a href="{{ url_for('performance.franchise', franchise_id=item.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open</a>{% endif %}
+        </div>
+        {% else %}<p>No urgent actions found for this period.</p>{% endfor %}
+    </section>
+
+    <section class="dc-panel">
+        <h2>Branch Watchlist</h2>
+        <p class="dc-muted">Lowest health scores and repeated target gaps.</p>
+        {% for row in centre.watchlist %}
+        <div class="dc-row">
+            <span class="dc-pill dc-{{ row.severity }}">#{{ row.rank }}</span>
+            <div><strong>{{ row.franchise_name }}</strong><br><span class="dc-muted">Health {{ row.health_score }}% · {{ row.below_target_count }} KPI(s) below 90%{% if row.below_target_labels %}: {{ row.below_target_labels }}{% endif %}</span></div>
+            <a href="{{ url_for('performance.franchise', franchise_id=row.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open</a>
+        </div>
+        {% else %}<p>No watchlist items.</p>{% endfor %}
+    </section>
+</div>
+
+<div class="dc-section">
+    <section class="dc-panel">
+        <h2>Wins to Recognise</h2>
+        {% for item in centre.wins %}
+        <div class="dc-row">
+            <span class="dc-pill dc-good">{{ item.type }}</span>
+            <div><strong>{{ item.title }}</strong><br><span class="dc-muted">{{ item.message }}</span></div>
+            <a href="{{ url_for('performance.franchise', franchise_id=item.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open</a>
+        </div>
+        {% else %}<p>No wins found yet.</p>{% endfor %}
+    </section>
+
+    <section class="dc-panel">
+        <h2>Top 10 Overall Leaderboard</h2>
+        {% for row in centre.executive.top_performers %}
+        <div class="dc-row">
+            <strong>#{{ row.rank }}</strong>
+            <div><strong>{{ row.franchise_name }}</strong><br><span class="dc-muted">{{ row.movement_text }}</span></div>
+            <span class="leaderboard-move {{ row.movement }}">{{ row.movement_label }}{% if row.movement_delta %} {{ row.movement_delta|abs }}{% endif %}</span>
+        </div>
+        {% else %}<p>No leaderboard data.</p>{% endfor %}
+    </section>
+</div>
+{% endblock %}
