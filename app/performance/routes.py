@@ -31,6 +31,7 @@ from app.performance.service import (
     save_growth_bracket_targets,
     annual_budget_plan_for_period,
     save_annual_budget_targets,
+    franchise_dashboard,
 )
 
 performance_bp = Blueprint("performance", __name__, url_prefix="/performance")
@@ -57,6 +58,39 @@ def request_growth():
         return Decimal(str(request.args.get("growth", DEFAULT_GROWTH_PERCENT)))
     except Exception:
         return DEFAULT_GROWTH_PERCENT
+
+
+@performance_bp.route("/dashboard")
+@login_required
+@permission_required("performance:view")
+def dashboard():
+    month, year = selected_period_from_request(request.args)
+    mode = request_mode()
+    growth = request_growth()
+    ids = accessible_franchise_ids()
+    selected = get_selected_franchise()
+    franchise_id = selected.id if selected else (ids[0] if ids else None)
+    if not franchise_id:
+        flash("No franchise is available for your user access.", "warning")
+        return redirect(url_for("performance.index", month=month, year=year))
+    if franchise_id not in ids:
+        abort(403)
+    franchise = Franchise.query.get_or_404(franchise_id)
+    dashboard_data = franchise_dashboard(franchise_id, month, year, mode, growth)
+    return render_template(
+        "performance/dashboard.html",
+        franchise=franchise,
+        dashboard=dashboard_data,
+        metrics=PERFORMANCE_METRICS,
+        target_modes=TARGET_MODES,
+        target_mode=mode,
+        growth=growth,
+        month_options=MONTHS,
+        year_options=reporting_years(),
+        selected_month=month,
+        selected_year=year,
+        selected_period_label=month_label(month, year),
+    )
 
 
 @performance_bp.route("/")

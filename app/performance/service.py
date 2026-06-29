@@ -688,3 +688,71 @@ def save_annual_budget_targets(target_year, franchise_ids, metric_keys=None, his
                 saved += 1
     db.session.commit()
     return saved
+
+# Phase 4: franchise dashboard helpers
+
+def achievement_status(achievement_percent):
+    achievement_percent = to_decimal(achievement_percent)
+    if achievement_percent >= Decimal("100"):
+        return "good"
+    if achievement_percent >= Decimal("90"):
+        return "warning"
+    return "danger"
+
+
+def health_score_from_metrics(metric_rows):
+    total = Decimal("0")
+    weight_total = Decimal("0")
+    for row in metric_rows:
+        config = PERFORMANCE_METRICS.get(row["key"], {})
+        weight = config.get("weight", Decimal("0"))
+        if row.get("target", Decimal("0")) > 0:
+            total += min(to_decimal(row.get("target_percent", 0)), Decimal("120")) * weight
+            weight_total += weight
+    if weight_total <= 0:
+        return Decimal("0")
+    return (total / weight_total).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def health_label(score):
+    score = to_decimal(score)
+    if score >= Decimal("100"):
+        return "Excellent"
+    if score >= Decimal("90"):
+        return "On Track"
+    if score >= Decimal("75"):
+        return "Needs Attention"
+    return "Critical"
+
+
+def dashboard_decision_insights(metric_rows):
+    insights = []
+    for row in metric_rows:
+        label = row["label"]
+        achievement = to_decimal(row.get("target_percent", 0))
+        prev_change = to_decimal(row.get("previous_month_difference", 0))
+        last_year_change = to_decimal(row.get("same_month_last_year_difference", 0))
+        if achievement >= Decimal("100"):
+            insights.append({"status": "good", "text": f"{label} is above target at {achievement}%."})
+        elif achievement >= Decimal("90"):
+            insights.append({"status": "warning", "text": f"{label} is close to target at {achievement}%."})
+        else:
+            insights.append({"status": "danger", "text": f"{label} is below target at {achievement}%."})
+        if prev_change > 0 and last_year_change > 0:
+            insights.append({"status": "good", "text": f"{label} is improving against both last month and last year."})
+        elif prev_change < 0 and last_year_change < 0:
+            insights.append({"status": "danger", "text": f"{label} is down against both last month and last year."})
+    return insights[:8]
+
+
+def franchise_dashboard(franchise_id, month, year, mode="growth_bracket", growth_percent=DEFAULT_GROWTH_PERCENT):
+    metric_rows = franchise_metric_summary(franchise_id, month, year, mode, growth_percent)
+    score = health_score_from_metrics(metric_rows)
+    snapshot = dashboard_snapshot(franchise_id, month, year, mode, growth_percent)
+    return {
+        "snapshot": snapshot,
+        "metrics": [dict(row, status=achievement_status(row.get("target_percent", 0))) for row in metric_rows],
+        "health_score": score,
+        "health_label": health_label(score),
+        "insights": dashboard_decision_insights(metric_rows),
+    }

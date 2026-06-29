@@ -3,7 +3,7 @@
 <div class="page-header">
     <div>
         <h1>Performance Leaderboard</h1>
-        <p class="muted">Live target comparison for Cash, Sales, Insurance Premiums, Joinings and Funerals.</p>
+        <p class="muted">Simple rank board. Current rank decides the position; previous rank only calculates Up, Down or Same.</p>
     </div>
     {% if show_manage_targets %}
     <div class="button-row">
@@ -62,7 +62,7 @@
 <table class="data-table">
     <thead>
         <tr>
-            <th>Rank</th><th>Franchise</th><th>Movement</th><th>Actual</th><th>Target</th><th>Achievement</th><th>Detail</th>
+            <th>Rank</th><th>Franchise</th><th>Movement</th><th>Detail</th>
         </tr>
     </thead>
     <tbody>
@@ -70,14 +70,11 @@
         <tr>
             <td><strong>#{{ row.rank }}</strong></td>
             <td>{{ row.franchise_name }}</td>
-            <td><span class="leaderboard-move {{ row.movement }}">{{ row.movement_label }}{% if row.movement_delta %} {{ row.movement_delta|abs }}{% endif %}</span></td>
-            <td>{{ '%.2f'|format(row.actual) }}</td>
-            <td>{{ '%.2f'|format(row.target) }}</td>
-            <td>{{ '%.2f'|format(row.achievement) }}%</td>
+            <td><span class="leaderboard-move {{ row.movement }}">{{ row.movement_label }}{% if row.movement_delta %} by {{ row.movement_delta|abs }}{% endif %}</span></td>
             <td><a href="{{ url_for('performance.franchise', franchise_id=row.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Open</a></td>
         </tr>
     {% else %}
-        <tr><td colspan="7">No performance data found for this period.</td></tr>
+        <tr><td colspan="4">No performance data found for this period.</td></tr>
     {% endfor %}
     </tbody>
 </table>
