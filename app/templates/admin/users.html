@@ -4,47 +4,40 @@
   <div class="section-header">
     <div>
       <h1>Users</h1>
-      <p class="muted">Create and manage Martins Funerals South Africa users here. Franchise employees are created by franchise users from Franchise Details > Employees.</p>
+      <p>Mother-company users are created here. Franchise employees are created by franchise owners from Franchise Details > Employees.</p>
     </div>
   </div>
 
   {% if can_create_admin_user %}
-  <div class="form-section-card mother-company-create-card">
+  <div class="form-section-card">
     <h2>Create Martins User</h2>
-    <p class="muted">Use this form only for Mother Company users and registered franchise owner accounts.</p>
-    <form method="post" action="{{ url_for('admin.create_admin_user') }}" class="professional-form">
-      <div class="form-grid">
-        <label for="new_user_role">Role</label>
-        <select id="new_user_role" name="role_id" required>
-          <option value="">Select role...</option>
+    <p class="muted">Select the role first. Finance users are not linked to franchises. Regional Managers and Franchise Users must be linked to selected franchise(s).</p>
+    <form method="post" action="{{ url_for('admin.create_admin_user') }}" class="inline-form-grid">
+      <label>Name<input type="text" name="name" required></label>
+      <label>Surname<input type="text" name="surname" required></label>
+      <label>Email<input type="email" name="email" required></label>
+      <label>Password<input type="text" name="password" required></label>
+      <label>Role
+        <select name="role_id" id="admin-create-role" required onchange="toggleFranchiseScope()">
+          <option value="">Select role</option>
           {% for role in admin_creatable_roles %}
             <option value="{{ role.id }}" data-role-name="{{ role.name }}">{{ role.name }}</option>
           {% endfor %}
         </select>
-
-        <label for="new_user_name">Name</label>
-        <input id="new_user_name" name="name" required>
-
-        <label for="new_user_surname">Surname</label>
-        <input id="new_user_surname" name="surname" required>
-
-        <label for="new_user_email">Email</label>
-        <input id="new_user_email" type="email" name="email" required>
-
-        <label for="new_user_password">Temporary Password</label>
-        <input id="new_user_password" type="text" name="password" required minlength="8">
-
-        <label for="new_user_franchises" class="new-user-scope-field">Linked Franchise(s)</label>
-        <select id="new_user_franchises" class="new-user-scope-field" name="franchise_ids" multiple size="7">
+      </label>
+      <div id="franchise-scope-box" style="display:none; grid-column: 1 / -1;">
+        <label>Linked Franchise(s)</label>
+        <p class="muted">Regional Managers can have multiple franchises. Franchise Users should normally have one franchise.</p>
+        <div class="modal-role-grid">
           {% for franchise in franchises %}
-            <option value="{{ franchise.id }}">{{ franchise.business_name or 'Unnamed Franchise' }}</option>
+            <label class="modal-role-option">
+              <input type="checkbox" name="franchise_ids" value="{{ franchise.id }}">
+              <span>{{ franchise.business_name or 'Unnamed Franchise' }}</span>
+            </label>
           {% endfor %}
-        </select>
+        </div>
       </div>
-      <div class="role-help-box" id="new-user-role-help">
-        Select a role first. Finance Manager and Finance Assistant do not link to franchises. Regional Manager links to one or more franchises. Franchise User links to the franchise account they own.
-      </div>
-      <button type="submit" class="btn button-auto">Create User</button>
+      <div style="grid-column: 1 / -1;"><button class="btn button-auto" type="submit">Create User</button></div>
     </form>
   </div>
   {% endif %}
@@ -52,100 +45,52 @@
   <div class="form-section-card">
     <h2>Mother Company Users</h2>
     <p class="muted">Admin, Finance Manager, Finance Assistant and Regional Manager users created under Martins Funerals South Africa.</p>
-    <div class="table-responsive">
-      <table class="system-report-table users-table">
-        <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Franchise Scope</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-          {% for user in mother_company_users %}
-          <tr class="{% if not user.is_active %}inactive-row{% endif %}">
-            <td><strong>{{ user.full_name }}</strong></td>
-            <td>{{ user.email }}</td>
-            <td>{{ user.roles|map(attribute='name')|join(', ') or 'No role' }}</td>
-            <td>{{ user.assigned_franchises|map(attribute='business_name')|join(' + ') or 'Not franchise-linked' }}</td>
-            <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
-            <td>
-              <button type="button" class="btn secondary small" onclick="openRoleModal('role-modal-{{ user.id }}')">Edit</button>
-              <div class="modal-backdrop" id="role-modal-{{ user.id }}" aria-hidden="true">
-                <div class="modal-card" role="dialog" aria-modal="true">
-                  <div class="modal-header"><div><h2>Edit User</h2><p>{{ user.email }}</p></div><button type="button" class="modal-close" onclick="closeRoleModal('role-modal-{{ user.id }}')">x</button></div>
-                  <form method="post" action="{{ url_for('admin.update_user_roles', user_id=user.id) }}">
-                    <div class="form-grid">
-                      <label>Roles</label>
-                      <div class="modal-role-grid">
-                        {% for role in roles %}
-                          {% if role.name in ['Admin','Finance Manager','Finance Assistant','Regional Manager','Franchise User'] %}
-                          <label class="modal-role-option"><input type="checkbox" name="role_ids" value="{{ role.id }}" {% if role in user.roles %}checked{% endif %}><span>{{ role.name }}</span></label>
-                          {% endif %}
-                        {% endfor %}
-                      </div>
-                      <label>Linked Franchise(s)</label>
-                      <div class="modal-role-grid">
-                        {% for franchise in franchises %}
-                        <label class="modal-role-option"><input type="checkbox" name="franchise_ids" value="{{ franchise.id }}" {% if franchise in user.assigned_franchises %}checked{% endif %}><span>{{ franchise.business_name or 'Unnamed Franchise' }}</span></label>
-                        {% endfor %}
-                      </div>
-                    </div>
-                    <div class="modal-actions"><button type="submit" class="btn button-auto">Save</button></div>
-                  </form>
-                </div>
-              </div>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="6" class="center-cell">No mother company users found.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <div class="table-responsive"><table class="system-report-table users-table">
+      <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Linked Franchises</th></tr></thead>
+      <tbody>
+      {% for user in mother_company_users %}
+        <tr>
+          <td><strong>{{ user.full_name }}</strong></td>
+          <td>{{ user.email }}</td>
+          <td>{{ user.roles|map(attribute='name')|join(', ') }}</td>
+          <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
+          <td>{% if user.assigned_franchises %}{{ user.assigned_franchises|map(attribute='business_name')|join(', ') }}{% else %}<span class="muted">None</span>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="center-cell">No mother-company users found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
   </div>
 
   <div class="form-section-card">
     <h2>Franchise User Accounts</h2>
     <p class="muted">These are the registered franchise owner/user accounts. Their employees are managed from the Employees sub tab.</p>
-    <div class="table-responsive">
-      <table class="system-report-table users-table">
-        <thead><tr><th>Franchise User</th><th>Email</th><th>Linked Franchise</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-          {% for user in franchise_owner_users %}
-          <tr class="{% if not user.is_active %}inactive-row{% endif %}">
-            <td><strong>{{ user.full_name }}</strong></td>
-            <td>{{ user.email }}</td>
-            <td>{{ user.assigned_franchises|map(attribute='business_name')|join(' + ') or 'Not linked' }}</td>
-            <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
-            <td><a class="btn secondary small" href="{{ url_for('admin.franchise_employees') }}">View Employees</a></td>
-          </tr>
-          {% else %}
-          <tr><td colspan="5" class="center-cell">No franchise user accounts found.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <div class="table-responsive"><table class="system-report-table users-table">
+      <thead><tr><th>Franchise User</th><th>Email</th><th>Linked Franchise(s)</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for user in franchise_owner_users %}
+        <tr>
+          <td><strong>{{ user.full_name }}</strong></td>
+          <td>{{ user.email }}</td>
+          <td>{% if user.assigned_franchises %}{{ user.assigned_franchises|map(attribute='business_name')|join(', ') }}{% else %}<span class="badge warning">Not linked</span>{% endif %}</td>
+          <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="center-cell">No franchise users found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
   </div>
 </section>
 <script>
-function openRoleModal(id){const modal=document.getElementById(id); if(modal){modal.classList.add('is-open'); modal.setAttribute('aria-hidden','false');}}
-function closeRoleModal(id){const modal=document.getElementById(id); if(modal){modal.classList.remove('is-open'); modal.setAttribute('aria-hidden','true');}}
-document.addEventListener('click', function(event){ if(event.target.classList && event.target.classList.contains('modal-backdrop')) closeRoleModal(event.target.id); });
-(function(){
-  const roleSelect = document.getElementById('new_user_role');
-  const scopeFields = document.querySelectorAll('.new-user-scope-field');
-  const help = document.getElementById('new-user-role-help');
-  function updateScope(){
-    if(!roleSelect) return;
-    const option = roleSelect.options[roleSelect.selectedIndex];
-    const role = option ? option.getAttribute('data-role-name') : '';
-    const needsScope = role === 'Regional Manager' || role === 'Franchise User';
-    scopeFields.forEach(el => { el.style.display = needsScope ? '' : 'none'; });
-    const scopeSelect = document.getElementById('new_user_franchises');
-    if(scopeSelect){ scopeSelect.required = needsScope; if(!needsScope){ Array.from(scopeSelect.options).forEach(o => o.selected = false); }}
-    if(help){
-      if(role === 'Finance Manager' || role === 'Finance Assistant') help.textContent = role + ' is a Martins Funerals South Africa user and is not linked to a franchise.';
-      else if(role === 'Regional Manager') help.textContent = 'Regional Manager must be linked to one or more franchises they manage.';
-      else if(role === 'Franchise User') help.textContent = 'Franchise User must be linked to the franchise account they own.';
-      else help.textContent = 'Select a role first.';
-    }
-  }
-  if(roleSelect){ roleSelect.addEventListener('change', updateScope); updateScope(); }
-})();
+function toggleFranchiseScope(){
+  const select = document.getElementById('admin-create-role');
+  const option = select.options[select.selectedIndex];
+  const roleName = option ? option.getAttribute('data-role-name') : '';
+  const box = document.getElementById('franchise-scope-box');
+  box.style.display = (roleName === 'Regional Manager' || roleName === 'Franchise User') ? 'block' : 'none';
+}
+document.addEventListener('DOMContentLoaded', toggleFranchiseScope);
 </script>
 {% endblock %}

@@ -69,7 +69,9 @@ def admin_creatable_roles():
 
 
 def can_create_admin_user():
-    return (is_current_user_admin() or current_user.has_role("Finance Manager")) and current_user.has_permission("users:add")
+    # Admin must always be able to create Martins mother-company users.
+    # Finance Manager can create the allowed lower-level roles when the Users Add permission is ticked.
+    return is_current_user_admin() or (current_user.has_role("Finance Manager") and current_user.has_permission("users:add"))
 
 
 def current_user_role_names():
@@ -165,7 +167,9 @@ def can_create_regional_manager():
 
 
 def can_assign_franchise_links():
-    # Controlled by User Roles, not hardcoded Admin/Finance Assistant names.
+    # Admin must always be able to link Regional Manager and Franchise User accounts.
+    if is_current_user_admin() or current_user.has_role("Super Admin"):
+        return True
     return current_user.has_permission("franchise_management:manage") and current_user.has_permission("users:edit")
 
 
@@ -210,11 +214,12 @@ def franchise_user_has_active_data(user):
 
 
 def can_change_user_roles():
-    # Role changes are deliberately stricter than normal Users Edit permission.
-    # Only Admin and Finance Assistant users may assign/change roles, and their role
-    # must still have Users Edit enabled on the User Roles permission page.
+    # Admin must always be able to correct user roles. Finance Assistant still
+    # requires the Users Edit permission.
     names = user_role_names(current_user)
-    return bool(names & {"Admin", "Finance Assistant"}) and current_user.has_permission("users:edit")
+    if "Admin" in names or "Super Admin" in names:
+        return True
+    return "Finance Assistant" in names and current_user.has_permission("users:edit")
 
 
 def clean_franchise_name(value):
@@ -278,6 +283,10 @@ def permission_required(code):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            # Admin/Super Admin must never be blocked from Admin screens by
+            # missing seeded permission rows.
+            if current_user.has_role("Admin") or current_user.has_role("Super Admin"):
+                return func(*args, **kwargs)
             if not current_user.has_permission(code):
                 abort(403)
             return func(*args, **kwargs)

@@ -9,6 +9,27 @@ from datetime import datetime, timezone
 auth_bp = Blueprint("auth", __name__)
 
 
+def user_role_names(user):
+    return {role.name for role in getattr(user, "roles", [])}
+
+
+def default_landing_url():
+    """Send each role to a page they are allowed to see after login.
+
+    Franchise users no longer have a Dashboard tab, so sending everyone to
+    /dashboard/ creates 403 errors for users whose role correctly has no
+    dashboard permission.
+    """
+    names = user_role_names(current_user)
+    if names & {"Admin", "Super Admin", "Finance Manager", "Finance Assistant"}:
+        return url_for("admin.users")
+    if "Regional Manager" in names:
+        return url_for("franchise.details")
+    if names & {"Franchise User", "Franchise Manager", "Franchise Employee", "Franchise Agent", "Read Only User"}:
+        return url_for("franchise.details")
+    return url_for("franchise.details")
+
+
 def send_password_reset_email(user):
     token = user.get_reset_token()
     reset_url = url_for("auth.reset_password", token=token, _external=True)
@@ -37,14 +58,14 @@ If you did not request this, you can ignore this email.
 @auth_bp.route("/")
 def home():
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(default_landing_url())
     return redirect(url_for("auth.login"))
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(default_landing_url())
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -103,7 +124,7 @@ def register():
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(default_landing_url())
 
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
@@ -116,7 +137,7 @@ def login():
             db.session.commit()
             login_user(user)
             flash("Welcome back.", "success")
-            return redirect(url_for("dashboard.index"))
+            return redirect(default_landing_url())
 
         flash("Invalid email or password.", "danger")
 
@@ -134,7 +155,7 @@ def logout():
 @auth_bp.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(default_landing_url())
 
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
@@ -159,7 +180,7 @@ def forgot_password():
 @auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard.index"))
+        return redirect(default_landing_url())
 
     user = User.verify_reset_token(token)
     if not user:

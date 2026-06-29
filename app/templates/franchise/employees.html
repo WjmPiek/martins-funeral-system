@@ -1,103 +1,45 @@
 {% extends "base.html" %}
 {% block app_content %}
 <section class="page-section">
-  <div class="section-header">
-    <div>
-      <h1>Employees</h1>
-      <p class="muted">Create Manager, Employee or Agent users under your own franchise. These users only see your franchise data.</p>
-    </div>
-  </div>
+  <div class="section-header"><div><h1>Employees</h1><p>Create Manager, Employee or Agent users under your own franchise. These users only see data for the franchise they are linked to.</p></div></div>
 
   {% if franchises %}
   <div class="form-section-card">
     <h2>Add Employee</h2>
-    <form method="post" class="professional-form compact-form">
-      <div class="form-grid">
-        <label for="franchise_id">Franchise</label>
-        <select id="franchise_id" name="franchise_id" required>
-          {% for franchise in franchises %}
-            <option value="{{ franchise.id }}">{{ franchise.business_name or 'Unnamed Franchise' }}</option>
-          {% endfor %}
-        </select>
-
-        <label for="role_id">Employee Type</label>
-        <select id="role_id" name="role_id" required>
-          <option value="">Select employee type...</option>
-          {% for role in creatable_roles %}
-            <option value="{{ role.id }}">{{ role.name.replace('Franchise ', '') }}</option>
-          {% endfor %}
-        </select>
-
-        <label for="name">Name</label>
-        <input id="name" name="name" required>
-
-        <label for="surname">Surname</label>
-        <input id="surname" name="surname" required>
-
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" required>
-
-        <label for="password">Temporary Password</label>
-        <input id="password" name="password" type="text" required minlength="8">
-      </div>
-      <div class="form-actions"><button type="submit" class="button-auto">Add Employee</button></div>
+    <form method="post" action="{{ url_for('franchise.employees') }}" class="inline-form-grid">
+      <label>Name<input type="text" name="name" required></label>
+      <label>Surname<input type="text" name="surname" required></label>
+      <label>Email<input type="email" name="email" required></label>
+      <label>Password<input type="text" name="password" required></label>
+      <label>Role<select name="role_id" required>{% for role in creatable_roles %}<option value="{{ role.id }}">{{ role.name.replace('Franchise ', '') }}</option>{% endfor %}</select></label>
+      <label>Franchise<select name="franchise_id" required>{% for franchise in franchises %}<option value="{{ franchise.id }}">{{ franchise.business_name or 'Unnamed Franchise' }}</option>{% endfor %}</select></label>
+      <div style="grid-column: 1 / -1;"><button class="btn button-auto" type="submit">Add Employee</button></div>
     </form>
   </div>
   {% else %}
-  <div class="alert warning">Your franchise user account is not linked to a franchise yet. Ask Admin to link your Franchise User account before creating employees.</div>
+  <div class="alert warning">Your user is not linked to any franchise yet. Ask Admin to link your franchise before creating employee users.</div>
   {% endif %}
 
   <div class="form-section-card">
-    <h2>My Employees</h2>
-    <div class="table-responsive">
-      <table class="system-report-table users-table">
-        <thead><tr><th>Name</th><th>Email</th><th>Employee Type</th><th>Franchise</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-          {% for user in employees %}
-          <tr class="{% if not user.is_active %}inactive-row{% endif %}">
-            <td><strong>{{ user.full_name }}</strong></td>
-            <td>{{ user.email }}</td>
-            <td>{{ user.primary_role_name.replace('Franchise ', '') }}</td>
-            <td>{{ user.assigned_franchises|map(attribute='business_name')|join(' + ') or 'Not linked' }}</td>
-            <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
-            <td>
-              <button type="button" class="btn secondary small" onclick="openEmployeeModal('employee-modal-{{ user.id }}')">Edit</button>
-              <form method="post" action="{{ url_for('franchise.delete_employee', user_id=user.id) }}" class="inline-form" onsubmit="return confirm('Deactivate this employee user?');">
-                <button type="submit" class="danger-btn small">Delete</button>
-              </form>
-              <div class="modal-backdrop" id="employee-modal-{{ user.id }}" aria-hidden="true">
-                <div class="modal-card" role="dialog" aria-modal="true">
-                  <div class="modal-header"><div><h2>Edit Employee</h2><p>{{ user.email }}</p></div><button type="button" class="modal-close" onclick="closeEmployeeModal('employee-modal-{{ user.id }}')">x</button></div>
-                  <form method="post" action="{{ url_for('franchise.update_employee', user_id=user.id) }}">
-                    <div class="form-grid">
-                      <label>Name</label><input name="name" value="{{ user.name }}" required>
-                      <label>Surname</label><input name="surname" value="{{ user.surname }}" required>
-                      <label>Employee Type</label>
-                      <select name="role_id" required>
-                        {% for role in creatable_roles %}
-                          <option value="{{ role.id }}" {% if role in user.roles %}selected{% endif %}>{{ role.name.replace('Franchise ', '') }}</option>
-                        {% endfor %}
-                      </select>
-                      <label>New Password</label><input name="password" type="text" placeholder="Leave blank to keep current password">
-                      <label>Status</label><select name="is_active"><option value="1" {% if user.is_active %}selected{% endif %}>Active</option><option value="0" {% if not user.is_active %}selected{% endif %}>Inactive</option></select>
-                    </div>
-                    <div class="modal-actions"><button type="submit" class="btn button-auto">Save</button></div>
-                  </form>
-                </div>
-              </div>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="6" class="center-cell">No employees created yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <h2>Users Created By Me</h2>
+    <div class="table-responsive"><table class="system-report-table users-table">
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for employee in employees %}
+      <tr>
+        <td><strong>{{ employee.full_name }}</strong></td>
+        <td>{{ employee.email }}</td>
+        <td>{{ employee.roles|map(attribute='name')|join(', ') }}</td>
+        <td>{% if employee.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
+        <td><button type="button" class="btn secondary button-auto" onclick="openEmp('emp-{{ employee.id }}')">Edit</button><form method="post" action="{{ url_for('franchise.delete_employee', user_id=employee.id) }}" style="display:inline" onsubmit="return confirm('Deactivate this employee user?');"><button class="btn danger button-auto" type="submit">Deactivate</button></form></td>
+      </tr>
+      <tr><td colspan="5"><div class="modal-backdrop" id="emp-{{ employee.id }}" aria-hidden="true"><div class="modal-card" role="dialog" aria-modal="true"><div class="modal-header"><div><h2>Edit Employee</h2><p>{{ employee.email }}</p></div><button type="button" class="modal-close" onclick="closeEmp('emp-{{ employee.id }}')">x</button></div><form method="post" action="{{ url_for('franchise.update_employee', user_id=employee.id) }}"><label>Name<input name="name" value="{{ employee.name or '' }}"></label><label>Surname<input name="surname" value="{{ employee.surname or '' }}"></label><label>Role<select name="role_id">{% for role in creatable_roles %}<option value="{{ role.id }}" {% if role in employee.roles %}selected{% endif %}>{{ role.name.replace('Franchise ', '') }}</option>{% endfor %}</select></label><label>Status<select name="is_active"><option value="1" {% if employee.is_active %}selected{% endif %}>Active</option><option value="0" {% if not employee.is_active %}selected{% endif %}>Inactive</option></select></label><label>New Password<input name="password" placeholder="Leave blank to keep current password"></label><div class="modal-actions"><button type="button" class="btn secondary button-auto" onclick="closeEmp('emp-{{ employee.id }}')">Cancel</button><button class="btn button-auto" type="submit">Save</button></div></form></div></div></td></tr>
+      {% else %}
+        <tr><td colspan="5" class="center-cell">No franchise users created yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
   </div>
 </section>
-<script>
-function openEmployeeModal(id){const modal=document.getElementById(id); if(modal){modal.classList.add('is-open'); modal.setAttribute('aria-hidden','false');}}
-function closeEmployeeModal(id){const modal=document.getElementById(id); if(modal){modal.classList.remove('is-open'); modal.setAttribute('aria-hidden','true');}}
-document.addEventListener('click', function(event){ if(event.target.classList && event.target.classList.contains('modal-backdrop')) closeEmployeeModal(event.target.id); });
-</script>
+<script>function openEmp(id){const m=document.getElementById(id); if(m){m.classList.add('is-open');m.setAttribute('aria-hidden','false');}} function closeEmp(id){const m=document.getElementById(id); if(m){m.classList.remove('is-open');m.setAttribute('aria-hidden','true');}}</script>
 {% endblock %}
