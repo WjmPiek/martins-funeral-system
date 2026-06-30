@@ -330,7 +330,12 @@ def export_details_pdf():
 # ---------------------------------------------------------------------------
 
 def can_manage_own_franchise_employees():
-    return current_user.has_permission("franchise_employees:manage") or current_user.has_permission("franchise_employees:add")
+    # Franchise owner users must always be able to create their own Managers, Employees and Agents.
+    return (
+        current_user.has_role("Franchise User")
+        or current_user.has_permission("franchise_employees:manage")
+        or current_user.has_permission("franchise_employees:add")
+    )
 
 
 FRANCHISE_USER_CREATABLE_ROLE_NAMES = ["Franchise Manager", "Franchise Employee", "Franchise Agent"]

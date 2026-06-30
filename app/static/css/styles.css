@@ -1603,3 +1603,124 @@ body.app-body {
     .user-management-table { min-width: 760px !important; }
     .form-section-card .table-responsive:has(.user-management-table) { overflow-x: auto !important; }
 }
+
+/* V83 top-right dropdown navigation */
+.app-shell {
+    display: block;
+    min-height: 100vh;
+}
+
+.app-menu {
+    position: fixed;
+    top: 18px;
+    right: 24px;
+    z-index: 3000;
+}
+
+.app-menu > summary {
+    list-style: none;
+}
+
+.app-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.menu-toggle {
+    width: 54px;
+    height: 48px;
+    border-radius: 14px;
+    background: #0f172a;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+}
+
+.menu-toggle span {
+    display: block;
+    width: 25px;
+    height: 3px;
+    border-radius: 999px;
+    background: #ffffff;
+}
+
+.menu-panel {
+    display: none;
+    position: absolute;
+    top: 58px;
+    right: 0;
+    width: min(360px, calc(100vw - 32px));
+    max-height: calc(100vh - 86px);
+    overflow-y: auto;
+    background: #0f172a;
+    color: #ffffff;
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+}
+
+.app-menu[open] .menu-panel {
+    display: block;
+}
+
+.sidebar-logo {
+    min-height: auto;
+    padding-bottom: 16px;
+    margin-bottom: 14px;
+}
+
+.sidebar-logo img {
+    width: 132px;
+    height: auto;
+}
+
+.sidebar-logo span {
+    font-size: 1.05rem;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding-bottom: 0;
+}
+
+.sidebar-nav a,
+.nav-section summary {
+    color: #dbe7f5;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.nav-subtabs {
+    padding-left: 10px;
+}
+
+.nav-subtabs a {
+    display: block;
+    font-size: 0.94rem;
+}
+
+.nav-group-title {
+    margin-top: 10px;
+    color: #94a3b8;
+}
+
+.main-panel {
+    margin-left: 0;
+    width: 100%;
+    min-height: 100vh;
+}
+
+.topbar {
+    padding-right: 96px;
+}
+
+@media print {
+    .app-menu { display: none !important; }
+}

@@ -6,12 +6,16 @@
     <title>Martins Funerals System</title>
 
     <link rel="preload" href="{{ url_for('static', filename='img/logo.png') }}" as="image" fetchpriority="high">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v82-admin-graphs-polish') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v83-top-menu-fix') }}">
 </head>
 <body class="app-body">
     {% if current_user.is_authenticated %}
         <div class="app-shell">
-            <aside class="sidebar">
+            <details class="app-menu">
+                <summary class="menu-toggle" aria-label="Open menu">
+                    <span></span><span></span><span></span><span></span>
+                </summary>
+                <div class="menu-panel">
                 <a class="sidebar-logo" href="{{ url_for('performance.graphs') if current_user.has_permission('performance:view') else url_for('dashboard.index') }}">
                     <img
                         src="{{ url_for('static', filename='img/logo.png') }}"
@@ -117,7 +121,8 @@
                         {% endif %}
                     {% endif %}
                 </nav>
-            </aside>
+                </div>
+            </details>
 
             <div class="main-panel">
                 <header class="topbar">
@@ -222,20 +227,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 <script>
-// Preserve the sidebar scroll position between normal Flask page loads.
+// Close the top-right menu after a link is clicked.
 (function () {
-  var key = 'martins-sidebar-scroll-top';
-  var sidebar = document.querySelector('.sidebar');
-  if (!sidebar) return;
-
-  var saved = sessionStorage.getItem(key);
-  if (saved !== null) {
-    sidebar.scrollTop = parseInt(saved, 10) || 0;
-  }
-
-  sidebar.addEventListener('scroll', function () {
-    sessionStorage.setItem(key, String(sidebar.scrollTop));
-  }, { passive: true });
+  var menu = document.querySelector('.app-menu');
+  if (!menu) return;
+  menu.querySelectorAll('a').forEach(function (link) {
+    link.addEventListener('click', function () { menu.open = false; });
+  });
 })();
 </script>
 
