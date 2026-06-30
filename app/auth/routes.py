@@ -13,14 +13,21 @@ def user_role_names(user):
     return {role.name for role in getattr(user, "roles", [])}
 
 
-def default_landing_url():
-    """Send users to the graph dashboard after login when allowed.
+def is_mobile_request():
+    agent = (request.headers.get("User-Agent") or "").lower()
+    return any(token in agent for token in ("mobile", "android", "iphone", "ipad", "ipod"))
 
-    The requested first-login experience is that every user sees the
-    Performance Graphs dashboard first.  Keep a safe fallback for legacy users
-    whose role has not yet received the performance permission.
+
+def default_landing_url():
+    """Send users to the right performance landing page after login.
+
+    Desktop users start on Performance Graphs.  Mobile users start on the
+    Leaderboard because it is the requested main mobile page and is easier to
+    read on a phone.
     """
     if current_user.has_permission("performance:view"):
+        if is_mobile_request():
+            return url_for("performance.index")
         return url_for("performance.graphs")
     if current_user.has_permission("dashboard:view"):
         return url_for("dashboard.index")

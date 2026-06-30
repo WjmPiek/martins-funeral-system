@@ -1256,6 +1256,110 @@ def growth_trend_series(franchise_id, metric_key, end_month, end_year, periods=1
     return series
 
 
+
+def aggregate_trend_series(franchise_ids, metric_key, end_month, end_year, periods=12, mode="manual", growth_percent=DEFAULT_GROWTH_PERCENT):
+    franchise_ids = filter_active_franchise_ids(franchise_ids or [])
+    series = []
+    for m, y in _series_periods(end_month, end_year, periods):
+        actuals = period_actuals(m, y, franchise_ids, [metric_key])
+        targets = targets_for_period(m, y, franchise_ids, mode, growth_percent, [metric_key])
+        actual = sum((actuals.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        target = sum((targets.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        series.append({
+            'label': f"{MONTH_NAME.get(m, m)[:3]} {y}",
+            'actual': float(round_money(actual)),
+            'target': float(round_money(target)),
+            'achievement': float(percent(actual, target)),
+        })
+    return series
+
+
+def aggregate_previous_year_series(franchise_ids, metric_key, end_month, end_year, periods=12):
+    franchise_ids = filter_active_franchise_ids(franchise_ids or [])
+    series = []
+    for m, y in _series_periods(end_month, end_year, periods):
+        current_rows = period_actuals(m, y, franchise_ids, [metric_key])
+        previous_rows = period_actuals(m, y - 1, franchise_ids, [metric_key])
+        current = sum((current_rows.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        previous = sum((previous_rows.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        series.append({
+            'label': f"{MONTH_NAME.get(m, m)[:3]} {y}",
+            'actual': float(round_money(current)),
+            'previous_year': float(round_money(previous)),
+            'growth_percent': float(growth_rate(current, previous)),
+        })
+    return series
+
+
+def aggregate_rolling_12_series(franchise_ids, metric_key, end_month, end_year, periods=12):
+    franchise_ids = filter_active_franchise_ids(franchise_ids or [])
+    series = []
+    for m, y in _series_periods(end_month, end_year, periods):
+        total = Decimal('0')
+        tm, ty = m, y
+        for _ in range(12):
+            rows = period_actuals(tm, ty, franchise_ids, [metric_key])
+            total += sum((rows.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+            tm, ty = previous_month(tm, ty)
+        series.append({'label': f"{MONTH_NAME.get(m, m)[:3]} {y}", 'rolling_total': float(round_money(total))})
+    return series
+
+
+def aggregate_forecast_series(franchise_ids, metric_key, end_month, end_year, periods=12, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    franchise_ids = filter_active_franchise_ids(franchise_ids or [])
+    series = []
+    for m, y in _series_periods(end_month, end_year, periods):
+        actuals = period_actuals(m, y, franchise_ids, [metric_key])
+        targets = targets_for_period(m, y, franchise_ids, mode, growth_percent, [metric_key])
+        actual = sum((actuals.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        target = sum((targets.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        previous_rows = period_actuals(*previous_month(m, y), franchise_ids, [metric_key])
+        previous = sum((previous_rows.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        same_last_year_rows = period_actuals(m, y - 1, franchise_ids, [metric_key])
+        same_last_year = sum((same_last_year_rows.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        projected = actual
+        if actual <= 0:
+            projected = safe_average([previous, same_last_year, target])
+        elif target > 0 and actual < target:
+            projected = safe_average([actual, target, previous if previous > 0 else actual])
+        series.append({
+            'label': f"{MONTH_NAME.get(m, m)[:3]} {y}",
+            'actual': float(round_money(actual)),
+            'target': float(round_money(target)),
+            'forecast': float(round_money(projected)),
+            'forecast_percent': float(percent(projected, target)),
+        })
+    return series
+
+
+def aggregate_growth_trend_series(franchise_ids, metric_key, end_month, end_year, periods=12):
+    franchise_ids = filter_active_franchise_ids(franchise_ids or [])
+    series = []
+    for m, y in _series_periods(end_month, end_year, periods):
+        current_rows = period_actuals(m, y, franchise_ids, [metric_key])
+        last_year_rows = period_actuals(m, y - 1, franchise_ids, [metric_key])
+        prev_m, prev_y = previous_month(m, y)
+        previous_rows = period_actuals(prev_m, prev_y, franchise_ids, [metric_key])
+        actual = sum((current_rows.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        last_year = sum((last_year_rows.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        previous = sum((previous_rows.get(fid, {}).get(metric_key, Decimal('0')) for fid in franchise_ids), Decimal('0'))
+        baseline = last_year if last_year > 0 else previous
+        series.append({'label': f"{MONTH_NAME.get(m, m)[:3]} {y}", 'growth_percent': float(growth_rate(actual, baseline))})
+    return series
+
+
+def graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, periods=12, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    franchise_ids = filter_active_franchise_ids(franchise_ids or [])
+    return {
+        'metric_key': metric_key,
+        'metric_label': PERFORMANCE_METRICS[metric_key]['label'],
+        'actual_vs_target': aggregate_trend_series(franchise_ids, metric_key, month, year, periods, mode, growth_percent),
+        'previous_year': aggregate_previous_year_series(franchise_ids, metric_key, month, year, periods),
+        'rolling_12': aggregate_rolling_12_series(franchise_ids, metric_key, month, year, periods),
+        'forecast': aggregate_forecast_series(franchise_ids, metric_key, month, year, periods, mode, growth_percent),
+        'growth_trend': aggregate_growth_trend_series(franchise_ids, metric_key, month, year, periods),
+    }
+
 def graph_engine_payload(franchise_id, metric_key, month, year, periods=12, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
     actual_target = trend_series(franchise_id, metric_key, month, year, periods, mode, growth_percent)
     return {

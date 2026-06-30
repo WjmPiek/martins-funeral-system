@@ -25,6 +25,9 @@
     </label>
     <label>Franchise
       <select name="franchise_id">
+        {% if show_combined_option %}
+        <option value="all" {% if is_combined_view %}selected{% endif %}>All Franchise Users Combined</option>
+        {% endif %}
         {% for franchise in franchises %}
         <option value="{{ franchise.id }}" {% if selected_franchise and selected_franchise.id == franchise.id %}selected{% endif %}>{{ franchise.business_name }}</option>
         {% endfor %}
@@ -50,7 +53,7 @@
 
   {% if graph_data %}
   <div class="graph-dashboard-title">
-    <h2>{{ graph_data.metric_label }} - {{ selected_franchise.business_name if selected_franchise else 'No franchise selected' }}</h2>
+    <h2>{{ graph_data.metric_label }} - {{ selected_label }}</h2>
     <p class="muted">Selected period ending {{ selected_period_label }}.</p>
   </div>
 

@@ -37,6 +37,7 @@ from app.performance.service import (
     metric_page_summary,
     metric_trend_summary,
     graph_engine_payload,
+    graph_engine_payload_for_franchises,
     leaderboard_rows,
     leaderboard_decision_centre,
     executive_dashboard,
@@ -261,20 +262,39 @@ def graphs():
     periods = request.args.get("periods", 12, type=int)
     if periods not in (6, 12, 24, 36):
         periods = 12
+
     franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all() if ids else []
-    selected = get_selected_franchise()
-    franchise_id = request.args.get("franchise_id", type=int)
-    if franchise_id and franchise_id not in ids:
-        abort(403)
-    if not franchise_id:
-        franchise_id = selected.id if selected and selected.id in ids else (franchises[0].id if franchises else None)
-    selected_franchise = Franchise.query.get(franchise_id) if franchise_id else None
-    graph_data = graph_engine_payload(franchise_id, metric_key, month, year, periods, mode, growth) if franchise_id else None
+    selected_franchise = None
+    is_combined_view = False
+    selected_label = "No franchise selected"
+
+    raw_franchise_id = (request.args.get("franchise_id") or "").strip().lower()
+    if is_privileged_user() and raw_franchise_id in ("", "all", "combined"):
+        # Admin / Mother Company users must see all franchise user data combined
+        # by default. Selecting a specific franchise switches the page to that
+        # franchise only.
+        is_combined_view = True
+        selected_label = "All Franchise Users Combined"
+        graph_data = graph_engine_payload_for_franchises(ids, metric_key, month, year, periods, mode, growth) if ids else None
+    else:
+        franchise_id = request.args.get("franchise_id", type=int)
+        selected = get_selected_franchise()
+        if franchise_id and franchise_id not in ids:
+            abort(403)
+        if not franchise_id:
+            franchise_id = selected.id if selected and selected.id in ids else (franchises[0].id if franchises else None)
+        selected_franchise = Franchise.query.get(franchise_id) if franchise_id else None
+        selected_label = selected_franchise.business_name if selected_franchise else selected_label
+        graph_data = graph_engine_payload(franchise_id, metric_key, month, year, periods, mode, growth) if franchise_id else None
+
     return render_template(
         "performance/graphs.html",
         graph_data=graph_data,
         franchises=franchises,
         selected_franchise=selected_franchise,
+        selected_label=selected_label,
+        is_combined_view=is_combined_view,
+        show_combined_option=is_privileged_user(),
         metrics=PERFORMANCE_METRICS,
         metric_key=metric_key,
         periods=periods,
