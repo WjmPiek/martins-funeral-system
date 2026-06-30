@@ -631,9 +631,12 @@ def capture_history():
 def inactive_franchises():
     month, year = selected_period_from_request(request.args)
     ids = accessible_franchise_ids(include_inactive=True)
-    rows = inactive_franchise_candidates(month, year, ids)
-    active_count = sum(1 for row in rows if row["is_performance_active"])
-    hidden_count = sum(1 for row in rows if not row["is_performance_active"])
+    all_rows = inactive_franchise_candidates(month, year, ids)
+    # Old Franchises must only show franchise users/franchises with no KPI data
+    # in the last 3 months. Active franchises with recent data are excluded.
+    rows = [row for row in all_rows if not row["has_recent_data"]]
+    active_count = sum(1 for row in all_rows if row["has_recent_data"])
+    hidden_count = len(rows)
     return render_template(
         "performance/inactive_franchises.html",
         rows=rows,

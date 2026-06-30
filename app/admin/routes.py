@@ -433,6 +433,10 @@ def users():
         or user.has_role("Regional Manager")
     ]
     franchise_owner_users = active_recent_franchise_owner_users(now.month, now.year)
+    all_franchise_owner_users = [
+        user for user in all_users
+        if user.has_role("Franchise User") and not getattr(user, "parent_franchise_user_id", None)
+    ]
     franchise_employee_users = [
         user for user in all_users
         if getattr(user, "parent_franchise_user_id", None)
@@ -443,7 +447,10 @@ def users():
     admin_side_users = mother_company_users
     franchise_side_users = franchise_owner_users
     all_franchise_side_users = franchise_owner_users + franchise_employee_users
-    old_franchise_users = [user for user in franchise_owner_users if not franchise_user_has_active_data(user) and old_linked_franchises_for_user(user)]
+    old_franchise_users = [
+        user for user in all_franchise_owner_users
+        if ordered_franchises_for_user(user) and not franchise_user_has_recent_kpi_data(user, now.month, now.year)
+    ]
     other_users = [user for user in all_users if user not in mother_company_users and user not in franchise_owner_users and user not in franchise_employee_users]
     linked_franchise_groups = []
     for user in franchise_owner_users:

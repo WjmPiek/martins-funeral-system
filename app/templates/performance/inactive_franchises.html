@@ -14,8 +14,8 @@
 </form>
 
 <div class="kpi-grid" style="margin-bottom: 1rem;">
-    <div class="kpi-card"><span class="muted">Active in calculations</span><strong>{{ active_count }}</strong></div>
-    <div class="kpi-card"><span class="muted">Hidden / inactive</span><strong>{{ hidden_count }}</strong></div>
+    <div class="kpi-card"><span class="muted">Active with recent data</span><strong>{{ active_count }}</strong></div>
+    <div class="kpi-card"><span class="muted">Old franchises shown</span><strong>{{ hidden_count }}</strong></div>
 </div>
 
 <form class="filter-bar" method="post" action="{{ url_for('performance.scan_inactive_franchises') }}">
@@ -68,7 +68,7 @@
             </td>
         </tr>
         {% else %}
-        <tr><td colspan="5">No franchises available for your access level.</td></tr>
+        <tr><td colspan="5">No old franchise users/franchises found with no data for the last 3 months.</td></tr>
         {% endfor %}
     </tbody>
 </table>

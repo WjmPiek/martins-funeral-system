@@ -398,7 +398,30 @@ def employees():
 
         existing = User.query.filter(db.func.lower(User.email) == email).first()
         if existing:
-            flash("A user with that email address already exists.", "danger")
+            # If the same employee was previously deactivated under this franchise user,
+            # restore it instead of blocking the franchise user with a confusing duplicate error.
+            if user_is_my_franchise_employee(existing):
+                selected_role = next((role for role in franchise_creatable_roles() if role.id == role_id), None)
+                if not selected_role:
+                    flash("Please select Manager, Employee or Agent.", "danger")
+                    return redirect(url_for("franchise.employees"))
+                existing.name = name
+                existing.surname = surname
+                existing.roles = [selected_role]
+                existing.assigned_franchises = [selected_franchise]
+                existing.parent_franchise_user_id = current_user.id
+                existing.created_by_user_id = current_user.id
+                existing.is_active = True
+                existing.is_active_account = True
+                existing.deactivated_at = None
+                existing.deactivation_reason = ""
+                existing.set_password(password)
+                log_action("Franchise Employees", "Reactivated franchise employee user", f"Employee: {email}; Role: {selected_role.name}; Franchise: {selected_franchise.business_name}")
+                db.session.commit()
+                flash(f"Employee user {existing.full_name} was reactivated under {selected_franchise.business_name}.", "success")
+                return redirect(url_for("franchise.employees"))
+            existing_roles = ", ".join(role.name for role in existing.roles) or "no role"
+            flash(f"Email {email} is already used by {existing.full_name} ({existing_roles}). Use a new email address or edit that existing user.", "danger")
             return redirect(url_for("franchise.employees"))
 
         user = User(
