@@ -1,7 +1,19 @@
 {% extends "base.html" %}
 {% block auth_content %}
-<section class="card narrow">
-    <h1>Login</h1>
+<section class="card narrow login-card">
+    <div class="login-branding" aria-label="Martins Funerals">
+        <img
+            class="login-logo"
+            src="{{ url_for('static', filename='img/logo.png') }}"
+            alt="Martins Funerals logo"
+            loading="eager"
+            decoding="async"
+            fetchpriority="high"
+            onerror="this.onerror=null;this.src='{{ url_for('static', filename='img/logo-placeholder.svg') }}';"
+        >
+    </div>
+    <h1>Martins Funerals System</h1>
+    <p class="login-subtitle">Sign in to continue</p>
     <form method="post">
         <label>Email address</label>
         <input type="email" name="email" required>

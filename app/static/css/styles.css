@@ -1851,3 +1851,39 @@ body.app-body {
         font-size: 1rem;
     }
 }
+
+
+/* V90 login logo restore */
+.login-card {
+    text-align: center;
+}
+.login-branding {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto 18px;
+}
+.login-logo {
+    display: block;
+    width: min(100%, 420px);
+    max-width: 420px;
+    height: auto;
+    max-height: 190px;
+    object-fit: contain;
+    image-rendering: auto;
+}
+.login-card h1 {
+    margin-top: 0;
+    margin-bottom: 6px;
+}
+.login-subtitle {
+    margin-top: 0;
+    color: #64748b;
+    font-weight: 600;
+}
+@media (max-width: 560px) {
+    .login-logo {
+        width: min(100%, 320px);
+        max-height: 145px;
+    }
+}
