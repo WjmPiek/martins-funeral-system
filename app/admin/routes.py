@@ -31,6 +31,7 @@ ROLE_HELP_TEXT = {
 }
 FINANCE_ADMIN_USERS = {
     "renette@martinsdirect.com": "Finance Manager",
+    "lowhann@martinsdirect.com": "Finance Assistant",
     "lowhaan@martinsdirect.com": "Finance Assistant",
     "deon@martinsdirect.com": "Finance Assistant",
 }
@@ -254,14 +255,71 @@ def franchise_user_has_recent_kpi_data(user, month=None, year=None):
     return False
 
 
-def active_recent_franchise_owner_users(month=None, year=None):
+def all_franchise_owner_users():
     query_users = User.query.order_by(User.name, User.surname).all()
     return [
         user for user in query_users
-        if user.has_role("Franchise User")
-        and not getattr(user, "parent_franchise_user_id", None)
-        and franchise_user_has_recent_kpi_data(user, month, year)
+        if user.has_role("Franchise User") and not getattr(user, "parent_franchise_user_id", None)
     ]
+
+
+def active_recent_franchise_owner_users(month=None, year=None):
+    return [
+        user for user in all_franchise_owner_users()
+        if franchise_user_has_recent_kpi_data(user, month, year)
+    ]
+
+
+def repair_existing_user_visibility():
+    """Repair legacy imported records so the admin pages do not hide them.
+
+    Some users were imported before the Admin/Franchise/Employee split existed.
+    They can have an email address in users, but no correct role/scope, which
+    causes duplicate-email errors while the person is invisible on the pages.
+    This keeps the account and makes it visible in the correct tab.
+    """
+    ensure_user_hierarchy_roles()
+    changed = 0
+
+    finance_role = Role.query.filter_by(name="Finance Assistant").first()
+    for email in ("lowhann@martinsdirect.com", "lowhaan@martinsdirect.com"):
+        user = User.query.filter(db.func.lower(User.email) == email).first()
+        if user and finance_role and finance_role not in user.roles:
+            user.roles = [role for role in user.roles if role.name not in FRANCHISE_SIDE_ROLE_NAMES]
+            user.roles.append(finance_role)
+            user.parent_franchise_user_id = None
+            changed += 1
+
+    franchise_role = Role.query.filter_by(name="Franchise User").first()
+    david = User.query.filter(db.func.lower(User.email) == "david@martinsfunerals.co.za").first()
+    if david and franchise_role and franchise_role not in david.roles and not any(role.name in ADMIN_SIDE_ROLE_NAMES for role in david.roles):
+        david.roles = [role for role in david.roles if role.name not in {"Franchise Manager", "Franchise Employee", "Franchise Agent"}]
+        david.roles.append(franchise_role)
+        david.parent_franchise_user_id = None
+        changed += 1
+
+    employee_role_names = {"Franchise Manager", "Franchise Employee", "Franchise Agent"}
+    owner_ids = {owner.id for owner in all_franchise_owner_users()}
+    for user in User.query.order_by(User.id).all():
+        if user.id in owner_ids or any(role.name in ADMIN_SIDE_ROLE_NAMES for role in user.roles):
+            continue
+        if any(role.name in employee_role_names for role in user.roles):
+            if not user.parent_franchise_user_id and user.created_by_user_id in owner_ids:
+                user.parent_franchise_user_id = user.created_by_user_id
+                changed += 1
+            continue
+        if user.parent_franchise_user_id or (user.created_by_user_id in owner_ids):
+            role = Role.query.filter_by(name="Franchise Employee").first()
+            if role and role not in user.roles:
+                user.roles.append(role)
+                changed += 1
+            if not user.parent_franchise_user_id and user.created_by_user_id in owner_ids:
+                user.parent_franchise_user_id = user.created_by_user_id
+                changed += 1
+
+    if changed:
+        db.session.flush()
+    return changed
 
 
 def is_protected_admin_user(user):
@@ -402,7 +460,7 @@ def seed():
 @login_required
 @permission_required("users:view")
 def users():
-    ensure_user_hierarchy_roles()
+    repair_existing_user_visibility()
     db.session.commit()
     # Keep the franchise selector clean: branches with no KPI data in the last 3 months
     # are hidden automatically and shown in the Old Franchises tab until reactivated.
@@ -433,10 +491,7 @@ def users():
         or user.has_role("Regional Manager")
     ]
     franchise_owner_users = active_recent_franchise_owner_users(now.month, now.year)
-    all_franchise_owner_users = [
-        user for user in all_users
-        if user.has_role("Franchise User") and not getattr(user, "parent_franchise_user_id", None)
-    ]
+    all_franchise_owner_user_rows = all_franchise_owner_users()
     franchise_employee_users = [
         user for user in all_users
         if getattr(user, "parent_franchise_user_id", None)
@@ -448,7 +503,7 @@ def users():
     franchise_side_users = franchise_owner_users
     all_franchise_side_users = franchise_owner_users + franchise_employee_users
     old_franchise_users = [
-        user for user in all_franchise_owner_users
+        user for user in all_franchise_owner_user_rows
         if ordered_franchises_for_user(user) and not franchise_user_has_recent_kpi_data(user, now.month, now.year)
     ]
     other_users = [user for user in all_users if user not in mother_company_users and user not in franchise_owner_users and user not in franchise_employee_users]
@@ -488,12 +543,12 @@ def users():
 @login_required
 @permission_required("users:view")
 def franchise_users():
-    ensure_user_hierarchy_roles()
+    repair_existing_user_visibility()
     now = datetime.utcnow()
     auto_hide_inactive_franchises(now.month, now.year, [franchise.id for franchise in Franchise.query.all()], current_user.id)
     db.session.commit()
     franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
-    franchise_users = active_recent_franchise_owner_users(now.month, now.year)
+    franchise_users = all_franchise_owner_users()
     return render_template(
         "admin/franchise_users.html",
         franchise_users=franchise_users,
@@ -528,8 +583,10 @@ def create_admin_user():
         flash("Name, surname, email, password and role are required.", "danger")
         return redirect(url_for("admin.users"))
 
-    if User.query.filter(db.func.lower(User.email) == email).first():
-        flash("A user with that email address already exists.", "danger")
+    existing = User.query.filter(db.func.lower(User.email) == email).first()
+    if existing:
+        existing_roles = ", ".join(role.name for role in existing.roles) or "No role"
+        flash(f"Email {email} already exists as {existing.full_name} ({existing_roles}). Use Edit on the correct page to set a password or activate the user.", "danger")
         return redirect(url_for("admin.users"))
 
     role = Role.query.get_or_404(role_id)
@@ -680,6 +737,9 @@ def update_user(user_id):
     user.email = email
     user.is_active = is_active
     user.is_active_account = is_active
+    password = request.form.get("password", "").strip()
+    if password:
+        user.set_password(password)
 
     if selected_role_names & {"Admin", "Finance Manager", "Finance Assistant"}:
         user.parent_franchise_user_id = None
@@ -1932,12 +1992,13 @@ def is_franchise_employee_user(user):
     keeps Manager, Employee and Agent accounts visible/editable in Admin >
     Employees.
     """
+    franchise_owner_ids = {owner.id for owner in all_franchise_owner_users()}
     return (
         user.has_role("Franchise Manager")
         or user.has_role("Franchise Employee")
         or user.has_role("Franchise Agent")
         or bool(getattr(user, "parent_franchise_user_id", None))
-        or bool(getattr(user, "created_by_user_id", None))
+        or bool(getattr(user, "created_by_user_id", None) in franchise_owner_ids)
     )
 
 
@@ -1945,11 +2006,13 @@ def is_franchise_employee_user(user):
 @login_required
 @permission_required("users:view")
 def franchise_employees():
+    repair_existing_user_visibility()
+    db.session.commit()
     employees = [user for user in User.query.order_by(User.name, User.surname).all() if is_franchise_employee_user(user)]
     owner_ids = [employee.parent_franchise_user_id for employee in employees if employee.parent_franchise_user_id]
     owners = {user.id: user for user in User.query.filter(User.id.in_(owner_ids)).all()} if owner_ids else {}
     now = datetime.utcnow()
-    franchise_owners = active_recent_franchise_owner_users(now.month, now.year)
+    franchise_owners = all_franchise_owner_users()
     franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
     employee_roles = Role.query.filter(Role.name.in_(["Franchise Manager", "Franchise Employee", "Franchise Agent"])).order_by(Role.name).all()
     return render_template(
@@ -1977,8 +2040,10 @@ def create_franchise_employee_admin():
     if not name or not surname or not email or not password or not role_id or not franchise_id:
         flash("Name, surname, email, password, role and franchise are required.", "danger")
         return redirect(url_for("admin.franchise_employees"))
-    if User.query.filter(db.func.lower(User.email) == email).first():
-        flash("A user with that email address already exists.", "danger")
+    existing = User.query.filter(db.func.lower(User.email) == email).first()
+    if existing:
+        existing_roles = ", ".join(role.name for role in existing.roles) or "No role"
+        flash(f"Email {email} already exists as {existing.full_name} ({existing_roles}). Use Edit to reset the password or activate the existing account.", "danger")
         return redirect(url_for("admin.franchise_employees"))
 
     selected_role = Role.query.get(role_id)
@@ -1988,10 +2053,10 @@ def create_franchise_employee_admin():
 
     franchise = Franchise.query.get_or_404(franchise_id)
     owner = User.query.get(owner_id) if owner_id else None
-    if owner and (not owner.has_role("Franchise User") or not franchise_user_has_recent_kpi_data(owner)):
+    if owner and not owner.has_role("Franchise User"):
         owner = None
     if not owner:
-        owner = next((candidate for candidate in active_recent_franchise_owner_users() if franchise in candidate.assigned_franchises), None)
+        owner = next((candidate for candidate in all_franchise_owner_users() if franchise in candidate.assigned_franchises), None)
 
     user = User(
         name=name,

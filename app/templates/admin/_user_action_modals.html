@@ -24,6 +24,7 @@
           <option value="0" {% if not user.is_active %}selected{% endif %}>Inactive</option>
         </select>
       </label>
+      <label>New Password<input type="text" name="password" placeholder="Leave blank to keep current password"></label>
       <div style="grid-column:1 / -1;">
         <label>Roles</label>
         <div class="modal-role-grid">
