@@ -53,6 +53,25 @@ def create_app(config_class=Config):
             amount = 0.0
         return f"R {amount:,.2f}"
 
+    @app.template_filter("count_value")
+    def format_count_value(value):
+        """Format non-currency operational counts such as Joinings and Funerals."""
+        try:
+            amount = float(value or 0)
+        except (TypeError, ValueError):
+            amount = 0.0
+        if amount == int(amount):
+            return f"{int(amount):,}"
+        return f"{amount:,.2f}"
+
+    @app.template_filter("metric_value")
+    def format_metric_value(value, metric_key=None, metric_format=None):
+        """Render KPI values with the correct unit. Joinings/Funerals are counts, not Rand."""
+        count_metrics = {"joinings", "funerals", "insurance_joinings", "mf_files", "number_of_funerals"}
+        if metric_format == "number" or metric_key in count_metrics:
+            return format_count_value(value)
+        return format_rand(value)
+
     @app.context_processor
     def inject_franchise_context():
         from app.franchise_context import (

@@ -137,15 +137,31 @@
 
             <div class="main-panel">
                 <header class="topbar">
-                    <div class="page-title">
+                    <div class="topbar-brand">
                         {% if pure_franchise_portal %}
-                            {{ selected_franchise.business_name if selected_franchise else 'My Business' }}
+                            <div class="topbar-logo-text">{{ selected_franchise.business_name if selected_franchise else 'My Business' }}</div>
                         {% else %}
-                            Martins Funerals System
-                            {% if franchise_view_mode and selected_franchise %}
-                                <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
-                            {% endif %}
+                            <img
+                                class="topbar-logo"
+                                src="{{ url_for('static', filename='img/logo.png') }}"
+                                alt="Martins Funerals logo"
+                                width="210"
+                                height="96"
+                                loading="eager"
+                                decoding="async"
+                                fetchpriority="high"
+                            >
                         {% endif %}
+                        <div class="page-title">
+                            {% if pure_franchise_portal %}
+                                <span class="sr-only">{{ selected_franchise.business_name if selected_franchise else 'My Business' }}</span>
+                            {% else %}
+                                Martins Funerals System
+                                {% if franchise_view_mode and selected_franchise %}
+                                    <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
+                                {% endif %}
+                            {% endif %}
+                        </div>
                     </div>
                     <div class="topbar-user">
                         <span>Logged in as</span>

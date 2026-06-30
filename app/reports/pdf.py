@@ -126,6 +126,17 @@ def _p(text, style):
     return Paragraph(safe, style)
 
 
+
+
+def _count(value):
+    try:
+        amount = float(value or 0)
+    except (TypeError, ValueError):
+        amount = 0
+    if amount == int(amount):
+        return f"{int(amount):,}"
+    return f"{amount:,.2f}"
+
 def _money(value):
     try:
         return f"{float(value or 0):,.2f}"
@@ -379,8 +390,8 @@ def build_monthly_figure_pdf(monthly_figure, generated_by):
         _money(monthly_figure.insurance_receipts),
         _money(monthly_figure.insurance_payover),
         _money(monthly_figure.admin_fee),
-        monthly_figure.insurance_joinings,
-        monthly_figure.mf_files,
+        _count(monthly_figure.insurance_joinings),
+        _count(monthly_figure.mf_files),
         _money(monthly_figure.gross_revenue),
         gross_method,
         f"{float(monthly_figure.royalty_percentage or 0):.2f}%",
@@ -474,8 +485,8 @@ def build_monthly_figures_period_pdf(figures, franchise, generated_by, period_la
             _money(item.insurance_receipts),
             _money(item.insurance_payover),
             _money(item.admin_fee),
-            str(item.insurance_joinings or 0),
-            str(item.mf_files or 0),
+            _count(item.insurance_joinings),
+            _count(item.mf_files),
             _money(item.gross_revenue),
             f"{float(item.royalty_percentage or 0):.2f}%",
             _money(item.royalty_amount),

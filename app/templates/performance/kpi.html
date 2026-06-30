@@ -37,28 +37,28 @@
 <div class="kpi-grid">
     <div class="kpi-card status-{{ summary.status }}">
         <div class="kpi-label">Actual</div>
-        <div class="kpi-value">{{ '%.2f'|format(summary.total_actual) }}</div>
-        <div class="kpi-detail">Target {{ '%.2f'|format(summary.total_target) }}</div>
+        <div class="kpi-value">{{ summary.total_actual|metric_value(metric_key, metrics[metric_key].format) }}</div>
+        <div class="kpi-detail">Target {{ summary.total_target|metric_value(metric_key, metrics[metric_key].format) }}</div>
     </div>
     <div class="kpi-card status-{{ summary.status }}">
         <div class="kpi-label">Target Achievement</div>
         <div class="kpi-value">{{ '%.2f'|format(summary.target_percent) }}%</div>
-        <div class="kpi-detail">Difference {{ '%.2f'|format(summary.target_difference) }}</div>
+        <div class="kpi-detail">Difference {{ summary.target_difference|metric_value(metric_key, metrics[metric_key].format) }}</div>
     </div>
     <div class="kpi-card">
         <div class="kpi-label">Previous Month</div>
         <div class="kpi-value">{{ '%.2f'|format(summary.previous_month_growth) }}%</div>
-        <div class="kpi-detail">Change {{ '%.2f'|format(summary.previous_month_difference) }}</div>
+        <div class="kpi-detail">Change {{ summary.previous_month_difference|metric_value(metric_key, metrics[metric_key].format) }}</div>
     </div>
     <div class="kpi-card">
         <div class="kpi-label">Same Month Last Year</div>
         <div class="kpi-value">{{ '%.2f'|format(summary.last_year_growth) }}%</div>
-        <div class="kpi-detail">Change {{ '%.2f'|format(summary.last_year_difference) }}</div>
+        <div class="kpi-detail">Change {{ summary.last_year_difference|metric_value(metric_key, metrics[metric_key].format) }}</div>
     </div>
     <div class="kpi-card">
         <div class="kpi-label">3-Year Average</div>
         <div class="kpi-value">{{ '%.2f'|format(summary.three_year_growth) }}%</div>
-        <div class="kpi-detail">Change {{ '%.2f'|format(summary.three_year_difference) }}</div>
+        <div class="kpi-detail">Change {{ summary.three_year_difference|metric_value(metric_key, metrics[metric_key].format) }}</div>
     </div>
 </div>
 
@@ -80,8 +80,8 @@
             <div class="chart-row">
                 <div class="chart-label">{{ point.label }}</div>
                 <div class="chart-bars">
-                    <div class="target-line">Target {{ '%.2f'|format(point.target) }}</div>
-                    <div class="bar actual" style="width: {{ [pct, 120]|min }}%;">{{ '%.2f'|format(point.actual) }}</div>
+                    <div class="target-line">Target {{ point.target|metric_value(metric_key, metrics[metric_key].format) }}</div>
+                    <div class="bar actual" style="width: {{ [pct, 120]|min }}%;">{{ point.actual|metric_value(metric_key, metrics[metric_key].format) }}</div>
                 </div>
                 <div class="chart-percent">{{ '%.0f'|format(pct) }}%</div>
             </div>

@@ -26,58 +26,58 @@
       <p class="muted">These figures come from the imported PDF and cannot be changed manually.</p>
       <div class="form-grid">
         <label>GROSS TURNOVER</label>
-        <input type="text" value="{{ '%.2f'|format(monthly_figure.gross_turnover|float) }}" disabled>
+        <input type="text" value="{{ monthly_figure.gross_turnover|rand }}" disabled>
 
         <label>CASH</label>
-        <input type="text" value="{{ '%.2f'|format(monthly_figure.cash|float) }}" disabled>
+        <input type="text" value="{{ monthly_figure.cash|rand }}" disabled>
 
         <label>Funeral Receipts</label>
-        <input type="text" value="{{ '%.2f'|format(monthly_figure.funeral_receipts|float) }}" disabled>
+        <input type="text" value="{{ monthly_figure.funeral_receipts|rand }}" disabled>
 
         <label>SOCIET RECEIPTS</label>
-        <input type="text" value="{{ '%.2f'|format(monthly_figure.society_receipts|float) }}" disabled>
+        <input type="text" value="{{ monthly_figure.society_receipts|rand }}" disabled>
 
         <label>Cash Sales</label>
-        <input type="text" value="{{ '%.2f'|format(monthly_figure.cash_sales|float) }}" disabled>
+        <input type="text" value="{{ monthly_figure.cash_sales|rand }}" disabled>
 
         <label>Tombstone Receipts</label>
-        <input type="text" value="{{ '%.2f'|format(monthly_figure.tombstone_receipts|float) }}" disabled>
+        <input type="text" value="{{ monthly_figure.tombstone_receipts|rand }}" disabled>
 
         <label>OBO Services Receipts</label>
-        <input type="text" value="{{ '%.2f'|format(monthly_figure.obo_service_receipts|float) }}" disabled>
+        <input type="text" value="{{ monthly_figure.obo_service_receipts|rand }}" disabled>
 
         <label>SALES</label>
-        <input type="text" value="{{ '%.2f'|format(monthly_figure.sales|float) }}" disabled>
+        <input type="text" value="{{ monthly_figure.sales|rand }}" disabled>
 
         <label>INSURANCE RECEIPTS</label>
-        <input type="text" value="{{ '%.2f'|format(monthly_figure.insurance_receipts|float) }}" disabled>
+        <input type="text" value="{{ monthly_figure.insurance_receipts|rand }}" disabled>
 
         <label for="insurance_payover">INSURANCE PAYOVER</label>
         <input id="insurance_payover" name="insurance_payover" type="number" step="0.01" value="{{ '%.2f'|format(monthly_figure.insurance_payover|float) }}">
         <small class="muted field-help">Leave this as 0.00 and click Save for Later if you do not have the payover yet.</small>
 
         <label>ADMIN FEE</label>
-        <input type="text" value="{{ '%.2f'|format(monthly_figure.admin_fee|float) }}" disabled>
+        <input type="text" value="{{ monthly_figure.admin_fee|rand }}" disabled>
 
         <label>INSURANCE JOININGS</label>
-        <input type="text" value="{{ monthly_figure.insurance_joinings }}" disabled>
+        <input type="text" value="{{ monthly_figure.insurance_joinings|count_value }}" disabled>
 
         <label>MF FILES</label>
-        <input type="text" value="{{ monthly_figure.mf_files }}" disabled>
+        <input type="text" value="{{ monthly_figure.mf_files|count_value }}" disabled>
       </div>
     </div>
 
     <div class="form-section-card protected-section">
       <h2>Royalty Calculation</h2>
       <div class="monthly-summary-grid">
-        <div><span>Gross Turnover</span><strong>{{ '%.2f'|format(monthly_figure.gross_turnover|float) }}</strong></div>
-        <div><span>Royalty Base</span><strong>{{ '%.2f'|format(monthly_figure.gross_revenue|float) }}</strong></div>
+        <div><span>Gross Turnover</span><strong>{{ monthly_figure.gross_turnover|rand }}</strong></div>
+        <div><span>Royalty Base</span><strong>{{ monthly_figure.gross_revenue|rand }}</strong></div>
         <div><span>Calculation Method</span><strong>Sales + Insurance Receipts</strong></div>
-        <div><span>Cash</span><strong>{{ '%.2f'|format(monthly_figure.cash|float) }}</strong></div>
-        <div><span>Insurance Payover</span><strong>{{ '%.2f'|format(monthly_figure.insurance_payover|float) }}</strong></div>
-        <div><span>Admin Fee</span><strong>{{ '%.2f'|format(monthly_figure.admin_fee|float) }}</strong></div>
+        <div><span>Cash</span><strong>{{ monthly_figure.cash|rand }}</strong></div>
+        <div><span>Insurance Payover</span><strong>{{ monthly_figure.insurance_payover|rand }}</strong></div>
+        <div><span>Admin Fee</span><strong>{{ monthly_figure.admin_fee|rand }}</strong></div>
         <div><span>Royalty %</span><strong>{{ '%.2f'|format(monthly_figure.royalty_percentage|float) }}%</strong></div>
-        <div><span>Royalty Amount</span><strong>{{ '%.2f'|format(monthly_figure.royalty_amount|float) }}</strong></div>
+        <div><span>Royalty Amount</span><strong>{{ monthly_figure.royalty_amount|rand }}</strong></div>
         <div><span>Minimum Applied</span><strong>{% if monthly_figure.minimum_royalty_applied %}Yes{% else %}No{% endif %}</strong></div>
         <div><span>Status</span><strong>{{ monthly_figure.status }}</strong></div>
       </div>

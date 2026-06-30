@@ -1776,3 +1776,78 @@ body.app-body {
 .import-progress-fill{height:100%;background:linear-gradient(90deg,#6b4ba3,#f4d900);border-radius:999px;transition:width .35s ease}
 .leaderboard-static-row{display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:center;border:1px solid #e5e7eb;border-radius:12px;padding:.55rem;background:#fff;color:inherit}
 @media (max-width:899px){.topbar{position:relative}.topbar-brand img{max-width:150px;height:auto}.content-area{padding-top:18px}}
+
+/* V89 header logo restore + desktop fixed top bar */
+.topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-width: 0;
+}
+.topbar-logo {
+    display: block;
+    width: clamp(150px, 13vw, 220px);
+    height: auto;
+    max-height: 72px;
+    object-fit: contain;
+    flex: 0 0 auto;
+    image-rendering: auto;
+}
+.topbar-logo-text {
+    color: #0f172a;
+    font-size: 1.35rem;
+    font-weight: 900;
+    line-height: 1.15;
+}
+.topbar .page-title {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0,0,0,0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+@media (min-width: 900px) {
+    .topbar {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        right: 0;
+        min-height: 92px;
+        z-index: 2500;
+        box-shadow: 0 1px 0 rgba(15, 23, 42, 0.08);
+    }
+    .app-menu {
+        top: 22px;
+        z-index: 3500;
+    }
+    .content-area {
+        padding-top: 120px !important;
+    }
+}
+@media (max-width: 899px) {
+    .topbar {
+        position: relative !important;
+        padding: 14px 74px 14px 18px;
+    }
+    .topbar-brand {
+        gap: 12px;
+        width: 100%;
+    }
+    .topbar-logo {
+        width: min(150px, 42vw);
+        max-height: 58px;
+    }
+    .topbar .page-title {
+        font-size: 1rem;
+    }
+}

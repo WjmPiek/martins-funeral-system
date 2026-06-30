@@ -71,9 +71,9 @@
         <div class="kpi-title">{{ row.label }}</div>
         <div class="kpi-percent">{{ '%.2f'|format(row.target_percent) }}%</div>
         <div class="progress-track"><div class="progress-fill" style="width: {{ [row.target_percent, 120]|min }}%"></div></div>
-        <div class="kpi-detail">Actual: {{ '%.2f'|format(row.actual) }}</div>
-        <div class="kpi-detail">Target: {{ '%.2f'|format(row.target) }}</div>
-        <div class="kpi-detail">Difference: {{ '%.2f'|format(row.target_difference) }}</div>
+        <div class="kpi-detail">Actual: {{ row.actual|metric_value(row.metric_key, metrics[row.metric_key].format if row.metric_key in metrics else none) }}</div>
+        <div class="kpi-detail">Target: {{ row.target|metric_value(row.metric_key, metrics[row.metric_key].format if row.metric_key in metrics else none) }}</div>
+        <div class="kpi-detail">Difference: {{ row.target_difference|metric_value(row.metric_key, metrics[row.metric_key].format if row.metric_key in metrics else none) }}</div>
         <div class="muted small">Growth target {{ '%.2f'|format(row.growth_target_percent) }}% from bracket {{ row.growth_bracket_label }}</div>
     </div>
 {% endfor %}
@@ -166,12 +166,12 @@
     {% for row in dashboard.metrics %}
         <tr>
             <td><strong>{{ row.label }}</strong></td>
-            <td>{{ '%.2f'|format(row.actual) }}</td>
-            <td>{{ '%.2f'|format(row.target) }}</td>
+            <td>{{ row.actual|metric_value(row.metric_key, metrics[row.metric_key].format if row.metric_key in metrics else none) }}</td>
+            <td>{{ row.target|metric_value(row.metric_key, metrics[row.metric_key].format if row.metric_key in metrics else none) }}</td>
             <td>{{ '%.2f'|format(row.target_percent) }}%</td>
-            <td>{{ '%.2f'|format(row.previous_month) }}</td>
-            <td>{{ '%.2f'|format(row.same_month_last_year) }}</td>
-            <td>{{ '%.2f'|format(row.three_year_average) }}</td>
+            <td>{{ row.previous_month|metric_value(row.metric_key, metrics[row.metric_key].format if row.metric_key in metrics else none) }}</td>
+            <td>{{ row.same_month_last_year|metric_value(row.metric_key, metrics[row.metric_key].format if row.metric_key in metrics else none) }}</td>
+            <td>{{ row.three_year_average|metric_value(row.metric_key, metrics[row.metric_key].format if row.metric_key in metrics else none) }}</td>
         </tr>
     {% endfor %}
     </tbody>

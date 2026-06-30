@@ -108,16 +108,16 @@
             <tr>
               <td><strong>{{ grouped_total.period_label }}</strong></td>
               <td>{% if grouped_total.gross_method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
-              <td>{{ '%.2f'|format(grouped_total.gross_revenue|float) }}</td>
+              <td>{{ grouped_total.gross_revenue|rand }}</td>
               <td>{{ '%.2f'|format(grouped_total.royalty_percentage|float) }}%</td>
-              <td><strong>{{ '%.2f'|format(grouped_total.royalty_amount|float) }}</strong></td>
-              <td>{{ '%.2f'|format(grouped_total.cash|float) }}</td>
-              <td>{{ '%.2f'|format(grouped_total.sales|float) }}</td>
-              <td>{{ '%.2f'|format(grouped_total.admin_fee|float) }}</td>
-              <td>{{ '%.2f'|format(grouped_total.insurance_receipts|float) }}</td>
-              <td>{{ '%.2f'|format(grouped_total.insurance_payover|float) }}</td>
-              <td>{{ grouped_total.insurance_joinings }}</td>
-              <td>{{ grouped_total.mf_files }}</td>
+              <td><strong>{{ grouped_total.royalty_amount|rand }}</strong></td>
+              <td>{{ grouped_total.cash|rand }}</td>
+              <td>{{ grouped_total.sales|rand }}</td>
+              <td>{{ grouped_total.admin_fee|rand }}</td>
+              <td>{{ grouped_total.insurance_receipts|rand }}</td>
+              <td>{{ grouped_total.insurance_payover|rand }}</td>
+              <td>{{ grouped_total.insurance_joinings|count_value }}</td>
+              <td>{{ grouped_total.mf_files|count_value }}</td>
             </tr>
           </tbody>
         </table>
@@ -165,23 +165,23 @@
               <tr>
                 <td><strong>{{ item.period_label }}</strong></td>
                 <td><span class="badge {% if item.status == 'Approved' %}success{% elif item.status in ['Submitted', 'Imported', 'Pending Payover'] %}warning{% endif %}">{{ 'Calc' if item.status == 'Calculated' else item.status }}</span></td>
-                <td>{{ '%.2f'|format(item.gross_turnover|float) }}</td>
-                <td>{{ '%.2f'|format(item.cash|float) }}</td>
-                <td>{{ '%.2f'|format(item.funeral_receipts|float) }}</td>
-                <td>{{ '%.2f'|format(item.society_receipts|float) }}</td>
-                <td>{{ '%.2f'|format(item.cash_sales|float) }}</td>
-                <td>{{ '%.2f'|format(item.tombstone_receipts|float) }}</td>
-                <td>{{ '%.2f'|format(item.obo_service_receipts|float) }}</td>
-                <td>{{ '%.2f'|format(item.sales|float) }}</td>
-                <td>{{ '%.2f'|format(item.insurance_receipts|float) }}</td>
-                <td>{{ '%.2f'|format(item.insurance_payover|float) }}</td>
-                <td>{{ '%.2f'|format(item.admin_fee|float) }}</td>
-                <td>{{ item.insurance_joinings }}</td>
-                <td>{{ item.mf_files }}</td>
-                <td>{{ '%.2f'|format(item.gross_revenue|float) }}</td>
+                <td>{{ item.gross_turnover|rand }}</td>
+                <td>{{ item.cash|rand }}</td>
+                <td>{{ item.funeral_receipts|rand }}</td>
+                <td>{{ item.society_receipts|rand }}</td>
+                <td>{{ item.cash_sales|rand }}</td>
+                <td>{{ item.tombstone_receipts|rand }}</td>
+                <td>{{ item.obo_service_receipts|rand }}</td>
+                <td>{{ item.sales|rand }}</td>
+                <td>{{ item.insurance_receipts|rand }}</td>
+                <td>{{ item.insurance_payover|rand }}</td>
+                <td>{{ item.admin_fee|rand }}</td>
+                <td>{{ item.insurance_joinings|count_value }}</td>
+                <td>{{ item.mf_files|count_value }}</td>
+                <td>{{ item.gross_revenue|rand }}</td>
                 <td>{% set method = item.gross_method if item.gross_method is defined else (item.franchise.royalty_gross_method if item.franchise else 'old') %}{% if method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
                 <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
-                <td>{{ '%.2f'|format(item.royalty_amount|float) }}</td>
+                <td>{{ item.royalty_amount|rand }}</td>
                 <td>{% if item.minimum_royalty_applied %}<span class="badge warning">Yes</span>{% else %}No{% endif %}</td>
                 <td>
                   <div class="button-row">
@@ -237,23 +237,23 @@
           <td><strong>{{ item.period_label }}</strong></td>
           <td><strong>{{ item.franchise.business_name if item.franchise else 'Unknown Branch' }}</strong></td>
           <td><span class="badge {% if item.status == 'Approved' %}success{% elif item.status in ['Submitted', 'Imported', 'Pending Payover'] %}warning{% endif %}">{{ 'Calc' if item.status == 'Calculated' else item.status }}</span></td>
-          <td>{{ '%.2f'|format(item.gross_turnover|float) }}</td>
-          <td>{{ '%.2f'|format(item.cash|float) }}</td>
-          <td>{{ '%.2f'|format(item.funeral_receipts|float) }}</td>
-          <td>{{ '%.2f'|format(item.society_receipts|float) }}</td>
-          <td>{{ '%.2f'|format(item.cash_sales|float) }}</td>
-          <td>{{ '%.2f'|format(item.tombstone_receipts|float) }}</td>
-          <td>{{ '%.2f'|format(item.obo_service_receipts|float) }}</td>
-          <td>{{ '%.2f'|format(item.sales|float) }}</td>
-          <td>{{ '%.2f'|format(item.insurance_receipts|float) }}</td>
-          <td>{{ '%.2f'|format(item.insurance_payover|float) }}</td>
-          <td>{{ '%.2f'|format(item.admin_fee|float) }}</td>
-          <td>{{ item.insurance_joinings }}</td>
-          <td>{{ item.mf_files }}</td>
-          <td>{{ '%.2f'|format(item.gross_revenue|float) }}</td>
+          <td>{{ item.gross_turnover|rand }}</td>
+          <td>{{ item.cash|rand }}</td>
+          <td>{{ item.funeral_receipts|rand }}</td>
+          <td>{{ item.society_receipts|rand }}</td>
+          <td>{{ item.cash_sales|rand }}</td>
+          <td>{{ item.tombstone_receipts|rand }}</td>
+          <td>{{ item.obo_service_receipts|rand }}</td>
+          <td>{{ item.sales|rand }}</td>
+          <td>{{ item.insurance_receipts|rand }}</td>
+          <td>{{ item.insurance_payover|rand }}</td>
+          <td>{{ item.admin_fee|rand }}</td>
+          <td>{{ item.insurance_joinings|count_value }}</td>
+          <td>{{ item.mf_files|count_value }}</td>
+          <td>{{ item.gross_revenue|rand }}</td>
           <td>{% set method = item.gross_method if item.gross_method is defined else (item.franchise.royalty_gross_method if item.franchise else 'old') %}{% if method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
           <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
-          <td>{{ '%.2f'|format(item.royalty_amount|float) }}</td>
+          <td>{{ item.royalty_amount|rand }}</td>
           <td>{% if item.minimum_royalty_applied %}<span class="badge warning">Yes</span>{% else %}No{% endif %}</td>
           <td>
             <div class="button-row">

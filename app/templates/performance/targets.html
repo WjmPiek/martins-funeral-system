@@ -41,8 +41,8 @@
         {% if detail %}
         <div class="muted" style="font-size: 0.8rem; margin-top: .25rem;">
             Bracket: {{ detail.bracket_label }}<br>
-            Basis: {{ detail.basis_metric_label }} {{ '%.2f'|format(detail.basis_value) }}<br>
-            Growth: {{ '%.2f'|format(detail.growth_percent) }}% → {{ '%.2f'|format(detail.target_value) }}
+            Basis: {{ detail.basis_metric_label }} {{ detail.basis_value|metric_value(detail.metric_key if detail.metric_key is defined else none, detail.metric_format if detail.metric_format is defined else none) }}<br>
+            Growth: {{ '%.2f'|format(detail.growth_percent) }}% → {{ detail.target_value|metric_value(detail.metric_key if detail.metric_key is defined else none, detail.metric_format if detail.metric_format is defined else none) }}
         </div>
         {% endif %}
     </td>
