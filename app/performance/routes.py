@@ -10,6 +10,7 @@ from app.franchise_context import get_accessible_franchises, get_selected_franch
 from app.models import Franchise, FranchiseTarget, HeatmapRecord, MonthlyFigure, PerformanceGrowthBracket, User
 from app.performance.service import (
     DEFAULT_GROWTH_PERCENT,
+    DEFAULT_SA_GDP_GROWTH_PERCENT,
     MONTHS,
     PERFORMANCE_METRICS,
     TARGET_MODES,
@@ -68,11 +69,17 @@ def permission_required(code):
 
 
 def request_mode():
+    # Franchise users must not see or choose target setup methods.
+    # Their portal always uses the Admin-controlled SA GDP growth standard.
+    if current_user.is_authenticated and not current_user.has_permission("performance:manage_targets"):
+        return "annual_gross_scale"
     mode = request.args.get("target_mode", "annual_gross_scale")
-    return mode if mode in TARGET_MODES else "manual"
+    return mode if mode in TARGET_MODES else "annual_gross_scale"
 
 
 def request_growth():
+    if current_user.is_authenticated and not current_user.has_permission("performance:manage_targets"):
+        return DEFAULT_SA_GDP_GROWTH_PERCENT
     try:
         return Decimal(str(request.args.get("growth", DEFAULT_GROWTH_PERCENT)))
     except Exception:
@@ -326,6 +333,7 @@ def graphs():
         selected_period_label=month_label(month, year),
         province_options=province_options,
         selected_province=selected_province,
+        show_manage_targets=current_user.has_permission("performance:manage_targets"),
     )
 
 

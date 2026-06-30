@@ -56,19 +56,24 @@
         <option value="36" {% if periods == 36 %}selected{% endif %}>36 months</option>
       </select>
     </label>
-    <label>Target Method
+    {% if show_manage_targets %}
+    <label>Target Standard
       <select name="target_mode">
         {% for key, label in target_modes.items() %}<option value="{{ key }}" {% if key == target_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
     </label>
     <input type="hidden" name="growth" value="{{ growth }}">
+    {% else %}
+    <input type="hidden" name="target_mode" value="annual_gross_scale">
+    <input type="hidden" name="growth" value="1.60">
+    {% endif %}
     <button class="btn button-auto" type="submit">Update Graphs</button>
   </form>
 
   {% if graph_data %}
   <div class="graph-dashboard-title">
     <h2>{{ graph_data.metric_label }} - {{ selected_label }}</h2>
-    <p class="muted">Selected period ending {{ selected_period_label }}. Target line uses the Admin scale: prior-year gross turnover / 12 determines the growth %, then the same month previous year is increased by that %.</p>
+    <p class="muted">Selected period ending {{ selected_period_label }}. Target line uses the Admin-controlled South Africa GDP growth standard. The scale is managed only from the Admin portal and is not shown on the franchise site.</p>
   </div>
 
   <div class="graph-grid-two">

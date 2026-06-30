@@ -62,10 +62,11 @@ TARGET_MODES = {
     "three_year_average": "3-Year Same Month Average",
     "three_year_growth": "3-Year Average + Growth %",
     "growth_bracket": "Fair Growth Bracket",
-    "annual_gross_scale": "Annual Gross Turnover Scale",
+    "annual_gross_scale": "SA GDP Growth Standard",
 }
 
-DEFAULT_GROWTH_PERCENT = Decimal("10")
+DEFAULT_GROWTH_PERCENT = Decimal("1.60")
+DEFAULT_SA_GDP_GROWTH_PERCENT = Decimal("1.60")
 SCORE_CAP_PERCENT = Decimal("150")
 
 
@@ -354,17 +355,17 @@ def annual_gross_scale_percent(franchise_id, target_year):
     brackets = active_growth_brackets("gross_turnover")
     if not brackets:
         defaults = [
-            (Decimal("0"), Decimal("100000"), Decimal("15")),
-            (Decimal("100000"), Decimal("200000"), Decimal("12")),
-            (Decimal("200000"), Decimal("400000"), Decimal("10")),
-            (Decimal("400000"), Decimal("700000"), Decimal("7")),
-            (Decimal("700000"), Decimal("1200000"), Decimal("4")),
-            (Decimal("1200000"), None, Decimal("3")),
+            (Decimal("0"), Decimal("100000"), DEFAULT_SA_GDP_GROWTH_PERCENT),
+            (Decimal("100000"), Decimal("200000"), DEFAULT_SA_GDP_GROWTH_PERCENT),
+            (Decimal("200000"), Decimal("400000"), DEFAULT_SA_GDP_GROWTH_PERCENT),
+            (Decimal("400000"), Decimal("700000"), DEFAULT_SA_GDP_GROWTH_PERCENT),
+            (Decimal("700000"), Decimal("1200000"), DEFAULT_SA_GDP_GROWTH_PERCENT),
+            (Decimal("1200000"), None, DEFAULT_SA_GDP_GROWTH_PERCENT),
         ]
         for low, high, pct in defaults:
             if basis_value >= low and (high is None or basis_value < high):
                 return pct, basis_value, None
-        return Decimal("3"), basis_value, None
+        return DEFAULT_SA_GDP_GROWTH_PERCENT, basis_value, None
     for bracket in brackets:
         low = to_decimal(bracket.amount_from)
         high = to_decimal(bracket.amount_to) if bracket.amount_to is not None else None
@@ -396,8 +397,8 @@ def annual_gross_scale_details(franchise_id, metric_key, month, target_year):
         "target_value": round_money(prior_value + growth_amount),
         "bracket_id": bracket.id if bracket else None,
         "bracket_label": growth_bracket_label(bracket) if bracket else f"{basis_value:,.2f}",
-        "formula": "Target = same month previous year + (same month previous year x scale %)",
-        "scale_formula": "Scale % = prior-year gross turnover / 12 looked up against the Admin scale table",
+        "formula": "Target = same month previous year + (same month previous year x SA GDP growth %)",
+        "scale_formula": "Growth % defaults to the South Africa GDP growth standard. Admin may edit the scale table only from the Admin portal.",
         "growth_status": growth_status(pct),
     }
 

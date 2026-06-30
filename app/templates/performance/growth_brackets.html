@@ -3,7 +3,7 @@
 <div class="page-header">
     <div>
         <h1>Growth Target Brackets</h1>
-        <p class="muted">Fair growth targets based on business size. These brackets prevent a R1m franchise and a R200k franchise from receiving the same unrealistic growth percentage.</p>
+        <p class="muted">Admin-only scale. The default growth standard is South Africa GDP growth (1.60%). Only Admin can change these percentages; franchise users never see this setup page.</p>
     </div>
     <a class="btn secondary" href="{{ url_for('performance.index', target_mode='growth_bracket') }}">Back to Performance</a>
 </div>
@@ -12,7 +12,7 @@
 {% for metric_key, metric in metrics.items() %}
 <div class="panel-card" style="margin-bottom: 1rem;">
     <h2>{{ metric.label }}</h2>
-    <p class="muted">Set the growth target percentage for each {{ metric.label }} bracket. Leave the last "To" value blank for open-ended.</p>
+    <p class="muted">Set the growth target percentage for each {{ metric.label }} bracket. Default is SA GDP growth; change it only when Admin wants a different standard.</p>
     <div class="table-responsive">
         <table class="data-table">
             <thead><tr><th>From</th><th>To</th><th>Growth Target %</th></tr></thead>

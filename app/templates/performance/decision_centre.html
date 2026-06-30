@@ -27,12 +27,17 @@
             {% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}
         </select>
     </label>
-    <label>Target Mode
+    {% if current_user.has_permission('performance:manage_targets') %}
+    <label>Target Standard
         <select name="target_mode">
             {% for key, label in target_modes.items() %}<option value="{{ key }}" {% if key == target_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
     </label>
     <label>Growth % <input type="number" step="0.01" name="growth" value="{{ growth }}"></label>
+    {% else %}
+    <input type="hidden" name="target_mode" value="annual_gross_scale">
+    <input type="hidden" name="growth" value="1.60">
+    {% endif %}
     <button class="btn" type="submit">Update</button>
 </form>
 
