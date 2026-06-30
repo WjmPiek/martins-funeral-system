@@ -6,7 +6,7 @@
     <title>Martins Funerals System</title>
 
     <link rel="preload" href="{{ url_for('static', filename='img/logo.png') }}" as="image" fetchpriority="high">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v83-top-menu-fix') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v84-white-label-portal') }}">
 </head>
 <body class="app-body">
     {% if current_user.is_authenticated %}
@@ -16,27 +16,38 @@
                     <span></span><span></span><span></span><span></span>
                 </summary>
                 <div class="menu-panel">
-                <a class="sidebar-logo" href="{{ url_for('performance.graphs') if current_user.has_permission('performance:view') else url_for('dashboard.index') }}">
-                    <img
-                        src="{{ url_for('static', filename='img/logo.png') }}"
-                        alt="System Logo"
-                        width="180"
-                        height="81"
-                        loading="eager"
-                        decoding="async"
-                        fetchpriority="high"
-                    >
-                    <span>Martins Funerals System</span>
-                </a>
-
                 <nav class="sidebar-nav">
                     {% set nav_role_names = current_user.roles|map(attribute='name')|list %}
-                    {% set is_franchise_user = 'Franchise User' in nav_role_names or 'Manager' in nav_role_names or 'Employee' in nav_role_names or 'Agent' in nav_role_names %}
+                    {% set is_franchise_user = 'Franchise User' in nav_role_names or 'Franchise Manager' in nav_role_names or 'Franchise Employee' in nav_role_names or 'Franchise Agent' in nav_role_names or 'Manager' in nav_role_names or 'Employee' in nav_role_names or 'Agent' in nav_role_names %}
                     {% set is_admin_user = 'Admin' in nav_role_names or 'Super Admin' in nav_role_names %}
                     {% set is_finance_user = 'Finance Manager' in nav_role_names or 'Finance Assistant' in nav_role_names %}
+                    {% set pure_franchise_portal = is_franchise_user and not is_admin_user and not is_finance_user and not privileged_user %}
 
-                    {# Menu order: lower-priority/admin setup first, daily important work lower in the sidebar. #}
-                    {% if privileged_user and franchise_view_mode %}
+                    <a class="sidebar-logo{% if pure_franchise_portal %} franchise-logo-text{% endif %}" href="{{ url_for('performance.index') if pure_franchise_portal else (url_for('performance.graphs') if current_user.has_permission('performance:view') else url_for('dashboard.index')) }}">
+                        {% if pure_franchise_portal %}
+                            <span>{{ selected_franchise.business_name if selected_franchise else 'My Business' }}</span>
+                        {% else %}
+                            <img
+                                src="{{ url_for('static', filename='img/logo.png') }}"
+                                alt="System Logo"
+                                width="180"
+                                height="81"
+                                loading="eager"
+                                decoding="async"
+                                fetchpriority="high"
+                            >
+                            <span>Martins Funerals System</span>
+                        {% endif %}
+                    </a>
+
+                    {# Menu order: franchise users see a white-label portal; admin users see the group system. #}
+                    {% if pure_franchise_portal %}
+                        {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.index') }}">Leaderboard</a>{% endif %}
+                        {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.graphs') }}">Dashboard</a>{% endif %}
+                        {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') or is_franchise_user %}<a href="{{ url_for('franchise.employees') }}">Employees</a>{% endif %}
+                        {% if current_user.has_permission('insurance_claims:view') %}<a href="{{ url_for('insurance_claims.index') }}">Claims</a>{% endif %}
+                        {% if current_user.has_permission('manuals:view') %}<a href="{{ url_for('manuals.index') }}">Manuals</a>{% endif %}
+                    {% elif privileged_user and franchise_view_mode %}
                         <div class="nav-group-title">Admin</div>
                         <a href="{{ url_for('dashboard.main_dashboard') }}">Back to Main Dashboard</a>
 
@@ -127,15 +138,19 @@
             <div class="main-panel">
                 <header class="topbar">
                     <div class="page-title">
-                        Martins Funerals System
-                        {% if franchise_view_mode and selected_franchise %}
-                            <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
+                        {% if pure_franchise_portal %}
+                            {{ selected_franchise.business_name if selected_franchise else 'My Business' }}
+                        {% else %}
+                            Martins Funerals System
+                            {% if franchise_view_mode and selected_franchise %}
+                                <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
+                            {% endif %}
                         {% endif %}
                     </div>
                     <div class="topbar-user">
                         <span>Logged in as</span>
                         <strong>{{ current_user.full_name }}</strong>
-                        <small>{{ current_user.roles|map(attribute='name')|join(', ') or 'No Role' }}</small>
+                        {% if not pure_franchise_portal %}<small>{{ current_user.roles|map(attribute='name')|join(', ') or 'No Role' }}</small>{% endif %}
                         {% if privileged_user and franchise_view_mode %}
                             <a class="logout-link secondary-link" href="{{ url_for('dashboard.main_dashboard') }}">Main Dashboard</a>
                         {% endif %}

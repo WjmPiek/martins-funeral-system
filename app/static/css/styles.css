@@ -1724,3 +1724,46 @@ body.app-body {
 @media print {
     .app-menu { display: none !important; }
 }
+
+/* V84 white-label franchise portal clean-up */
+.sidebar-logo.franchise-logo-text {
+    min-height: 64px;
+    padding: 1rem;
+    justify-content: flex-start;
+    text-decoration: none;
+}
+.sidebar-logo.franchise-logo-text span {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--text-main, #10233d);
+    line-height: 1.2;
+}
+.franchise-portal-page .section-header p,
+.franchise-portal-page .muted {
+    color: var(--text-muted, #64748b);
+}
+.clean-employee-form {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    align-items: end;
+}
+.compact-user-table td,
+.compact-user-table th {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+    vertical-align: middle;
+}
+.action-buttons-inline {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+.action-buttons-inline form {
+    margin: 0;
+}
+@media (max-width: 760px) {
+    .topbar { align-items: flex-start; gap: .75rem; }
+    .topbar-user { flex-wrap: wrap; justify-content: flex-start; }
+    .action-buttons-inline { flex-wrap: wrap; }
+}

@@ -339,6 +339,11 @@ def can_manage_own_franchise_employees():
 
 
 FRANCHISE_USER_CREATABLE_ROLE_NAMES = ["Franchise Manager", "Franchise Employee", "Franchise Agent"]
+FRANCHISE_ROLE_LABELS = {
+    "Franchise Manager": "Manager",
+    "Franchise Employee": "Employee",
+    "Franchise Agent": "Agent",
+}
 
 
 def franchise_creatable_roles():
@@ -379,7 +384,7 @@ def employees():
     franchises = franchises_available_for_employee_creation()
     if not franchises:
         flash("Your user is not linked to any franchise yet. Ask Admin to link your franchise before creating employee users.", "warning")
-        return render_template("franchise/employees.html", franchises=[], employees=[], creatable_roles=franchise_creatable_roles(), can_manage_employees=can_manage_own_franchise_employees())
+        return render_template("franchise/employees.html", franchises=[], employees=[], creatable_roles=franchise_creatable_roles(), role_labels=FRANCHISE_ROLE_LABELS, can_manage_employees=can_manage_own_franchise_employees())
 
     if request.method == "POST":
         if not can_manage_own_franchise_employees():
@@ -390,6 +395,8 @@ def employees():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "").strip()
         franchise_id = request.form.get("franchise_id", type=int)
+        if not franchise_id and franchises:
+            franchise_id = franchises[0].id
         role_id = request.form.get("role_id", type=int)
 
         if not name or not surname or not email or not password:
@@ -466,7 +473,7 @@ def employees():
         .all()
     )
     employees = [user for user in employees if user_is_my_franchise_employee(user)]
-    return render_template("franchise/employees.html", franchises=franchises, employees=employees, creatable_roles=franchise_creatable_roles(), can_manage_employees=can_manage_own_franchise_employees())
+    return render_template("franchise/employees.html", franchises=franchises, employees=employees, creatable_roles=franchise_creatable_roles(), role_labels=FRANCHISE_ROLE_LABELS, can_manage_employees=can_manage_own_franchise_employees())
 
 
 @franchise_bp.route("/employees/<int:user_id>/update", methods=["POST"])
@@ -503,7 +510,7 @@ def update_employee(user_id):
 @franchise_bp.route("/employees/<int:user_id>/delete", methods=["POST"])
 @login_required
 def delete_employee(user_id):
-    if not current_user.has_permission("franchise_employees:delete") and not current_user.has_permission("franchise_employees:manage"):
+    if not can_manage_own_franchise_employees():
         abort(403)
     user = User.query.get_or_404(user_id)
     if not user_is_my_franchise_employee(user):
