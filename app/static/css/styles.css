@@ -1513,3 +1513,93 @@ body.app-body {
 
 /* User management action buttons */
 .action-buttons{white-space:nowrap;display:flex;gap:.35rem;align-items:center;flex-wrap:wrap}.action-buttons form{margin:0}.btn.danger{background:#b42318;color:#fff;border-color:#b42318}.btn.danger:hover{background:#912018;border-color:#912018}
+
+/* Compact user-management lists: Users, Franchise Users, Employees */
+.user-management-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+}
+.user-management-table th,
+.user-management-table td {
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 9px 12px !important;
+    font-size: 13px !important;
+    line-height: 1.25 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    vertical-align: middle !important;
+    text-align: left !important;
+}
+.user-management-table td { min-height: 44px; }
+.user-management-table th:last-child,
+.user-management-table td:last-child {
+    width: 210px !important;
+    min-width: 210px !important;
+    text-align: right !important;
+}
+.user-management-table .action-buttons {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 6px !important;
+    white-space: nowrap !important;
+}
+.user-management-table .action-buttons form {
+    display: inline-flex !important;
+    margin: 0 !important;
+}
+.user-management-table .action-buttons .btn,
+.user-management-table .action-buttons button {
+    width: auto !important;
+    min-width: 58px !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 7px 10px !important;
+    font-size: 12px !important;
+    line-height: 1 !important;
+    border-radius: 7px !important;
+}
+.user-management-table .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding: 4px 10px;
+    white-space: nowrap;
+}
+.mother-company-table th:nth-child(1),
+.mother-company-table td:nth-child(1) { width: 24% !important; }
+.mother-company-table th:nth-child(2),
+.mother-company-table td:nth-child(2) { width: 29% !important; }
+.mother-company-table th:nth-child(3),
+.mother-company-table td:nth-child(3) { width: 20% !important; }
+.mother-company-table th:nth-child(4),
+.mother-company-table td:nth-child(4) { width: 12% !important; text-align: center !important; }
+.franchise-users-table th:nth-child(1),
+.franchise-users-table td:nth-child(1) { width: 34% !important; }
+.franchise-users-table th:nth-child(2),
+.franchise-users-table td:nth-child(2) { width: 34% !important; }
+.franchise-users-table th:nth-child(3),
+.franchise-users-table td:nth-child(3) { width: 12% !important; text-align: center !important; }
+.employee-users-table th:nth-child(1),
+.employee-users-table td:nth-child(1) { width: 20% !important; }
+.employee-users-table th:nth-child(2),
+.employee-users-table td:nth-child(2) { width: 25% !important; }
+.employee-users-table th:nth-child(3),
+.employee-users-table td:nth-child(3) { width: 16% !important; }
+.employee-users-table th:nth-child(4),
+.employee-users-table td:nth-child(4) { width: 17% !important; }
+.employee-users-table th:nth-child(5),
+.employee-users-table td:nth-child(5) { width: 10% !important; text-align: center !important; }
+.form-section-card .table-responsive:has(.user-management-table) {
+    overflow-x: visible !important;
+}
+.user-management-modals { display: contents; }
+@media (max-width: 900px) {
+    .user-management-table { min-width: 760px !important; }
+    .form-section-card .table-responsive:has(.user-management-table) { overflow-x: auto !important; }
+}

@@ -9,7 +9,7 @@
   </div>
 
   <div class="form-section-card">
-    <div class="table-responsive"><table class="system-report-table users-table">
+    <div class="table-responsive"><table class="system-report-table users-table user-management-table franchise-users-table">
       <thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
       {% for user in franchise_users %}
@@ -23,12 +23,16 @@
             <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" style="display:inline" onsubmit="return confirm('Delete/deactivate this franchise user?');"><button class="btn danger button-auto" type="submit">Delete</button></form>
           </td>
         </tr>
-        {% include 'admin/_user_action_modals.html' %}
       {% else %}
         <tr><td colspan="4" class="center-cell">No franchise users found.</td></tr>
       {% endfor %}
       </tbody>
     </table></div>
+    <div class="user-management-modals">
+      {% for user in franchise_users %}
+        {% include 'admin/_user_action_modals.html' %}
+      {% endfor %}
+    </div>
   </div>
 </section>
 <script>

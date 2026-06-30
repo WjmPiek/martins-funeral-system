@@ -17,7 +17,7 @@
   <div class="form-section-card">
     <h2>Mother Company Users</h2>
     <p class="muted">Admin, Finance Manager, Finance Assistant and Regional Manager users created under Martins Funerals South Africa.</p>
-    <div class="table-responsive"><table class="system-report-table users-table">
+    <div class="table-responsive"><table class="system-report-table users-table user-management-table mother-company-table">
       <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
       {% for user in mother_company_users %}
@@ -32,12 +32,16 @@
             <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" style="display:inline" onsubmit="return confirm('Deactivate this user?');"><button class="btn danger button-auto" type="submit">Delete</button></form>
           </td>
         </tr>
-        {% include 'admin/_user_action_modals.html' %}
       {% else %}
         <tr><td colspan="5" class="center-cell">No mother-company users found.</td></tr>
       {% endfor %}
       </tbody>
     </table></div>
+    <div class="user-management-modals">
+      {% for user in mother_company_users %}
+        {% include 'admin/_user_action_modals.html' %}
+      {% endfor %}
+    </div>
   </div>
 </section>
 <script>
