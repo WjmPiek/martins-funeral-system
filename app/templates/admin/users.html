@@ -4,7 +4,7 @@
   <div class="section-header">
     <div>
       <h1>Users</h1>
-      <p>Only Martins users are listed here. Use the button only when you want to add a new user.</p>
+      <p>All users registered under Admin / Mother Company are listed here.</p>
     </div>
   </div>
 
@@ -18,7 +18,7 @@
     <h2>Mother Company Users</h2>
     <p class="muted">Admin, Finance Manager, Finance Assistant and Regional Manager users created under Martins Funerals South Africa.</p>
     <div class="table-responsive"><table class="system-report-table users-table">
-      <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Linked Franchises</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
       {% for user in mother_company_users %}
         <tr>
@@ -26,7 +26,6 @@
           <td>{{ user.email }}</td>
           <td>{{ user.roles|map(attribute='name')|join(', ') }}</td>
           <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
-          <td>{% if user.assigned_franchises %}{{ user.assigned_franchises|map(attribute='business_name')|join(', ') }}{% else %}<span class="muted">None</span>{% endif %}</td>
           <td class="action-buttons">
             <button type="button" class="btn secondary button-auto" onclick="openUserModal('view-user-{{ user.id }}')">View</button>
             <button type="button" class="btn secondary button-auto" onclick="openUserModal('edit-user-{{ user.id }}')">Edit</button>
@@ -35,7 +34,7 @@
         </tr>
         {% include 'admin/_user_action_modals.html' %}
       {% else %}
-        <tr><td colspan="6" class="center-cell">No mother-company users found.</td></tr>
+        <tr><td colspan="5" class="center-cell">No mother-company users found.</td></tr>
       {% endfor %}
       </tbody>
     </table></div>

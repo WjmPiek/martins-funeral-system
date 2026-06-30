@@ -447,6 +447,26 @@ def users():
     )
 
 
+@admin_bp.route("/franchise-users")
+@login_required
+@permission_required("users:view")
+def franchise_users():
+    ensure_user_hierarchy_roles()
+    db.session.commit()
+    franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
+    franchise_users = [
+        user for user in User.query.order_by(User.name, User.surname).all()
+        if user.has_role("Franchise User") and not getattr(user, "parent_franchise_user_id", None)
+    ]
+    return render_template(
+        "admin/franchise_users.html",
+        franchise_users=franchise_users,
+        roles=Role.query.filter(Role.name.in_(["Franchise User"])).order_by(Role.name).all(),
+        franchises=franchises,
+        can_assign_franchise_links=can_assign_franchise_links(),
+    )
+
+
 @admin_bp.route("/users/create", methods=["GET", "POST"])
 @login_required
 def create_admin_user():
@@ -503,6 +523,8 @@ def create_admin_user():
     db.session.commit()
     log_action("Users", "Created admin-managed user", f"User: {email}; Role: {role.name}")
     flash(f"User {user.full_name} was created as {role.name}.", "success")
+    if role.name == "Franchise User":
+        return redirect(url_for("admin.franchise_users"))
     return redirect(url_for("admin.users"))
 
 
@@ -1880,16 +1902,70 @@ def is_franchise_employee_user(user):
 @permission_required("users:view")
 def franchise_employees():
     employees = [user for user in User.query.order_by(User.name, User.surname).all() if is_franchise_employee_user(user)]
-    owners = {user.id: user for user in User.query.filter(User.id.in_([employee.parent_franchise_user_id for employee in employees if employee.parent_franchise_user_id])).all()} if employees else {}
+    owner_ids = [employee.parent_franchise_user_id for employee in employees if employee.parent_franchise_user_id]
+    owners = {user.id: user for user in User.query.filter(User.id.in_(owner_ids)).all()} if owner_ids else {}
+    franchise_owners = [
+        user for user in User.query.order_by(User.name, User.surname).all()
+        if user.has_role("Franchise User") and not getattr(user, "parent_franchise_user_id", None)
+    ]
     franchises = Franchise.query.order_by(Franchise.business_name).all()
     employee_roles = Role.query.filter(Role.name.in_(["Franchise Manager", "Franchise Employee", "Franchise Agent"])).order_by(Role.name).all()
     return render_template(
         "admin/franchise_employees.html",
         employees=employees,
         owners=owners,
+        franchise_owners=franchise_owners,
         franchises=franchises,
         employee_roles=employee_roles,
     )
+
+
+@admin_bp.route("/franchise-employees/create", methods=["POST"])
+@login_required
+@permission_required("users:add")
+def create_franchise_employee_admin():
+    name = request.form.get("name", "").strip()
+    surname = request.form.get("surname", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "").strip()
+    role_id = request.form.get("role_id", type=int)
+    franchise_id = request.form.get("franchise_id", type=int)
+    owner_id = request.form.get("parent_franchise_user_id", type=int)
+
+    if not name or not surname or not email or not password or not role_id or not franchise_id:
+        flash("Name, surname, email, password, role and franchise are required.", "danger")
+        return redirect(url_for("admin.franchise_employees"))
+    if User.query.filter(db.func.lower(User.email) == email).first():
+        flash("A user with that email address already exists.", "danger")
+        return redirect(url_for("admin.franchise_employees"))
+
+    selected_role = Role.query.get(role_id)
+    if not selected_role or selected_role.name not in {"Franchise Manager", "Franchise Employee", "Franchise Agent"}:
+        flash("Please select Manager, Employee or Agent.", "danger")
+        return redirect(url_for("admin.franchise_employees"))
+
+    franchise = Franchise.query.get_or_404(franchise_id)
+    owner = User.query.get(owner_id) if owner_id else None
+    if owner and not owner.has_role("Franchise User"):
+        owner = None
+
+    user = User(
+        name=name,
+        surname=surname,
+        email=email,
+        is_active=True,
+        is_active_account=True,
+        parent_franchise_user_id=owner.id if owner else None,
+        created_by_user_id=current_user.id,
+    )
+    user.set_password(password)
+    user.roles.append(selected_role)
+    user.assigned_franchises.append(franchise)
+    db.session.add(user)
+    log_action("Franchise Employees", "Admin created franchise employee user", f"Employee: {email}; Franchise: {franchise.business_name}")
+    db.session.commit()
+    flash(f"Employee user {user.full_name} was created.", "success")
+    return redirect(url_for("admin.franchise_employees"))
 
 
 @admin_bp.route("/franchise-employees/<int:user_id>/update", methods=["POST"])

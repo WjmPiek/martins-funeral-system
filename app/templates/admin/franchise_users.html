@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Franchise Users</h1>
+      <p>All registered franchise user accounts are listed here.</p>
+    </div>
+  </div>
+
+  <div class="form-section-card">
+    <div class="table-responsive"><table class="system-report-table users-table">
+      <thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for user in franchise_users %}
+        <tr>
+          <td><strong>{{ user.full_name }}</strong></td>
+          <td>{{ user.email }}</td>
+          <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
+          <td class="action-buttons">
+            <button type="button" class="btn secondary button-auto" onclick="openUserModal('view-user-{{ user.id }}')">View</button>
+            <button type="button" class="btn secondary button-auto" onclick="openUserModal('edit-user-{{ user.id }}')">Edit</button>
+            <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" style="display:inline" onsubmit="return confirm('Delete/deactivate this franchise user?');"><button class="btn danger button-auto" type="submit">Delete</button></form>
+          </td>
+        </tr>
+        {% include 'admin/_user_action_modals.html' %}
+      {% else %}
+        <tr><td colspan="4" class="center-cell">No franchise users found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</section>
+<script>
+function openUserModal(id){ const modal=document.getElementById(id); if(modal){modal.classList.add('is-open');modal.setAttribute('aria-hidden','false');} }
+function closeUserModal(id){ const modal=document.getElementById(id); if(modal){modal.classList.remove('is-open');modal.setAttribute('aria-hidden','true');} }
+function toggleEditFranchiseScope(userId){ const box=document.getElementById(`edit-franchise-scope-${userId}`); if(box){box.style.display='block';} }
+document.addEventListener('DOMContentLoaded', function(){ document.querySelectorAll('[data-user-edit-id]').forEach(function(item){ toggleEditFranchiseScope(item.getAttribute('data-user-edit-id')); }); });
+</script>
+{% endblock %}

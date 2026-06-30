@@ -2,15 +2,15 @@
 {% block app_content %}
 <section class="page-section">
   <div class="section-header">
-    <div><h1>Employees</h1><p>Create Manager, Employee or Agent users under your own franchise. These users only see data for the franchise they are linked to.</p></div>
+    <div><h1>Employees</h1><p>Create and manage employees under your franchise.</p></div>
     {% if franchises and can_manage_employees %}
-      <button type="button" class="btn button-auto" onclick="toggleNewEmployeeForm()">New User</button>
+      <button type="button" class="btn button-auto" onclick="toggleNewEmployeeForm()">New Employee</button>
     {% endif %}
   </div>
 
   {% if franchises and can_manage_employees %}
   <div class="form-section-card" id="new-employee-form" style="display:none;">
-    <h2>New User</h2>
+    <h2>New Employee</h2>
     <form method="post" action="{{ url_for('franchise.employees') }}" class="inline-form-grid">
       <label>Name<input type="text" name="name" required></label>
       <label>Surname<input type="text" name="surname" required></label>
@@ -26,7 +26,7 @@
   {% endif %}
 
   <div class="form-section-card">
-    <h2>Users Created By Me</h2>
+    <h2>Employees</h2>
     <div class="table-responsive"><table class="system-report-table users-table">
       <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>
@@ -36,7 +36,7 @@
         <td>{{ employee.email }}</td>
         <td>{{ employee.roles|map(attribute='name')|join(', ') }}</td>
         <td>{% if employee.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
-        <td><button type="button" class="btn secondary button-auto" onclick="openEmp('emp-{{ employee.id }}')">Edit</button><form method="post" action="{{ url_for('franchise.delete_employee', user_id=employee.id) }}" style="display:inline" onsubmit="return confirm('Deactivate this employee user?');"><button class="btn danger button-auto" type="submit">Deactivate</button></form></td>
+        <td><button type="button" class="btn secondary button-auto" onclick="openEmp('emp-{{ employee.id }}')">Edit</button><form method="post" action="{{ url_for('franchise.delete_employee', user_id=employee.id) }}" style="display:inline" onsubmit="return confirm('Delete/deactivate this employee?');"><button class="btn danger button-auto" type="submit">Delete</button></form></td>
       </tr>
       <tr><td colspan="5"><div class="modal-backdrop" id="emp-{{ employee.id }}" aria-hidden="true"><div class="modal-card" role="dialog" aria-modal="true"><div class="modal-header"><div><h2>Edit Employee</h2><p>{{ employee.email }}</p></div><button type="button" class="modal-close" onclick="closeEmp('emp-{{ employee.id }}')">x</button></div><form method="post" action="{{ url_for('franchise.update_employee', user_id=employee.id) }}"><label>Name<input name="name" value="{{ employee.name or '' }}"></label><label>Surname<input name="surname" value="{{ employee.surname or '' }}"></label><label>Role<select name="role_id">{% for role in creatable_roles %}<option value="{{ role.id }}" {% if role in employee.roles %}selected{% endif %}>{{ role.name.replace('Franchise ', '') }}</option>{% endfor %}</select></label><label>Status<select name="is_active"><option value="1" {% if employee.is_active %}selected{% endif %}>Active</option><option value="0" {% if not employee.is_active %}selected{% endif %}>Inactive</option></select></label><label>New Password<input name="password" placeholder="Leave blank to keep current password"></label><div class="modal-actions"><button type="button" class="btn secondary button-auto" onclick="closeEmp('emp-{{ employee.id }}')">Cancel</button><button class="btn button-auto" type="submit">Save</button></div></form></div></div></td></tr>
       {% else %}

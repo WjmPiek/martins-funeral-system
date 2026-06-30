@@ -362,7 +362,7 @@ def user_is_my_franchise_employee(user):
     # Safe fallback for older records: employee must be linked only to franchises the owner can access.
     my_franchise_ids = {franchise.id for franchise in franchises_available_for_employee_creation()}
     employee_franchise_ids = {franchise.id for franchise in (user.assigned_franchises or [])}
-    return bool(employee_franchise_ids) and employee_franchise_ids.issubset(my_franchise_ids) and user.has_role("Franchise Employee")
+    return bool(employee_franchise_ids) and employee_franchise_ids.issubset(my_franchise_ids) and any(user.has_role(role_name) for role_name in FRANCHISE_USER_CREATABLE_ROLE_NAMES)
 
 
 @franchise_bp.route("/employees", methods=["GET", "POST"])

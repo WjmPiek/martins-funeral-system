@@ -65,9 +65,10 @@
                         {% if current_user.has_permission('users:view') or current_user.has_permission('user_roles:view') or current_user.has_permission('performance:manage_inactive') or is_admin_user or is_finance_user %}
                             <div class="nav-group-title">Admin</div>
                             <details class="nav-section" open>
-                                <summary>Users <span class="nav-count-badge">4</span></summary>
+                                <summary>Users <span class="nav-count-badge">5</span></summary>
                                 <div class="nav-subtabs">
                                     {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.users') }}">Users</a>{% endif %}
+                                    {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.franchise_users') }}">Franchise Users</a>{% endif %}
                                     {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.franchise_employees') }}">Employees</a>{% endif %}
                                     {% if current_user.has_permission('user_roles:view') %}<a href="{{ url_for('admin.roles') }}">User Roles</a>{% endif %}
                                     {% if current_user.has_permission('performance:manage_inactive') or is_admin_user or 'Finance Manager' in nav_role_names %}<a href="{{ url_for('performance.inactive_franchises') }}">Old Franchises</a>{% endif %}
