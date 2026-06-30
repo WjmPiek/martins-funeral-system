@@ -1062,7 +1062,7 @@ def iter_xlsx_import_sheets(file_storage):
             yield title, rows
 
 
-def import_monthly_figures_excel_file(file_storage, allocate_users=True):
+def import_monthly_figures_excel_file(file_storage, allocate_users=True, progress_job=None):
     suffix = Path(file_storage.filename or "").suffix.lower()
     if suffix not in {".xlsx", ".xlsm"}:
         raise ValueError("Please upload an Excel workbook (.xlsx or .xlsm).")
@@ -1078,7 +1078,13 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True):
     franchise_ids_touched = set()
     franchise_names = set()
 
-    for sheet_title, rows in iter_xlsx_import_sheets(file_storage):
+    sheets = list(iter_xlsx_import_sheets(file_storage))
+    total_sheets = max(len(sheets), 1)
+    from app.import_progress import update_import_job
+
+    for sheet_index, (sheet_title, rows) in enumerate(sheets, start=1):
+        if progress_job:
+            update_import_job(progress_job, sheet_index, f"Importing {sheet_title} ({sheet_index}/{total_sheets})", commit=True)
         month, year = parse_excel_sheet_period(sheet_title)
         if not month or not year:
             skipped += 1
@@ -1323,9 +1329,17 @@ def import_excel():
             flash("Please select the Excel workbook to import.", "warning")
             return redirect(url_for("monthly.import_excel"))
         try:
-            result = import_monthly_figures_excel_file(file_storage, allocate_users=allocate_users)
+            from app.import_progress import start_import_job, update_import_job
+            # Count sheets quickly for a realistic progress bar.
+            progress_job = start_import_job("monthly_excel", file_storage.filename, total_steps=100)
+            result = import_monthly_figures_excel_file(file_storage, allocate_users=allocate_users, progress_job=progress_job)
+            update_import_job(progress_job, 100, "Monthly figures import complete.", status="completed", commit=True)
         except Exception as exc:
             db.session.rollback()
+            try:
+                update_import_job(progress_job, None, str(exc), status="failed", commit=True)
+            except Exception:
+                pass
             flash(str(exc), "danger")
             return redirect(url_for("monthly.import_excel"))
 

@@ -7,7 +7,8 @@ a { color: #0f4c81; text-decoration: none; }
 .brand { font-weight: bold; }
 .container { max-width: 1000px; margin: 32px auto; padding: 0 18px; }
 
-.topbar { min-height: 74px; background: white; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 5; }
+.topbar { min-height: 74px; background: white; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; border-bottom: 1px solid #e2e8f0; position: relative; z-index: 5; }
+@media (min-width: 900px) { .topbar { position: sticky; top: 0; } }
 .page-title { font-size: 20px; font-weight: bold; }
 .topbar-user { display: flex; align-items: center; gap: 10px; color: #475569; }
 .topbar-user span { font-size: 13px; }
@@ -1769,93 +1770,9 @@ body.app-body {
 }
 
 
-/* V86 enterprise branding: crisp logo, shared headers, branded login and print exports */
-.brand-lockup {
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-}
-.brand-logo,
-.topbar-logo,
-.auth-nav-logo,
-.sidebar-logo img {
-    display: block;
-    height: auto;
-    object-fit: contain;
-    image-rendering: auto;
-    max-width: 100%;
-}
-.brand-logo {
-    width: min(360px, 78vw);
-}
-.brand-text strong {
-    display: block;
-    font-size: 1.25rem;
-    line-height: 1.15;
-    color: var(--text-main, #10233d);
-}
-.brand-text small {
-    display: block;
-    color: var(--text-muted, #64748b);
-    font-weight: 700;
-    margin-top: 0.2rem;
-}
-.auth-nav-logo {
-    width: 86px;
-    margin-right: .6rem;
-}
-.nav .brand {
-    display: flex;
-    align-items: center;
-    gap: .35rem;
-}
-.branded-login-card {
-    max-width: 560px;
-    padding-top: 2.2rem;
-}
-.login-branding {
-    justify-content: flex-start;
-    margin: 0 0 1.1rem 0;
-}
-.login-branding .brand-logo {
-    width: min(330px, 74vw);
-}
-.branded-login-card h1 {
-    margin-top: 0;
-    margin-bottom: 0.25rem;
-}
-.login-subtitle {
-    margin-top: 0;
-    color: var(--text-muted, #64748b);
-    font-weight: 700;
-}
-.page-title-branded {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem;
-    min-width: 0;
-}
-.topbar-logo {
-    width: clamp(90px, 12vw, 170px);
-    flex: 0 0 auto;
-}
-.topbar-title-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.12;
-}
-.sidebar-logo img {
-    width: clamp(112px, 11vw, 154px);
-}
-@media (max-width: 760px) {
-    .branded-login-card { padding: 1.35rem; }
-    .login-branding { justify-content: center; }
-    .login-branding .brand-logo { width: min(280px, 82vw); }
-    .page-title-branded { align-items: flex-start; }
-    .topbar-logo { width: 94px; }
-    .topbar-title-text { font-size: 1.05rem; }
-    .auth-nav-logo { width: 64px; }
-}
-@media print {
-    .topbar-logo, .brand-logo, .sidebar-logo img { max-height: 28mm; }
-}
+.import-progress-card{background:#fff;border:1px solid #dbe3ee;border-radius:14px;padding:1rem;margin:0 0 1rem;box-shadow:0 8px 24px rgba(15,23,42,.08)}
+.import-progress-head{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:.65rem}
+.import-progress-track{height:12px;background:#e8edf5;border-radius:999px;overflow:hidden}
+.import-progress-fill{height:100%;background:linear-gradient(90deg,#6b4ba3,#f4d900);border-radius:999px;transition:width .35s ease}
+.leaderboard-static-row{display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:center;border:1px solid #e5e7eb;border-radius:12px;padding:.55rem;background:#fff;color:inherit}
+@media (max-width:899px){.topbar{position:relative}.topbar-brand img{max-width:150px;height:auto}.content-area{padding-top:18px}}

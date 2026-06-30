@@ -256,6 +256,25 @@ class MonthlyFigure(db.Model):
         return f"{self.year}-{self.month:02d}"
 
 
+
+
+class ImportJob(db.Model):
+    __tablename__ = "import_jobs"
+    id = db.Column(db.Integer, primary_key=True)
+    kind = db.Column(db.String(80), nullable=False, index=True)
+    filename = db.Column(db.String(255), default="")
+    status = db.Column(db.String(30), nullable=False, default="queued", index=True)
+    message = db.Column(db.String(255), default="")
+    total_steps = db.Column(db.Integer, nullable=False, default=100)
+    current_step = db.Column(db.Integer, nullable=False, default=0)
+    progress_percent = db.Column(db.Integer, nullable=False, default=0)
+    extra_json = db.Column(db.Text, default="")
+    started_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    finished_at = db.Column(db.DateTime)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    created_by = db.relationship("User", backref=db.backref("import_jobs", lazy=True))
+
+
 class FranchiseTarget(db.Model):
     __tablename__ = "franchise_targets"
     id = db.Column(db.Integer, primary_key=True)

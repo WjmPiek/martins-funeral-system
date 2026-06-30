@@ -158,7 +158,7 @@
   {% endif %}
 
   <div class="royalty-dashboard-grid">
-    <div class="metric-card"><span>Total Royalties</span><strong>R {{ '%.2f'|format(totals.total_due|float) }}</strong></div>
+    <div class="metric-card"><span>Total Royalties</span><strong>{{ totals.total_due|rand }}</strong></div>
     <div class="metric-card"><span>Unapproved</span><strong>{{ totals.unapproved }}</strong></div>
     <div class="metric-card"><span>Approved</span><strong>{{ totals.approved }}</strong></div>
     <div class="metric-card"><span>Locked</span><strong>{{ totals.locked }}</strong></div>

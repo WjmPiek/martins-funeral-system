@@ -8,7 +8,7 @@ from difflib import SequenceMatcher
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, user_franchises
+from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
@@ -1107,12 +1107,64 @@ def find_franchise_by_name(name):
     for franchise in franchises:
         if normalize_franchise_key(franchise.business_name) == key:
             return franchise
-    # compare common shortened branch names
+    # compare common branch aliases.  Imported contracts often contain legal
+    # names such as "Martin's Funerals Alberton" or "... T/As ...", while
+    # the system stores only the branch name.
     for franchise in franchises:
-        existing = normalize_franchise_key(franchise.business_name)
-        if key and existing and (key == existing or key in existing or existing in key):
-            return franchise
+        aliases = [
+            franchise.business_name,
+            franchise.ck_business_name,
+            franchise.pty_business_name,
+            franchise.franchise_code,
+        ]
+        for alias in aliases:
+            existing = normalize_franchise_key(alias)
+            if key and existing and (key == existing or key in existing or existing in key):
+                return franchise
     return None
+
+
+def contract_group_aliases(group, worksheet):
+    aliases = [group.get("name", "")]
+    for r in group.get("rows", []):
+        for c in (10, 12, 20, 36):
+            aliases.append(clean_excel_text(worksheet.cell(r, c).value))
+    cleaned = []
+    seen = set()
+    for alias in aliases:
+        for part in re.split(r";|/|\bt/as\b|\btrading as\b", alias or "", flags=re.I):
+            part = clean_franchise_name(part)
+            if not part:
+                continue
+            key = normalize_franchise_key(part)
+            if key and key not in seen:
+                cleaned.append(part)
+                seen.add(key)
+    return cleaned
+
+
+def find_franchise_for_contract_group(group, worksheet):
+    for alias in contract_group_aliases(group, worksheet):
+        franchise = find_franchise_by_name(alias)
+        if franchise:
+            return franchise, alias
+    return None, ""
+
+
+def ensure_franchise_owner_login(franchise):
+    """Ensure a branch has one Franchise User login linked to it.
+
+    The contract-summary import updates agreement/scale data.  It should not
+    break grouped-franchise ownership, but when a branch has no franchise login
+    yet we create/link the expected owner so royalties and franchise-side pages
+    can find the correct user.
+    """
+    if not franchise:
+        return None, False
+    for user in getattr(franchise, "assigned_users", []) or []:
+        if "Franchise User" in user_role_names(user) and not is_admin_side_user(user):
+            return user, False
+    return find_franchise_user_for_main_franchise(franchise)
 
 
 
@@ -1617,13 +1669,17 @@ def import_contract_summary():
             return redirect(url_for("admin.import_contract_summary"))
 
         groups = build_contract_summary_groups(worksheet)
+        from app.import_progress import start_import_job, update_import_job
+        job = start_import_job("contract_summary", uploaded_file.filename, total_steps=max(len(groups), 1))
         processed = matched = updated_scales = 0
         unmatched = []
+        created_or_linked_users = 0
         for group in groups:
             processed += 1
-            franchise = find_franchise_by_name(group["name"])
+            franchise, matched_alias = find_franchise_for_contract_group(group, worksheet)
+            update_import_job(job, processed, f"Processing {group['name']} ({processed}/{len(groups)})", commit=True)
             if not franchise:
-                unmatched.append(group["name"])
+                unmatched.append({"name": group["name"], "aliases": contract_group_aliases(group, worksheet)})
                 continue
             matched += 1
             rows = group["rows"]
@@ -1676,6 +1732,9 @@ def import_contract_summary():
             updated_scale_rows = sync_royalty_scales_from_contract_file(franchise, parsed_rows, raw_scale_lines, minimum)
             if updated_scale_rows:
                 updated_scales += 1
+            owner, owner_created = ensure_franchise_owner_login(franchise)
+            if owner_created:
+                created_or_linked_users += 1
 
         # Recalculate existing monthly figures because the agreement date controls
         # whether the franchise uses Gross = New Gross Method or Gross = Old.
@@ -1685,6 +1744,7 @@ def import_contract_summary():
                 recalculate_monthly_figure(figure)
 
         db.session.commit()
+        update_import_job(job, job.total_steps, f"Import complete. {matched} franchises matched; {updated_scales} royalty scales updated.", status="completed", commit=True)
         log_action("Imports & Data", "Imported contract summary", f"Processed: {processed}, matched: {matched}, unmatched: {len(unmatched)}")
         flash(f"Contract summary import complete. {processed} franchises processed, {matched} matched, {len(unmatched)} unmatched, {updated_scales} royalty scales updated.", "success")
         return render_template(
@@ -1694,9 +1754,32 @@ def import_contract_summary():
             matched=matched,
             unmatched=unmatched,
             updated_scales=updated_scales,
+            created_or_linked_users=created_or_linked_users,
         )
 
-    return render_template("admin/import_contract_summary.html", import_complete=False, processed=0, matched=0, unmatched=[], updated_scales=0)
+    return render_template("admin/import_contract_summary.html", import_complete=False, processed=0, matched=0, unmatched=[], updated_scales=0, created_or_linked_users=0)
+
+
+@admin_bp.route("/imports/status/latest")
+@login_required
+def latest_import_status():
+    if not can_view_imports_data():
+        abort(403)
+    job = ImportJob.query.order_by(ImportJob.started_at.desc()).first()
+    if not job:
+        return jsonify({"status": "none", "progress_percent": 0, "message": "No imports started yet."})
+    return jsonify({
+        "id": job.id,
+        "kind": job.kind,
+        "filename": job.filename,
+        "status": job.status,
+        "message": job.message,
+        "current_step": job.current_step,
+        "total_steps": job.total_steps,
+        "progress_percent": job.progress_percent,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+    })
 
 
 

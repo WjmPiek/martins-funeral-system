@@ -112,7 +112,7 @@
         loading.style.display = 'none';
         var g = data.graph_data;
         if(!g){grid.innerHTML = '<div class="panel-card"><p class="muted">No graph data available yet. Import monthly figures and rebuild the performance cache.</p></div>'; return;}
-        var prefix = moneyMetrics.indexOf(g.metric_key) >= 0 ? 'R' : '';
+        var prefix = moneyMetrics.indexOf(g.metric_key) >= 0 ? 'R ' : '';
         title.textContent = g.metric_label + ' - ' + (data.selected_label || 'Selected franchise');
         subtitle.textContent = 'Selected period ending ' + (data.selected_period_label || '') + '. Target line uses the Admin-controlled South Africa GDP growth standard.';
         grid.innerHTML = card('Actual vs Target','Shows whether performance is above or below the fair target line.',g.actual_vs_target,[{key:'actual',label:'Actual'},{key:'target',label:'Target'}],prefix,'','line')

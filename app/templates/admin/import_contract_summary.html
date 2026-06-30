@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block app_content %}
+{% include "includes/_import_progress.html" %}
 <div class="button-row" style="margin-bottom:1rem;"><a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a></div>
 <div class="section-header">
     <div>
@@ -13,7 +14,7 @@
 </div>
 
 <div class="form-section-card">
-    <form method="post" enctype="multipart/form-data" class="professional-form">
+    <form method="post" enctype="multipart/form-data" class="professional-form" data-import-form>
         <div class="form-grid">
             <label for="excel_file">Contract Summary Excel File</label>
             <input id="excel_file" type="file" name="excel_file" accept=".xlsx,.xlsm,.xls" required>
@@ -50,11 +51,12 @@
     <p><strong>{{ processed }}</strong> franchises processed.</p>
     <p><strong>{{ matched }}</strong> matched and updated.</p>
     <p><strong>{{ updated_scales }}</strong> royalty scale sets updated.</p>
+    <p><strong>{{ created_or_linked_users|default(0) }}</strong> franchise login(s) created or linked.</p>
     {% if unmatched %}
         <h3>Unmatched Franchises</h3>
         <p class="muted">These names were found in the spreadsheet but could not be matched to an existing franchise.</p>
         <ul>
-            {% for name in unmatched %}<li>{{ name }}</li>{% endfor %}
+            {% for item in unmatched %}<li>{% if item.name is defined %}{{ item.name }}{% if item.aliases %}<br><small class="muted">Checked aliases: {{ item.aliases|join(", ") }}</small>{% endif %}{% else %}{{ item }}{% endif %}</li>{% endfor %}
         </ul>
     {% endif %}
 </div>

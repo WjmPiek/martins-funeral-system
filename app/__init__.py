@@ -44,6 +44,15 @@ def create_app(config_class=Config):
     app.register_blueprint(leaderboard_bp)
     app.register_blueprint(performance_bp)
 
+
+    @app.template_filter("rand")
+    def format_rand(value):
+        try:
+            amount = float(value or 0)
+        except (TypeError, ValueError):
+            amount = 0.0
+        return f"R {amount:,.2f}"
+
     @app.context_processor
     def inject_franchise_context():
         from app.franchise_context import (

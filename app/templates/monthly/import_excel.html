@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block app_content %}
+{% include "includes/_import_progress.html" %}
 <div class="button-row" style="margin-bottom:1rem;"><a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a></div>
 <section class="page-section">
   <div class="section-header">
@@ -30,7 +31,7 @@
       </div>
     </div>
   {% else %}
-    <form method="post" enctype="multipart/form-data" class="professional-form">
+    <form method="post" enctype="multipart/form-data" class="professional-form" data-import-form>
       <div class="form-section-card">
         <h2>Excel File</h2>
         <div class="form-grid">

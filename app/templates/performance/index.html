@@ -14,11 +14,11 @@
         <p class="muted leaderboard-note">Ranking is based on YTD actuals versus YTD targets.</p>
         <div class="mini-leaderboard-list">
             {% for row in board.rows %}
-            <a class="mini-leaderboard-row movement-{{ row.movement }}" href="{{ url_for('performance.franchise', franchise_id=row.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">
+            <div class="mini-leaderboard-row leaderboard-static-row movement-{{ row.movement }}">
                 <span class="mini-rank">#{{ row.rank }}</span>
                 <span class="mini-name">{{ row.franchise_name }}</span>
                 <span class="mini-score">{{ row.achievement_percent }}%</span>
-            </a>
+            </div>
             {% else %}
             <div class="mini-leaderboard-empty">No data</div>
             {% endfor %}

@@ -3,11 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Martins Funeral System</title>
-    <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}">
+    <title>Martins Funerals System</title>
 
     <link rel="preload" href="{{ url_for('static', filename='img/logo.png') }}" as="image" fetchpriority="high">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v86-branding-enterprise') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v84-white-label-portal') }}">
 </head>
 <body class="app-body">
     {% if current_user.is_authenticated %}
@@ -30,14 +29,14 @@
                         {% else %}
                             <img
                                 src="{{ url_for('static', filename='img/logo.png') }}"
-                                alt="Martins Funerals Logo"
+                                alt="System Logo"
                                 width="180"
                                 height="81"
                                 loading="eager"
                                 decoding="async"
                                 fetchpriority="high"
                             >
-                            <span>Martins Funeral System</span>
+                            <span>Martins Funerals System</span>
                         {% endif %}
                     </a>
 
@@ -138,16 +137,14 @@
 
             <div class="main-panel">
                 <header class="topbar">
-                    <div class="page-title page-title-branded">
+                    <div class="page-title">
                         {% if pure_franchise_portal %}
                             {{ selected_franchise.business_name if selected_franchise else 'My Business' }}
                         {% else %}
-                            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Martins Funerals Logo" class="topbar-logo" width="1705" height="769" loading="eager" decoding="async">
-                            <span class="topbar-title-text">Martins Funeral System
-                                {% if franchise_view_mode and selected_franchise %}
-                                    <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
-                                {% endif %}
-                            </span>
+                            Martins Funerals System
+                            {% if franchise_view_mode and selected_franchise %}
+                                <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
+                            {% endif %}
                         {% endif %}
                     </div>
                     <div class="topbar-user">
@@ -177,7 +174,7 @@
         </div>
     {% else %}
         <nav class="nav">
-            <div class="brand"><img src="{{ url_for('static', filename='img/logo.png') }}" alt="Martins Funerals Logo" class="auth-nav-logo"> Martins Funeral System</div>
+            <div class="brand">Martins Funerals System</div>
             <div>
                 <a href="{{ url_for('auth.login') }}">Login</a>
                 <a href="{{ url_for('auth.register') }}">Register</a>
@@ -241,6 +238,50 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 });
+
+// Import progress notification bar.
+document.addEventListener('DOMContentLoaded', function () {
+  var card = document.querySelector('[data-import-progress]');
+  var forms = document.querySelectorAll('[data-import-form]');
+  if (!card || !forms.length) return;
+  var fill = card.querySelector('[data-import-progress-fill]');
+  var pct = card.querySelector('[data-import-progress-percent]');
+  var msg = card.querySelector('[data-import-progress-message]');
+  var statusUrl = card.dataset.statusUrl;
+  var localProgress = 3;
+  var pollTimer = null;
+  function setProgress(value, message) {
+    value = Math.max(0, Math.min(100, parseInt(value || 0, 10)));
+    fill.style.width = value + '%';
+    pct.textContent = value + '%';
+    if (message) msg.textContent = message;
+  }
+  function poll() {
+    if (!statusUrl) return;
+    fetch(statusUrl, {headers: {'Accept': 'application/json'}}).then(function (r) { return r.json(); }).then(function (data) {
+      if (data && data.status && data.status !== 'none') {
+        setProgress(data.progress_percent || localProgress, data.message || 'Import running...');
+        if (data.status === 'completed' || data.status === 'failed') clearInterval(pollTimer);
+      } else {
+        localProgress = Math.min(92, localProgress + 3);
+        setProgress(localProgress, 'Uploading file and preparing import...');
+      }
+    }).catch(function () {
+      localProgress = Math.min(92, localProgress + 2);
+      setProgress(localProgress, 'Import is still running. Please wait...');
+    });
+  }
+  forms.forEach(function (form) {
+    form.addEventListener('submit', function () {
+      card.hidden = false;
+      setProgress(3, 'Uploading file. Please do not close this page.');
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(poll, 1200);
+      poll();
+    });
+  });
+});
+
 </script>
 
 

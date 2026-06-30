@@ -15,9 +15,9 @@
 <div class="royalty-dashboard-grid">
   <article class="metric-card"><span>Franchises</span><strong>{{ totals.total_franchises }}</strong></article>
   <article class="metric-card"><span>Policy Months</span><strong>{{ totals.policy_months }}</strong></article>
-  <article class="metric-card"><span>Retail Premium</span><strong>R {{ "{:,.2f}".format(totals.total_retail) }}</strong></article>
-  <article class="metric-card"><span>Risk Premium</span><strong>R {{ "{:,.2f}".format(totals.total_risk) }}</strong></article>
-  <article class="metric-card"><span>Claims</span><strong>R {{ "{:,.2f}".format(totals.total_claims) }}</strong></article>
+  <article class="metric-card"><span>Retail Premium</span><strong>{{ totals.total_retail|rand }}</strong></article>
+  <article class="metric-card"><span>Risk Premium</span><strong>{{ totals.total_risk|rand }}</strong></article>
+  <article class="metric-card"><span>Claims</span><strong>{{ totals.total_claims|rand }}</strong></article>
   <article class="metric-card"><span>Claim Ratio</span><strong>{{ "{:,.2f}".format(totals.claim_ratio) }}%</strong></article>
   <article class="metric-card"><span>Open Cases</span><strong>{{ totals.open_cases }}</strong></article>
 </div>
@@ -54,14 +54,14 @@
 <div class="form-section-card">
   <h2>Monthly Policy / Risk Totals</h2>
   <div class="table-responsive"><table class="system-report-table"><thead><tr><th>Franchise</th><th>Month</th><th>Retail Premium</th><th>Risk Premium</th><th>Policies</th><th>R1 Fee</th><th>2.1% Fee</th><th>Source</th></tr></thead><tbody>
-  {% for row in recent_policy %}<tr><td>{{ row.franchise_name }}</td><td>{{ row.import_month }}</td><td>R {{ "{:,.2f}".format(row.retail_premium or 0) }}</td><td>R {{ "{:,.2f}".format(row.risk_premium or 0) }}</td><td>{{ row.policy_qty }}</td><td>R {{ "{:,.2f}".format(row.r1_policy_fee or 0) }}</td><td>R {{ "{:,.2f}".format(row.underwriter_2_1_fee or 0) }}</td><td>{{ row.source_file }}</td></tr>{% else %}<tr><td colspan="8">No PolicyData imported yet.</td></tr>{% endfor %}
+  {% for row in recent_policy %}<tr><td>{{ row.franchise_name }}</td><td>{{ row.import_month }}</td><td>{{ row.retail_premium|rand }}</td><td>{{ row.risk_premium|rand }}</td><td>{{ row.policy_qty }}</td><td>{{ row.r1_policy_fee|rand }}</td><td>{{ row.underwriter_2_1_fee|rand }}</td><td>{{ row.source_file }}</td></tr>{% else %}<tr><td colspan="8">No PolicyData imported yet.</td></tr>{% endfor %}
   </tbody></table></div>
 </div>
 
 <div class="form-section-card">
   <h2>Monthly Claims Totals</h2>
   <div class="table-responsive"><table class="system-report-table"><thead><tr><th>Franchise</th><th>Month</th><th>Claims</th><th>Claim Count</th><th>Paid Franchise</th><th>Paid Client</th><th>Pending/Repudiated</th><th>Source</th></tr></thead><tbody>
-  {% for row in recent_claims %}<tr><td>{{ row.claims_franchise_name }}</td><td>{{ row.claim_month }}</td><td>R {{ "{:,.2f}".format(row.claims_amount or 0) }}</td><td>{{ row.claim_count }}</td><td>R {{ "{:,.2f}".format(row.claim_paid_franchise or 0) }}</td><td>R {{ "{:,.2f}".format(row.claim_paid_client or 0) }}</td><td>R {{ "{:,.2f}".format(row.repudiated_pending or 0) }}</td><td>{{ row.source_file }}</td></tr>{% else %}<tr><td colspan="8">No claims imported yet.</td></tr>{% endfor %}
+  {% for row in recent_claims %}<tr><td>{{ row.claims_franchise_name }}</td><td>{{ row.claim_month }}</td><td>{{ row.claims_amount|rand }}</td><td>{{ row.claim_count }}</td><td>{{ row.claim_paid_franchise|rand }}</td><td>{{ row.claim_paid_client|rand }}</td><td>{{ row.repudiated_pending|rand }}</td><td>{{ row.source_file }}</td></tr>{% else %}<tr><td colspan="8">No claims imported yet.</td></tr>{% endfor %}
   </tbody></table></div>
 </div>
 {% endblock %}
