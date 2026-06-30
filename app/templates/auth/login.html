@@ -4,12 +4,12 @@
     <div class="login-branding" aria-label="Martins Funerals">
         <img
             class="login-logo"
-            src="{{ url_for('static', filename='img/logo.png') }}"
+            src="{{ brand_logo_url }}"
             alt="Martins Funerals logo"
             loading="eager"
             decoding="async"
             fetchpriority="high"
-            onerror="this.onerror=null;this.src='{{ url_for('static', filename='img/logo-placeholder.svg') }}';"
+            onerror="this.onerror=null;this.src='{{ brand_logo_fallback_url }}';"
         >
     </div>
     <h1>Martins Funerals System</h1>

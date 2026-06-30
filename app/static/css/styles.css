@@ -1887,3 +1887,23 @@ body.app-body {
         max-height: 145px;
     }
 }
+
+
+/* V91 static logo cache and no-flicker rendering */
+.brand-logo,
+.sidebar-logo img,
+.topbar-logo,
+.login-logo {
+    content-visibility: auto;
+    contain: layout paint;
+    backface-visibility: hidden;
+}
+.topbar-logo,
+.login-logo {
+    transform: translateZ(0);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .topbar-logo, .login-logo, .sidebar-logo img {
+        transition: none !important;
+    }
+}

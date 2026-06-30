@@ -1,4 +1,6 @@
-from flask import Flask
+from flask import Flask, request, url_for
+from pathlib import Path
+from datetime import datetime, timedelta
 from config import Config
 from app.extensions import db, migrate, login_manager, mail
 
@@ -7,8 +9,27 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
-    # Cache static assets so the sidebar logo does not refetch/reflash on every page load.
+    # Long-lived browser cache for static assets. This keeps the Martins logo, CSS and JS
+    # in the browser cache instead of refetching/reflashing them on every page change.
     app.config.setdefault("SEND_FILE_MAX_AGE_DEFAULT", 31536000)
+
+    @app.after_request
+    def add_static_asset_cache_headers(response):
+        if request.path.startswith(app.static_url_path + "/"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            response.headers["Expires"] = (datetime.utcnow() + timedelta(days=365)).strftime("%a, %d %b %Y %H:%M:%S GMT")
+            response.headers.pop("Pragma", None)
+        return response
+
+    def _static_asset_version(relative_path):
+        try:
+            asset_path = Path(app.static_folder) / relative_path
+            return str(int(asset_path.stat().st_mtime))
+        except OSError:
+            return "1"
+
+    def _static_asset_url(relative_path):
+        return url_for("static", filename=relative_path, v=_static_asset_version(relative_path))
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -71,6 +92,14 @@ def create_app(config_class=Config):
         if metric_format == "number" or metric_key in count_metrics:
             return format_count_value(value)
         return format_rand(value)
+
+    @app.context_processor
+    def inject_static_branding():
+        return {
+            "brand_logo_url": _static_asset_url("img/logo.png"),
+            "brand_logo_fallback_url": _static_asset_url("img/logo-placeholder.svg"),
+            "asset_url": _static_asset_url,
+        }
 
     @app.context_processor
     def inject_franchise_context():

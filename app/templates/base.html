@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Martins Funerals System</title>
 
-    <link rel="preload" href="{{ url_for('static', filename='img/logo.png') }}" as="image" fetchpriority="high">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v84-white-label-portal') }}">
+    <link rel="preload" href="{{ brand_logo_url }}" as="image" fetchpriority="high">
+    <link rel="stylesheet" href="{{ asset_url('css/styles.css') }}">
 </head>
 <body class="app-body">
     {% if current_user.is_authenticated %}
@@ -28,7 +28,7 @@
                             <span>{{ selected_franchise.business_name if selected_franchise else 'My Business' }}</span>
                         {% else %}
                             <img
-                                src="{{ url_for('static', filename='img/logo.png') }}"
+                                src="{{ brand_logo_url }}"
                                 alt="System Logo"
                                 width="180"
                                 height="81"
@@ -143,7 +143,7 @@
                         {% else %}
                             <img
                                 class="topbar-logo"
-                                src="{{ url_for('static', filename='img/logo.png') }}"
+                                src="{{ brand_logo_url }}"
                                 alt="Martins Funerals logo"
                                 width="210"
                                 height="96"

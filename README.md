@@ -288,3 +288,11 @@ flask db upgrade
 ```
 
 The Heat Map import accepts Excel files with columns such as MF File, Deceased Name, Deceased Surname, DOD, Address, City, Province, Country, Full Address, Latitude, Longitude, Weight, Next of Kin Name, Next of Kin Surname, Relationship, Relation, and Contact Number. If a `Relation` column exists, only `MEM` rows are imported for client-density accuracy.
+
+
+## V91 Static Logo Cache
+
+- Added long-lived immutable cache headers for static assets.
+- Added shared `brand_logo_url` and `asset_url()` helpers.
+- Login/topbar/sidebar now reuse the same cached logo URL.
+- Logo will not refetch on every normal page navigation; browser only reloads it when the file changes.
