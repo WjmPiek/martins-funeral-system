@@ -28,8 +28,12 @@
           <td>{% if user.is_active %}<span class="badge success">Active</span>{% else %}<span class="badge warning">Inactive</span>{% endif %}</td>
           <td class="action-buttons">
             <button type="button" class="btn secondary button-auto" onclick="openUserModal('view-user-{{ user.id }}')">View</button>
-            <button type="button" class="btn secondary button-auto" onclick="openUserModal('edit-user-{{ user.id }}')">Edit</button>
-            <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" style="display:inline" onsubmit="return confirm('Deactivate this user?');"><button class="btn danger button-auto" type="submit">Delete</button></form>
+            {% if not user.is_protected_admin %}
+              <button type="button" class="btn secondary button-auto" onclick="openUserModal('edit-user-{{ user.id }}')">Edit</button>
+              <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" style="display:inline" onsubmit="return confirm('Deactivate this user?');"><button class="btn danger button-auto" type="submit">Delete</button></form>
+            {% else %}
+              <span class="badge warning">Locked Admin</span>
+            {% endif %}
           </td>
         </tr>
       {% else %}

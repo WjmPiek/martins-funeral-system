@@ -12,7 +12,7 @@ from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
-from app.performance.service import auto_hide_inactive_franchises, inactive_franchise_candidates, reactivate_franchise_performance
+from app.performance.service import auto_hide_inactive_franchises, inactive_franchise_candidates, reactivate_franchise_performance, has_recent_performance_data
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -152,9 +152,12 @@ def normalise_user_scope_for_role(user, role_name, franchise_ids=None):
         user.assigned_franchises = selected_franchises
         return True, ""
 
-    # Finance/Admin-side users are Martins users. They must not sit under a franchise user.
+    # Finance/Admin-side users are Martins users. Finance Manager is linked to all active franchises.
     if is_role_admin_side(role_name):
-        user.assigned_franchises = []
+        if role_name == "Finance Manager":
+            user.assigned_franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
+        else:
+            user.assigned_franchises = []
         return True, ""
 
     # Unknown roles are not allowed from the Admin create form.
@@ -176,7 +179,12 @@ def tidy_finance_admin_users():
         if set(cleaned_roles) != set(user.roles):
             user.roles = cleaned_roles
             changed += 1
-        if user.assigned_franchises:
+        if role_name == "Finance Manager":
+            active_franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
+            if set(user.assigned_franchises) != set(active_franchises):
+                user.assigned_franchises = active_franchises
+                changed += 1
+        elif user.assigned_franchises:
             user.assigned_franchises = []
             changed += 1
     return changed
@@ -233,6 +241,31 @@ def old_linked_franchises_for_user(user):
 
 def franchise_user_has_active_data(user):
     return bool(active_linked_franchises_for_user(user))
+
+
+def franchise_user_has_recent_kpi_data(user, month=None, year=None):
+    """A franchise user is listed only when at least one linked franchise has KPI data in the last 3 months."""
+    now = datetime.utcnow()
+    month = month or now.month
+    year = year or now.year
+    for franchise in active_linked_franchises_for_user(user):
+        if has_recent_performance_data(franchise.id, month, year, 3):
+            return True
+    return False
+
+
+def active_recent_franchise_owner_users(month=None, year=None):
+    query_users = User.query.order_by(User.name, User.surname).all()
+    return [
+        user for user in query_users
+        if user.has_role("Franchise User")
+        and not getattr(user, "parent_franchise_user_id", None)
+        and franchise_user_has_recent_kpi_data(user, month, year)
+    ]
+
+
+def is_protected_admin_user(user):
+    return bool(user and (user.email or "").lower() == PROTECTED_ADMIN_EMAIL)
 
 
 
@@ -399,10 +432,7 @@ def users():
         or user.has_role("Finance Assistant")
         or user.has_role("Regional Manager")
     ]
-    franchise_owner_users = [
-        user for user in all_users
-        if user.has_role("Franchise User") and not getattr(user, "parent_franchise_user_id", None)
-    ]
+    franchise_owner_users = active_recent_franchise_owner_users(now.month, now.year)
     franchise_employee_users = [
         user for user in all_users
         if getattr(user, "parent_franchise_user_id", None)
@@ -452,12 +482,11 @@ def users():
 @permission_required("users:view")
 def franchise_users():
     ensure_user_hierarchy_roles()
+    now = datetime.utcnow()
+    auto_hide_inactive_franchises(now.month, now.year, [franchise.id for franchise in Franchise.query.all()], current_user.id)
     db.session.commit()
     franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
-    franchise_users = [
-        user for user in User.query.order_by(User.name, User.surname).all()
-        if user.has_role("Franchise User") and not getattr(user, "parent_franchise_user_id", None)
-    ]
+    franchise_users = active_recent_franchise_owner_users(now.month, now.year)
     return render_template(
         "admin/franchise_users.html",
         franchise_users=franchise_users,
@@ -566,12 +595,18 @@ def update_user_roles(user_id):
         flash("Your role does not have permission to create or assign Regional Manager users.", "danger")
         return redirect(url_for("admin.users"))
     selected_role_names = {role.name for role in selected_roles}
+    if "Admin" in selected_role_names and (user.email or "").lower() != PROTECTED_ADMIN_EMAIL:
+        flash("The Admin role is locked to wjm@martinsdirect.com only.", "danger")
+        return redirect(url_for("admin.users"))
     franchise_ids = [int(item) for item in request.form.getlist("franchise_ids")]
 
-    # Mother-company finance/admin users must never sit under a franchise.
+    # Mother-company finance/admin users must never sit under a franchise. Finance Manager is linked to all active franchise users/franchises.
     if selected_role_names & {"Admin", "Finance Manager", "Finance Assistant"}:
         user.parent_franchise_user_id = None
-        user.assigned_franchises = []
+        if "Finance Manager" in selected_role_names:
+            user.assigned_franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
+        else:
+            user.assigned_franchises = []
     elif selected_role_names & {"Regional Manager", "Franchise User"}:
         user.parent_franchise_user_id = None
         selected_franchises = Franchise.query.filter(
@@ -600,8 +635,8 @@ def update_user_roles(user_id):
 def update_user(user_id):
     user = User.query.get_or_404(user_id)
 
-    if user.email and user.email.lower() == PROTECTED_ADMIN_EMAIL and not is_current_user_admin():
-        flash("Primary system administrator can only be edited by Admin.", "danger")
+    if is_protected_admin_user(user):
+        flash("The primary Admin account is locked and cannot be edited.", "danger")
         return redirect(url_for("admin.users"))
 
     name = request.form.get("name", "").strip()
@@ -625,11 +660,10 @@ def update_user(user_id):
         flash("Please select at least one role.", "danger")
         return redirect(url_for("admin.users"))
 
-    if user.email and user.email.lower() == PROTECTED_ADMIN_EMAIL and not any(role.name == "Admin" for role in selected_roles):
-        flash("Primary system administrator must keep the Admin role.", "danger")
-        return redirect(url_for("admin.users"))
-
     selected_role_names = {role.name for role in selected_roles}
+    if "Admin" in selected_role_names and email != PROTECTED_ADMIN_EMAIL:
+        flash("The Admin role is locked to wjm@martinsdirect.com only.", "danger")
+        return redirect(url_for("admin.users"))
     if "Regional Manager" in selected_role_names and not can_create_regional_manager():
         flash("Your role does not have permission to assign Regional Manager users.", "danger")
         return redirect(url_for("admin.users"))
@@ -642,7 +676,10 @@ def update_user(user_id):
 
     if selected_role_names & {"Admin", "Finance Manager", "Finance Assistant"}:
         user.parent_franchise_user_id = None
-        user.assigned_franchises = []
+        if "Finance Manager" in selected_role_names:
+            user.assigned_franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
+        else:
+            user.assigned_franchises = []
     elif selected_role_names & {"Regional Manager", "Franchise User"}:
         user.parent_franchise_user_id = None
         selected_franchises = Franchise.query.filter(
@@ -669,8 +706,8 @@ def update_user(user_id):
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
 
-    if user.email and user.email.lower() == PROTECTED_ADMIN_EMAIL:
-        flash("Primary system administrator cannot be deleted or deactivated.", "danger")
+    if is_protected_admin_user(user):
+        flash("The primary Admin account is locked and cannot be deleted or deactivated.", "danger")
         return redirect(url_for("admin.users"))
 
     user.is_active = False
@@ -1904,11 +1941,9 @@ def franchise_employees():
     employees = [user for user in User.query.order_by(User.name, User.surname).all() if is_franchise_employee_user(user)]
     owner_ids = [employee.parent_franchise_user_id for employee in employees if employee.parent_franchise_user_id]
     owners = {user.id: user for user in User.query.filter(User.id.in_(owner_ids)).all()} if owner_ids else {}
-    franchise_owners = [
-        user for user in User.query.order_by(User.name, User.surname).all()
-        if user.has_role("Franchise User") and not getattr(user, "parent_franchise_user_id", None)
-    ]
-    franchises = Franchise.query.order_by(Franchise.business_name).all()
+    now = datetime.utcnow()
+    franchise_owners = active_recent_franchise_owner_users(now.month, now.year)
+    franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
     employee_roles = Role.query.filter(Role.name.in_(["Franchise Manager", "Franchise Employee", "Franchise Agent"])).order_by(Role.name).all()
     return render_template(
         "admin/franchise_employees.html",
@@ -1946,8 +1981,10 @@ def create_franchise_employee_admin():
 
     franchise = Franchise.query.get_or_404(franchise_id)
     owner = User.query.get(owner_id) if owner_id else None
-    if owner and not owner.has_role("Franchise User"):
+    if owner and (not owner.has_role("Franchise User") or not franchise_user_has_recent_kpi_data(owner)):
         owner = None
+    if not owner:
+        owner = next((candidate for candidate in active_recent_franchise_owner_users() if franchise in candidate.assigned_franchises), None)
 
     user = User(
         name=name,

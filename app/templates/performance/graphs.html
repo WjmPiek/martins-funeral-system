@@ -9,11 +9,10 @@
     </div>
     <div class="quick-actions">
       <a class="btn secondary button-auto" href="{{ url_for('performance.index', month=selected_month, year=selected_year) }}">Leaderboard</a>
-      <a class="btn secondary button-auto" href="{{ url_for('performance.inactive_franchises', month=selected_month, year=selected_year) }}">Old Franchises</a>
     </div>
   </div>
 
-  <form class="filter-bar instant-filter-bar" method="get">
+  <form class="performance-filter-card instant-filter-bar" method="get">
     <label>Month
       <select name="month">
         {% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}
@@ -68,7 +67,7 @@
 
 {{ graph_assets() }}
 <style>
-.performance-graphs-page .graph-grid-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.graph-dashboard-title{margin:1rem 0}.instant-filter-bar{align-items:end}.instant-filter-bar select{min-width:150px}@media(max-width:1000px){.performance-graphs-page .graph-grid-two{grid-template-columns:1fr}.instant-filter-bar{display:grid;grid-template-columns:1fr 1fr}.instant-filter-bar button{grid-column:1/-1}}
+.performance-graphs-page .graph-grid-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.graph-dashboard-title{margin:1rem 0}.performance-filter-card{display:grid;grid-template-columns:repeat(6,minmax(135px,1fr));gap:.85rem;align-items:end;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:1rem 1.15rem;box-shadow:0 10px 28px rgba(15,23,42,.06);margin:1.2rem 0}.performance-filter-card label{display:flex;flex-direction:column;gap:.35rem;font-weight:700;color:#16243a;font-size:.92rem}.performance-filter-card select{width:100%;height:42px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:0 .75rem;font-size:.95rem}.performance-filter-card .btn{height:42px;white-space:nowrap}@media(max-width:1200px){.performance-filter-card{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.performance-graphs-page .graph-grid-two{grid-template-columns:1fr}.performance-filter-card{grid-template-columns:1fr}.performance-filter-card .btn{width:100%}}
 </style>
 
 {% endblock %}

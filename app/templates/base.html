@@ -6,7 +6,7 @@
     <title>Martins Funerals System</title>
 
     <link rel="preload" href="{{ url_for('static', filename='img/logo.png') }}" as="image" fetchpriority="high">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v80-performance-graphs-tabs') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v82-admin-graphs-polish') }}">
 </head>
 <body class="app-body">
     {% if current_user.is_authenticated %}
@@ -71,7 +71,6 @@
                                     {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.franchise_users') }}">Franchise Users</a>{% endif %}
                                     {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.franchise_employees') }}">Employees</a>{% endif %}
                                     {% if current_user.has_permission('user_roles:view') %}<a href="{{ url_for('admin.roles') }}">User Roles</a>{% endif %}
-                                    {% if current_user.has_permission('performance:manage_inactive') or is_admin_user or 'Finance Manager' in nav_role_names %}<a href="{{ url_for('performance.inactive_franchises') }}">Old Franchises</a>{% endif %}
                                 </div>
                             </details>
 

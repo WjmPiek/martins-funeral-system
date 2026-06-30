@@ -10,6 +10,7 @@
   </div>
 </div>
 
+{% if not user.is_protected_admin %}
 <div class="modal-backdrop" id="edit-user-{{ user.id }}" aria-hidden="true" data-user-edit-id="{{ user.id }}">
   <div class="modal-card" role="dialog" aria-modal="true">
     <div class="modal-header"><div><h2>Edit User</h2><p>{{ user.email }}</p></div><button type="button" class="modal-close" onclick="closeUserModal('edit-user-{{ user.id }}')">x</button></div>
@@ -27,7 +28,9 @@
         <label>Roles</label>
         <div class="modal-role-grid">
           {% for role in roles %}
-          <label class="modal-role-option"><input type="checkbox" name="role_ids" value="{{ role.id }}" data-role-name="{{ role.name }}" onchange="toggleEditFranchiseScope('{{ user.id }}')" {% if role in user.roles %}checked{% endif %}><span>{{ role.name }}</span></label>
+            {% if role.name != 'Admin' or user.is_protected_admin %}
+            <label class="modal-role-option"><input type="checkbox" name="role_ids" value="{{ role.id }}" data-role-name="{{ role.name }}" onchange="toggleEditFranchiseScope('{{ user.id }}')" {% if role in user.roles %}checked{% endif %}><span>{{ role.name }}</span></label>
+            {% endif %}
           {% endfor %}
         </div>
       </div>
@@ -43,3 +46,5 @@
     </form>
   </div>
 </div>
+
+{% endif %}
