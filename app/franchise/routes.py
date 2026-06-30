@@ -374,7 +374,7 @@ def employees():
     franchises = franchises_available_for_employee_creation()
     if not franchises:
         flash("Your user is not linked to any franchise yet. Ask Admin to link your franchise before creating employee users.", "warning")
-        return render_template("franchise/employees.html", franchises=[], employees=[], creatable_roles=franchise_creatable_roles())
+        return render_template("franchise/employees.html", franchises=[], employees=[], creatable_roles=franchise_creatable_roles(), can_manage_employees=can_manage_own_franchise_employees())
 
     if request.method == "POST":
         if not can_manage_own_franchise_employees():
@@ -424,8 +424,21 @@ def employees():
         flash(f"Employee user {user.full_name} was created under {selected_franchise.business_name}.", "success")
         return redirect(url_for("franchise.employees"))
 
-    employees = User.query.filter_by(parent_franchise_user_id=current_user.id).order_by(User.name, User.surname).all()
-    return render_template("franchise/employees.html", franchises=franchises, employees=employees, creatable_roles=franchise_creatable_roles())
+    franchise_ids = [franchise.id for franchise in franchises]
+    employees = (
+        User.query
+        .filter(
+            db.or_(
+                User.parent_franchise_user_id == current_user.id,
+                User.created_by_user_id == current_user.id,
+                User.assigned_franchises.any(Franchise.id.in_(franchise_ids)),
+            )
+        )
+        .order_by(User.name, User.surname)
+        .all()
+    )
+    employees = [user for user in employees if user_is_my_franchise_employee(user)]
+    return render_template("franchise/employees.html", franchises=franchises, employees=employees, creatable_roles=franchise_creatable_roles(), can_manage_employees=can_manage_own_franchise_employees())
 
 
 @franchise_bp.route("/employees/<int:user_id>/update", methods=["POST"])

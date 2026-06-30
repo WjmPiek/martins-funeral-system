@@ -1,11 +1,16 @@
 {% extends "base.html" %}
 {% block app_content %}
 <section class="page-section">
-  <div class="section-header"><div><h1>Employees</h1><p>Create Manager, Employee or Agent users under your own franchise. These users only see data for the franchise they are linked to.</p></div></div>
+  <div class="section-header">
+    <div><h1>Employees</h1><p>Create Manager, Employee or Agent users under your own franchise. These users only see data for the franchise they are linked to.</p></div>
+    {% if franchises and can_manage_employees %}
+      <button type="button" class="btn button-auto" onclick="toggleNewEmployeeForm()">New User</button>
+    {% endif %}
+  </div>
 
-  {% if franchises %}
-  <div class="form-section-card">
-    <h2>Add Employee</h2>
+  {% if franchises and can_manage_employees %}
+  <div class="form-section-card" id="new-employee-form" style="display:none;">
+    <h2>New User</h2>
     <form method="post" action="{{ url_for('franchise.employees') }}" class="inline-form-grid">
       <label>Name<input type="text" name="name" required></label>
       <label>Surname<input type="text" name="surname" required></label>
@@ -35,11 +40,18 @@
       </tr>
       <tr><td colspan="5"><div class="modal-backdrop" id="emp-{{ employee.id }}" aria-hidden="true"><div class="modal-card" role="dialog" aria-modal="true"><div class="modal-header"><div><h2>Edit Employee</h2><p>{{ employee.email }}</p></div><button type="button" class="modal-close" onclick="closeEmp('emp-{{ employee.id }}')">x</button></div><form method="post" action="{{ url_for('franchise.update_employee', user_id=employee.id) }}"><label>Name<input name="name" value="{{ employee.name or '' }}"></label><label>Surname<input name="surname" value="{{ employee.surname or '' }}"></label><label>Role<select name="role_id">{% for role in creatable_roles %}<option value="{{ role.id }}" {% if role in employee.roles %}selected{% endif %}>{{ role.name.replace('Franchise ', '') }}</option>{% endfor %}</select></label><label>Status<select name="is_active"><option value="1" {% if employee.is_active %}selected{% endif %}>Active</option><option value="0" {% if not employee.is_active %}selected{% endif %}>Inactive</option></select></label><label>New Password<input name="password" placeholder="Leave blank to keep current password"></label><div class="modal-actions"><button type="button" class="btn secondary button-auto" onclick="closeEmp('emp-{{ employee.id }}')">Cancel</button><button class="btn button-auto" type="submit">Save</button></div></form></div></div></td></tr>
       {% else %}
-        <tr><td colspan="5" class="center-cell">No franchise users created yet.</td></tr>
+        <tr><td colspan="5" class="center-cell">No employee users found for your linked franchise yet.</td></tr>
       {% endfor %}
       </tbody>
     </table></div>
   </div>
 </section>
-<script>function openEmp(id){const m=document.getElementById(id); if(m){m.classList.add('is-open');m.setAttribute('aria-hidden','false');}} function closeEmp(id){const m=document.getElementById(id); if(m){m.classList.remove('is-open');m.setAttribute('aria-hidden','true');}}</script>
+<script>
+function toggleNewEmployeeForm(){
+  const form = document.getElementById('new-employee-form');
+  if(form){ form.style.display = form.style.display === 'none' ? 'block' : 'none'; }
+}
+function openEmp(id){const m=document.getElementById(id); if(m){m.classList.add('is-open');m.setAttribute('aria-hidden','false');}}
+function closeEmp(id){const m=document.getElementById(id); if(m){m.classList.remove('is-open');m.setAttribute('aria-hidden','true');}}
+</script>
 {% endblock %}

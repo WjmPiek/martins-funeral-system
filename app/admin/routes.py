@@ -1859,7 +1859,20 @@ def clear_franchise_user_links():
 # ---------------------------------------------------------------------------
 
 def is_franchise_employee_user(user):
-    return user.has_role("Franchise Employee") or bool(getattr(user, "parent_franchise_user_id", None))
+    """Return True for any employee account that belongs under a franchise user.
+
+    Older records were not always saved with parent_franchise_user_id, so Admin
+    must also treat the franchise-side employee roles as employee accounts. This
+    keeps Manager, Employee and Agent accounts visible/editable in Admin >
+    Employees.
+    """
+    return (
+        user.has_role("Franchise Manager")
+        or user.has_role("Franchise Employee")
+        or user.has_role("Franchise Agent")
+        or bool(getattr(user, "parent_franchise_user_id", None))
+        or bool(getattr(user, "created_by_user_id", None))
+    )
 
 
 @admin_bp.route("/franchise-employees")
