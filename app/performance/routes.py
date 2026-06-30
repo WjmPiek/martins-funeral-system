@@ -14,6 +14,7 @@ from app.performance.service import (
     PERFORMANCE_METRICS,
     TARGET_MODES,
     accessible_franchise_ids,
+    active_leaderboard_franchise_ids,
     attach_movement,
     dashboard_snapshot,
     franchise_metric_summary,
@@ -118,12 +119,15 @@ def index():
     month, year = selected_period_from_request(request.args)
     mode = request_mode()
     growth = request_growth()
-    ids = accessible_franchise_ids()
+    ids = active_leaderboard_franchise_ids()
     ensure_performance_results(month, year, ids, "growth_bracket")
     previous_m, previous_y = previous_month(month, year)
     ensure_performance_results(previous_m, previous_y, ids, "growth_bracket")
 
     # Live KPI leaderboards shown side-by-side on the Leaderboard tab.
+    # This uses all active franchise users so a franchise user can see their
+    # own position on the full leaderboard. Detailed graph/KPI pages remain
+    # protected by accessible_franchise_ids().
     metric_order = ["cash", "sales", "insurance_premiums", "joinings", "funerals"]
     metric_titles = {
         "cash": "Cash",
@@ -342,7 +346,7 @@ def leaderboards():
     month, year = selected_period_from_request(request.args)
     mode = request_mode()
     growth = request_growth()
-    ids = accessible_franchise_ids()
+    ids = active_leaderboard_franchise_ids()
     ensure_performance_results(month, year, ids, "growth_bracket")
     boards = leaderboard_decision_centre(month, year, ids, mode, growth)
     return render_template(

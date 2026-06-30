@@ -447,11 +447,19 @@ def users():
     )
 
 
-@admin_bp.route("/users/create", methods=["POST"])
+@admin_bp.route("/users/create", methods=["GET", "POST"])
 @login_required
 def create_admin_user():
     if not can_create_admin_user():
         abort(403)
+
+    if request.method == "GET":
+        franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
+        return render_template(
+            "admin/create_martins_user.html",
+            admin_creatable_roles=admin_creatable_roles(),
+            franchises=franchises,
+        )
 
     name = request.form.get("name", "").strip()
     surname = request.form.get("surname", "").strip()
@@ -563,6 +571,74 @@ def update_user_roles(user_id):
     flash(f"User and scope updated for {user.full_name}.", "success")
     return redirect(url_for("admin.users"))
 
+
+@admin_bp.route("/users/<int:user_id>/update", methods=["POST"])
+@login_required
+@permission_required("users:edit")
+def update_user(user_id):
+    user = User.query.get_or_404(user_id)
+
+    if user.email and user.email.lower() == PROTECTED_ADMIN_EMAIL and not is_current_user_admin():
+        flash("Primary system administrator can only be edited by Admin.", "danger")
+        return redirect(url_for("admin.users"))
+
+    name = request.form.get("name", "").strip()
+    surname = request.form.get("surname", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    is_active = request.form.get("is_active") == "1"
+    role_ids = [int(role_id) for role_id in request.form.getlist("role_ids") if str(role_id).isdigit()]
+    franchise_ids = [int(item) for item in request.form.getlist("franchise_ids") if str(item).isdigit()]
+
+    if not name or not surname or not email:
+        flash("Name, surname and email are required.", "danger")
+        return redirect(url_for("admin.users"))
+
+    duplicate = User.query.filter(db.func.lower(User.email) == email, User.id != user.id).first()
+    if duplicate:
+        flash("Another user already uses that email address.", "danger")
+        return redirect(url_for("admin.users"))
+
+    selected_roles = Role.query.filter(Role.id.in_(role_ids)).all() if role_ids else []
+    if not selected_roles:
+        flash("Please select at least one role.", "danger")
+        return redirect(url_for("admin.users"))
+
+    if user.email and user.email.lower() == PROTECTED_ADMIN_EMAIL and not any(role.name == "Admin" for role in selected_roles):
+        flash("Primary system administrator must keep the Admin role.", "danger")
+        return redirect(url_for("admin.users"))
+
+    selected_role_names = {role.name for role in selected_roles}
+    if "Regional Manager" in selected_role_names and not can_create_regional_manager():
+        flash("Your role does not have permission to assign Regional Manager users.", "danger")
+        return redirect(url_for("admin.users"))
+
+    user.name = name
+    user.surname = surname
+    user.email = email
+    user.is_active = is_active
+    user.is_active_account = is_active
+
+    if selected_role_names & {"Admin", "Finance Manager", "Finance Assistant"}:
+        user.parent_franchise_user_id = None
+        user.assigned_franchises = []
+    elif selected_role_names & {"Regional Manager", "Franchise User"}:
+        user.parent_franchise_user_id = None
+        selected_franchises = Franchise.query.filter(
+            Franchise.id.in_(franchise_ids or []),
+            Franchise.is_performance_active == True,
+        ).order_by(Franchise.business_name).all()
+        if not selected_franchises:
+            flash("Regional Manager and Franchise User accounts must be linked to at least one active franchise.", "danger")
+            return redirect(url_for("admin.users"))
+        user.assigned_franchises = selected_franchises
+    else:
+        user.parent_franchise_user_id = None
+
+    user.roles = selected_roles
+    log_action("Users", "Updated user details", f"User: {user.full_name}; Email: {user.email}")
+    db.session.commit()
+    flash(f"User updated for {user.full_name}.", "success")
+    return redirect(url_for("admin.users"))
 
 
 @admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])

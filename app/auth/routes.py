@@ -14,19 +14,16 @@ def user_role_names(user):
 
 
 def default_landing_url():
-    """Send each role to a page they are allowed to see after login.
+    """Send users to the graph dashboard after login when allowed.
 
-    Franchise users no longer have a Dashboard tab, so sending everyone to
-    /dashboard/ creates 403 errors for users whose role correctly has no
-    dashboard permission.
+    The requested first-login experience is that every user sees the
+    Performance Graphs dashboard first.  Keep a safe fallback for legacy users
+    whose role has not yet received the performance permission.
     """
-    names = user_role_names(current_user)
-    if names & {"Admin", "Super Admin", "Finance Manager", "Finance Assistant"}:
-        return url_for("admin.users")
-    if "Regional Manager" in names:
-        return url_for("franchise.details")
-    if names & {"Franchise User", "Franchise Manager", "Franchise Employee", "Franchise Agent", "Read Only User"}:
-        return url_for("franchise.details")
+    if current_user.has_permission("performance:view"):
+        return url_for("performance.graphs")
+    if current_user.has_permission("dashboard:view"):
+        return url_for("dashboard.index")
     return url_for("franchise.details")
 
 

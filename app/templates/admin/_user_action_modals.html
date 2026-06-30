@@ -1,0 +1,45 @@
+<div class="modal-backdrop" id="view-user-{{ user.id }}" aria-hidden="true">
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <div class="modal-header"><div><h2>User Details</h2><p>{{ user.email }}</p></div><button type="button" class="modal-close" onclick="closeUserModal('view-user-{{ user.id }}')">x</button></div>
+    <p><strong>Name:</strong> {{ user.full_name }}</p>
+    <p><strong>Email:</strong> {{ user.email }}</p>
+    <p><strong>Roles:</strong> {{ user.roles|map(attribute='name')|join(', ') }}</p>
+    <p><strong>Status:</strong> {% if user.is_active %}Active{% else %}Inactive{% endif %}</p>
+    <p><strong>Linked Franchises:</strong> {% if user.assigned_franchises %}{{ user.assigned_franchises|map(attribute='business_name')|join(', ') }}{% else %}None{% endif %}</p>
+    <div class="modal-actions"><button type="button" class="btn secondary button-auto" onclick="closeUserModal('view-user-{{ user.id }}')">Close</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="edit-user-{{ user.id }}" aria-hidden="true" data-user-edit-id="{{ user.id }}">
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <div class="modal-header"><div><h2>Edit User</h2><p>{{ user.email }}</p></div><button type="button" class="modal-close" onclick="closeUserModal('edit-user-{{ user.id }}')">x</button></div>
+    <form method="post" action="{{ url_for('admin.update_user', user_id=user.id) }}" class="inline-form-grid">
+      <label>Name<input type="text" name="name" value="{{ user.name }}" required></label>
+      <label>Surname<input type="text" name="surname" value="{{ user.surname }}" required></label>
+      <label>Email<input type="email" name="email" value="{{ user.email }}" required></label>
+      <label>Status
+        <select name="is_active">
+          <option value="1" {% if user.is_active %}selected{% endif %}>Active</option>
+          <option value="0" {% if not user.is_active %}selected{% endif %}>Inactive</option>
+        </select>
+      </label>
+      <div style="grid-column:1 / -1;">
+        <label>Roles</label>
+        <div class="modal-role-grid">
+          {% for role in roles %}
+          <label class="modal-role-option"><input type="checkbox" name="role_ids" value="{{ role.id }}" data-role-name="{{ role.name }}" onchange="toggleEditFranchiseScope('{{ user.id }}')" {% if role in user.roles %}checked{% endif %}><span>{{ role.name }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      <div id="edit-franchise-scope-{{ user.id }}" style="display:none; grid-column:1 / -1;">
+        <label>Linked Franchise(s)</label>
+        <div class="modal-role-grid">
+          {% for franchise in franchises %}
+          <label class="modal-role-option"><input type="checkbox" name="franchise_ids" value="{{ franchise.id }}" {% if franchise in user.assigned_franchises %}checked{% endif %}><span>{{ franchise.business_name or 'Unnamed Franchise' }}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="modal-actions" style="grid-column:1 / -1;"><button type="button" class="btn secondary button-auto" onclick="closeUserModal('edit-user-{{ user.id }}')">Cancel</button><button class="btn button-auto" type="submit">Save</button></div>
+    </form>
+  </div>
+</div>

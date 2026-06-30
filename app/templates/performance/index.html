@@ -3,72 +3,21 @@
 <div class="page-header">
     <div>
         <h1>Leaderboard</h1>
-        <p class="muted">Live monthly KPI leaderboard for {{ selected_period_label }}.</p>
+        <p class="muted">Year-to-date live leaderboard compared to accumulated current-year targets for {{ selected_period_label }}.</p>
     </div>
-    {% if show_manage_targets %}
-    <div class="button-row">
-        <a class="btn secondary" href="{{ url_for('performance.graphs', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Graphs</a>
-        <a class="btn secondary" href="{{ url_for('performance.decision_centre_view', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Decision Centre</a>
-        <a class="btn secondary" href="{{ url_for('performance.executive', month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">Executive Dashboard</a>
-        <a class="btn secondary" href="{{ url_for('performance.targets', month=selected_month, year=selected_year) }}">Manual Targets</a>
-        <a class="btn secondary" href="{{ url_for('performance.growth_brackets') }}">Growth Brackets</a>
-    </div>
-    {% endif %}
-</div>
-
-<form class="filter-bar" method="get">
-    <label>Month
-        <select name="month">
-            {% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}
-        </select>
-    </label>
-    <label>Year
-        <select name="year">
-            {% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}
-        </select>
-    </label>
-    <label>Target Mode
-        <select name="target_mode">
-            {% for key, label in target_modes.items() %}<option value="{{ key }}" {% if key == target_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}
-        </select>
-    </label>
-    <label>Growth % <input type="number" step="0.01" name="growth" value="{{ growth }}"></label>
-    <button class="btn" type="submit">Update</button>
-</form>
-
-
-
-{% if show_manage_targets %}
-<form method="post" action="{{ url_for('performance.recalculate') }}" class="filter-bar">
-    <input type="hidden" name="month" value="{{ selected_month }}">
-    <input type="hidden" name="year" value="{{ selected_year }}">
-    <button class="btn secondary" type="submit">Recalculate Current Month</button>
-    <span class="muted">Pre-calculates this month so dashboards load fast.</span>
-</form>
-<form method="post" action="{{ url_for('performance.recalculate_all') }}" class="filter-bar">
-    <input type="hidden" name="month" value="{{ selected_month }}">
-    <input type="hidden" name="year" value="{{ selected_year }}">
-    <button class="btn secondary" type="submit">Rebuild All Performance Cache</button>
-    <span class="muted">Run after deploying this speed update or after a big historic import.</span>
-</form>
-{% endif %}
-
-
-<div class="panel-card">
-    <h2>Leaderboard</h2>
-    <p class="muted">Live KPI leaderboards for {{ selected_period_label }}. Graphs are removed from this tab and remain available under Performance Graphs.</p>
 </div>
 
 <div class="leaderboard-five-grid">
     {% for board in metric_boards %}
     <section class="leaderboard-column panel-card">
         <h3>{{ board.title }}</h3>
+        <p class="muted leaderboard-note">Ranking is based on YTD actuals versus YTD targets.</p>
         <div class="mini-leaderboard-list">
             {% for row in board.rows %}
             <a class="mini-leaderboard-row movement-{{ row.movement }}" href="{{ url_for('performance.franchise', franchise_id=row.franchise_id, month=selected_month, year=selected_year, target_mode=target_mode, growth=growth) }}">
                 <span class="mini-rank">#{{ row.rank }}</span>
                 <span class="mini-name">{{ row.franchise_name }}</span>
-                <span class="leaderboard-move {{ row.movement }}">{{ row.movement_label }}{% if row.movement_delta %} {{ row.movement_delta|abs }}{% endif %}</span>
+                <span class="mini-score">{{ row.achievement_percent }}%</span>
             </a>
             {% else %}
             <div class="mini-leaderboard-empty">No data</div>
@@ -79,7 +28,6 @@
 </div>
 
 <style>
-.leaderboard-five-grid{display:grid;grid-template-columns:repeat(5,minmax(190px,1fr));gap:1rem;align-items:start;margin-top:1rem}.leaderboard-column{padding:1rem}.leaderboard-column h3{margin:.1rem 0 .75rem;font-size:1.05rem}.mini-leaderboard-list{display:grid;gap:.45rem}.mini-leaderboard-row{display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:center;text-decoration:none;color:inherit;border:1px solid #e5e7eb;border-radius:12px;padding:.55rem;background:#fff}.mini-leaderboard-row:hover{border-color:#b6c2cf;box-shadow:0 2px 8px rgba(15,23,42,.08)}.mini-rank{font-weight:800}.mini-name{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mini-leaderboard-empty{padding:.75rem;border:1px dashed #cbd5e1;border-radius:12px;color:#64748b;text-align:center}@media(max-width:1200px){.leaderboard-five-grid{grid-template-columns:repeat(2,minmax(220px,1fr))}}@media(max-width:700px){.leaderboard-five-grid{grid-template-columns:1fr}.mini-leaderboard-row{grid-template-columns:auto 1fr}.mini-leaderboard-row .leaderboard-move{grid-column:2}}
+.leaderboard-five-grid{display:grid;grid-template-columns:repeat(5,minmax(190px,1fr));gap:1rem;align-items:start;margin-top:1rem}.leaderboard-column{padding:1rem}.leaderboard-column h3{margin:.1rem 0 .35rem;font-size:1.1rem}.leaderboard-note{font-size:.82rem;margin:0 0 .75rem}.mini-leaderboard-list{display:grid;gap:.45rem}.mini-leaderboard-row{display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:center;text-decoration:none;color:inherit;border:1px solid #e5e7eb;border-radius:12px;padding:.55rem;background:#fff}.mini-leaderboard-row:hover{border-color:#b6c2cf;box-shadow:0 2px 8px rgba(15,23,42,.08)}.mini-rank{font-weight:800}.mini-name{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mini-score{font-weight:800;color:#1e3a5f}.mini-leaderboard-empty{padding:.75rem;border:1px dashed #cbd5e1;border-radius:12px;color:#64748b;text-align:center}@media(max-width:1200px){.leaderboard-five-grid{grid-template-columns:repeat(2,minmax(220px,1fr))}}@media(max-width:700px){.leaderboard-five-grid{grid-template-columns:1fr}.mini-leaderboard-row{grid-template-columns:auto 1fr auto}}
 </style>
 {% endblock %}
-

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Create Martins User</h1>
+      <p>Create a Martins mother-company user, Regional Manager, or Franchise User account.</p>
+    </div>
+    <a class="btn secondary button-auto" href="{{ url_for('admin.users') }}">Back to Users</a>
+  </div>
+
+  <div class="form-section-card">
+    <form method="post" action="{{ url_for('admin.create_admin_user') }}" class="inline-form-grid">
+      <label>Name<input type="text" name="name" required></label>
+      <label>Surname<input type="text" name="surname" required></label>
+      <label>Email<input type="email" name="email" required></label>
+      <label>Password<input type="text" name="password" required></label>
+      <label>Role
+        <select name="role_id" id="admin-create-role" required onchange="toggleFranchiseScope()">
+          <option value="">Select role</option>
+          {% for role in admin_creatable_roles %}
+            <option value="{{ role.id }}" data-role-name="{{ role.name }}">{{ role.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div id="franchise-scope-box" style="display:none; grid-column: 1 / -1;">
+        <label>Linked Franchise(s)</label>
+        <p class="muted">Regional Managers can have multiple franchises. Franchise Users should normally have one franchise.</p>
+        <div class="modal-role-grid">
+          {% for franchise in franchises %}
+            <label class="modal-role-option">
+              <input type="checkbox" name="franchise_ids" value="{{ franchise.id }}">
+              <span>{{ franchise.business_name or 'Unnamed Franchise' }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div style="grid-column: 1 / -1;"><button class="btn button-auto" type="submit">Create User</button></div>
+    </form>
+  </div>
+</section>
+<script>
+function toggleFranchiseScope(){
+  const select = document.getElementById('admin-create-role');
+  const option = select.options[select.selectedIndex];
+  const roleName = option ? option.getAttribute('data-role-name') : '';
+  const box = document.getElementById('franchise-scope-box');
+  box.style.display = (roleName === 'Regional Manager' || roleName === 'Franchise User') ? 'block' : 'none';
+}
+document.addEventListener('DOMContentLoaded', toggleFranchiseScope);
+</script>
+{% endblock %}

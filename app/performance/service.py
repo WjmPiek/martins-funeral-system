@@ -379,6 +379,20 @@ def accessible_franchise_ids(include_inactive=False):
     return filter_active_franchise_ids(ids, include_inactive=include_inactive)
 
 
+
+
+def active_leaderboard_franchise_ids(include_inactive=False):
+    """Return the franchise scope used for public leaderboard ranking.
+
+    Franchise users must be able to see where they rank against all active
+    franchise users, while their detailed graphs/KPI pages remain scoped by
+    accessible_franchise_ids().
+    """
+    query = Franchise.query.order_by(Franchise.business_name)
+    if not include_inactive:
+        query = query.filter(Franchise.is_performance_active == True)
+    return [franchise.id for franchise in query.all()]
+
 def previous_periods_including(month, year, count=3):
     periods = []
     m, y = month, year
@@ -1266,19 +1280,48 @@ def movement_text(row):
     return 'Same'
 
 
-def leaderboard_rows(metric_key, month, year, franchise_ids, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
-    """Return clean leaderboard rows ordered by current rank only.
+def _ytd_metric_rows(metric_key, month, year, franchise_ids, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    """Rank franchises by year-to-date actuals against accumulated current-year targets."""
+    franchise_ids = filter_active_franchise_ids(franchise_ids)
+    franchises = {item.id: item for item in Franchise.query.filter(Franchise.id.in_(franchise_ids)).all()} if franchise_ids else {}
+    actual_totals = {fid: Decimal('0') for fid in franchise_ids}
+    target_totals = {fid: Decimal('0') for fid in franchise_ids}
+    for period_month in range(1, int(month) + 1):
+        actuals = period_actuals(period_month, year, franchise_ids, [metric_key])
+        targets = targets_for_period(period_month, year, franchise_ids, mode, growth_percent, [metric_key])
+        for fid in franchise_ids:
+            actual_totals[fid] += actuals.get(fid, {}).get(metric_key, Decimal('0'))
+            target_totals[fid] += targets.get(fid, {}).get(metric_key, Decimal('0'))
 
-    Figures are calculated internally for ranking, but the returned rows are intended for
-    display as rank, franchise name and movement only.
-    """
+    rows = []
+    for fid in franchise_ids:
+        actual = actual_totals.get(fid, Decimal('0'))
+        target = target_totals.get(fid, Decimal('0'))
+        score = percent(actual, target) if target > 0 else Decimal('0')
+        rows.append({
+            'franchise_id': fid,
+            'franchise_name': franchises.get(fid).business_name if franchises.get(fid) else f'Franchise {fid}',
+            'actual': round_money(actual),
+            'target': round_money(target),
+            'achievement_percent': score,
+            'score': score,
+        })
+    rows.sort(key=lambda item: (item['score'], item['actual']), reverse=True)
+    for index, row in enumerate(rows, 1):
+        row['rank'] = index
+    return rows
+
+
+def leaderboard_rows(metric_key, month, year, franchise_ids, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    """Return leaderboard rows ranked on YTD actuals vs accumulated current-year targets."""
     if metric_key != 'overall' and metric_key not in PERFORMANCE_METRICS:
         metric_key = 'overall'
+    if metric_key == 'overall':
+        return ranked_performance(month, year, franchise_ids, mode, growth_percent, metric_key)
     prev_m, prev_y = previous_month(month, year)
-    rows = attach_movement(
-        ranked_performance(month, year, franchise_ids, mode, growth_percent, metric_key),
-        ranked_performance(prev_m, prev_y, franchise_ids, mode, growth_percent, metric_key),
-    )
+    current_rows = _ytd_metric_rows(metric_key, month, year, franchise_ids, mode, growth_percent)
+    previous_rows = _ytd_metric_rows(metric_key, prev_m, prev_y, franchise_ids, mode, growth_percent)
+    rows = attach_movement(current_rows, previous_rows)
     rows.sort(key=lambda item: item['rank'])
     for row in rows:
         row['movement_text'] = movement_text(row)

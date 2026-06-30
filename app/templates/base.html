@@ -12,7 +12,7 @@
     {% if current_user.is_authenticated %}
         <div class="app-shell">
             <aside class="sidebar">
-                <a class="sidebar-logo" href="{{ url_for('dashboard.index') }}">
+                <a class="sidebar-logo" href="{{ url_for('performance.graphs') if current_user.has_permission('performance:view') else url_for('dashboard.index') }}">
                     <img
                         src="{{ url_for('static', filename='img/logo.png') }}"
                         alt="System Logo"

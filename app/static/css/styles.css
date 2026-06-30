@@ -1510,3 +1510,6 @@ body.app-body {
     background: #0f4c81;
     color: #ffffff;
 }
+
+/* User management action buttons */
+.action-buttons{white-space:nowrap;display:flex;gap:.35rem;align-items:center;flex-wrap:wrap}.action-buttons form{margin:0}.btn.danger{background:#b42318;color:#fff;border-color:#b42318}.btn.danger:hover{background:#912018;border-color:#912018}

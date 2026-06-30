@@ -81,13 +81,18 @@ def reporting_years():
 
 
 def accessible_franchise_ids():
-    selected = get_selected_franchise()
-    if selected and is_franchise_view_mode():
-        if not current_user.can_access_franchise(selected.id):
-            return []
-        return [selected.id]
-    franchises = get_accessible_franchises()
-    return [franchise.id for franchise in franchises]
+    """Return the leaderboard ranking scope.
+
+    The leaderboard is a company-wide comparison: franchise users must see all
+    active franchise users and have their own franchise highlighted. This does
+    not change detailed franchise access elsewhere in the system.
+    """
+    return [
+        franchise.id
+        for franchise in Franchise.query.filter(Franchise.is_performance_active == True)
+        .order_by(Franchise.business_name)
+        .all()
+    ]
 
 
 def money_to_decimal(value):
