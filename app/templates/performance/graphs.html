@@ -23,6 +23,16 @@
         {% for year in year_options %}<option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>{% endfor %}
       </select>
     </label>
+    {% if show_combined_option and province_options %}
+    <label>Province
+      <select name="province">
+        <option value="" {% if not selected_province %}selected{% endif %}>All Provinces</option>
+        {% for province in province_options %}
+        <option value="{{ province }}" {% if selected_province == province %}selected{% endif %}>{{ province }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
     <label>Franchise
       <select name="franchise_id">
         {% if show_combined_option %}
@@ -46,7 +56,11 @@
         <option value="36" {% if periods == 36 %}selected{% endif %}>36 months</option>
       </select>
     </label>
-    <input type="hidden" name="target_mode" value="{{ target_mode }}">
+    <label>Target Method
+      <select name="target_mode">
+        {% for key, label in target_modes.items() %}<option value="{{ key }}" {% if key == target_mode %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
     <input type="hidden" name="growth" value="{{ growth }}">
     <button class="btn button-auto" type="submit">Update Graphs</button>
   </form>
@@ -54,13 +68,13 @@
   {% if graph_data %}
   <div class="graph-dashboard-title">
     <h2>{{ graph_data.metric_label }} - {{ selected_label }}</h2>
-    <p class="muted">Selected period ending {{ selected_period_label }}.</p>
+    <p class="muted">Selected period ending {{ selected_period_label }}. Target line uses the Admin scale: prior-year gross turnover / 12 determines the growth %, then the same month previous year is increased by that %.</p>
   </div>
 
   <div class="graph-grid-two">
-    {{ chart_card('Actual vs Target', 'Shows whether performance is above or below the fair target line.', graph_data.actual_vs_target, [{'key':'actual','label':'Actual'}, {'key':'target','label':'Target'}], 'R' if graph_data.metric_key in ['cash','sales','insurance'] else '', '', 'line') }}
-    {{ chart_card('Compare to Last Year', 'Compares this year against the same month last year.', graph_data.previous_year, [{'key':'actual','label':'This year'}, {'key':'previous_year','label':'Last year'}], 'R' if graph_data.metric_key in ['cash','sales','insurance'] else '', '', 'line') }}
-    {{ chart_card('Forecast vs Target', 'Current forecast compared to the target line.', graph_data.forecast, [{'key':'forecast','label':'Forecast'}, {'key':'target','label':'Target'}], 'R' if graph_data.metric_key in ['cash','sales','insurance'] else '', '', 'line') }}
+    {{ chart_card('Actual vs Target', 'Shows whether performance is above or below the fair target line.', graph_data.actual_vs_target, [{'key':'actual','label':'Actual'}, {'key':'target','label':'Target'}], 'R' if graph_data.metric_key in ['cash','sales','insurance_premiums'] else '', '', 'line') }}
+    {{ chart_card('Compare to Last Year', 'Compares this year against the same month last year.', graph_data.previous_year, [{'key':'actual','label':'This year'}, {'key':'previous_year','label':'Last year'}], 'R' if graph_data.metric_key in ['cash','sales','insurance_premiums'] else '', '', 'line') }}
+    {{ chart_card('Forecast vs Target', 'Current forecast compared to the target line.', graph_data.forecast, [{'key':'forecast','label':'Forecast'}, {'key':'target','label':'Target'}], 'R' if graph_data.metric_key in ['cash','sales','insurance_premiums'] else '', '', 'line') }}
     {{ chart_card('Growth Trend', 'Month-on-month growth percentage for the selected KPI.', graph_data.growth_trend, [{'key':'growth_percent','label':'Growth %'}], '', '%', 'line') }}
   </div>
   {% else %}
@@ -70,7 +84,7 @@
 
 {{ graph_assets() }}
 <style>
-.performance-graphs-page .graph-grid-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.graph-dashboard-title{margin:1rem 0}.performance-filter-card{display:grid;grid-template-columns:repeat(6,minmax(135px,1fr));gap:.85rem;align-items:end;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:1rem 1.15rem;box-shadow:0 10px 28px rgba(15,23,42,.06);margin:1.2rem 0}.performance-filter-card label{display:flex;flex-direction:column;gap:.35rem;font-weight:700;color:#16243a;font-size:.92rem}.performance-filter-card select{width:100%;height:42px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:0 .75rem;font-size:.95rem}.performance-filter-card .btn{height:42px;white-space:nowrap}@media(max-width:1200px){.performance-filter-card{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.performance-graphs-page .graph-grid-two{grid-template-columns:1fr}.performance-filter-card{grid-template-columns:1fr}.performance-filter-card .btn{width:100%}}
+.performance-graphs-page .graph-grid-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.graph-dashboard-title{margin:1rem 0}.performance-filter-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:.85rem;align-items:end;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:1rem 1.15rem;box-shadow:0 10px 28px rgba(15,23,42,.06);margin:1.2rem 0}.performance-filter-card label{display:flex;flex-direction:column;gap:.35rem;font-weight:700;color:#16243a;font-size:.92rem}.performance-filter-card select{width:100%;height:42px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:0 .75rem;font-size:.95rem}.performance-filter-card .btn{height:42px;white-space:nowrap}@media(max-width:1200px){.performance-filter-card{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.performance-graphs-page .graph-grid-two{grid-template-columns:1fr}.performance-filter-card{grid-template-columns:1fr}.performance-filter-card .btn{width:100%}}
 </style>
 
 {% endblock %}

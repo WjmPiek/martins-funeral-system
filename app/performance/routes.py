@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 from app.audit import log_action
 from app.extensions import db
 from app.franchise_context import get_accessible_franchises, get_selected_franchise, is_privileged_user
-from app.models import Franchise, FranchiseTarget, MonthlyFigure, PerformanceGrowthBracket, User
+from app.models import Franchise, FranchiseTarget, HeatmapRecord, MonthlyFigure, PerformanceGrowthBracket, User
 from app.performance.service import (
     DEFAULT_GROWTH_PERCENT,
     MONTHS,
@@ -68,7 +68,7 @@ def permission_required(code):
 
 
 def request_mode():
-    mode = request.args.get("target_mode", "growth_bracket")
+    mode = request.args.get("target_mode", "annual_gross_scale")
     return mode if mode in TARGET_MODES else "manual"
 
 
@@ -255,7 +255,25 @@ def graphs():
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
-    ensure_performance_results(month, year, ids, "growth_bracket")
+    selected_province = (request.args.get("province") or "").strip()
+    province_options = []
+    if is_privileged_user() and ids:
+        province_options = [row[0] for row in (
+            db.session.query(HeatmapRecord.province)
+            .filter(HeatmapRecord.franchise_id.in_(ids), HeatmapRecord.province != "")
+            .distinct()
+            .order_by(HeatmapRecord.province.asc())
+            .all()
+        )]
+        if selected_province:
+            province_ids = [row[0] for row in (
+                db.session.query(HeatmapRecord.franchise_id)
+                .filter(HeatmapRecord.franchise_id.in_(ids), HeatmapRecord.province == selected_province)
+                .distinct()
+                .all()
+            )]
+            ids = [fid for fid in ids if fid in province_ids]
+    ensure_performance_results(month, year, ids, "annual_gross_scale")
     metric_key = request.args.get("metric", "cash")
     if metric_key not in PERFORMANCE_METRICS:
         metric_key = "cash"
@@ -306,6 +324,8 @@ def graphs():
         selected_month=month,
         selected_year=year,
         selected_period_label=month_label(month, year),
+        province_options=province_options,
+        selected_province=selected_province,
     )
 
 
@@ -441,7 +461,8 @@ def targets():
     if request.method == "POST":
         saved = 0
         for franchise in franchises:
-            for metric_key in PERFORMANCE_METRICS:
+            bracket_metrics = {**{"gross_turnover": {"label": "Annual Gross Turnover Scale"}}, **PERFORMANCE_METRICS}
+        for metric_key in bracket_metrics:
                 field = f"target_{franchise.id}_{metric_key}"
                 raw_value = (request.form.get(field) or "0").replace("R", "").replace(",", "").strip()
                 try:
@@ -464,7 +485,7 @@ def targets():
         flash("Performance targets saved.", "success")
         return redirect(url_for("performance.targets", month=month, year=year))
     values = stored_targets(month, year, ids)
-    auto_values = targets_for_period(month, year, ids, "growth_bracket", DEFAULT_GROWTH_PERCENT)
+    auto_values = targets_for_period(month, year, ids, "annual_gross_scale", DEFAULT_GROWTH_PERCENT)
     bracket_plan = target_plan_for_period(month, year, ids)
     return render_template(
         "performance/targets.html",
@@ -525,7 +546,8 @@ def annual_budget():
 def growth_brackets():
     if request.method == "POST":
         updated = 0
-        for metric_key in PERFORMANCE_METRICS:
+        bracket_metrics = {**{"gross_turnover": {"label": "Annual Gross Turnover Scale"}}, **PERFORMANCE_METRICS}
+        for metric_key in bracket_metrics:
             for index in range(1, 8):
                 from_raw = (request.form.get(f"{metric_key}_{index}_from") or "").replace("R", "").replace(",", "").strip()
                 to_raw = (request.form.get(f"{metric_key}_{index}_to") or "").replace("R", "").replace(",", "").strip()
@@ -561,7 +583,7 @@ def growth_brackets():
         existing.setdefault(bracket.metric, []).append(bracket)
     return render_template(
         "performance/growth_brackets.html",
-        metrics=PERFORMANCE_METRICS,
+        metrics={**{"gross_turnover": {"label": "Annual Gross Turnover Scale"}}, **PERFORMANCE_METRICS},
         existing=existing,
     )
 

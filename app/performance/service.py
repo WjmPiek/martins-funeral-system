@@ -62,6 +62,7 @@ TARGET_MODES = {
     "three_year_average": "3-Year Same Month Average",
     "three_year_growth": "3-Year Average + Growth %",
     "growth_bracket": "Fair Growth Bracket",
+    "annual_gross_scale": "Annual Gross Turnover Scale",
 }
 
 DEFAULT_GROWTH_PERCENT = Decimal("10")
@@ -302,8 +303,10 @@ def target_plan_for(franchise_id, month, year, metric_keys=None):
 
 def target_plan_for_period(month, year, franchise_ids, metric_keys=None):
     result = {}
+    metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
     for franchise_id in franchise_ids:
-        result[franchise_id] = {item["metric"]: item for item in target_plan_for(franchise_id, month, year, metric_keys)}
+        items = [annual_gross_scale_details(franchise_id, metric_key, month, year) for metric_key in metric_keys]
+        result[franchise_id] = {item["metric"]: item for item in items}
     return result
 
 
@@ -316,7 +319,7 @@ def save_growth_bracket_targets(month, year, franchise_ids, metric_keys=None):
     metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
     saved = 0
     for franchise_id in franchise_ids:
-        for detail in target_plan_for(franchise_id, month, year, metric_keys):
+        for detail in [annual_gross_scale_details(franchise_id, metric_key, month, year) for metric_key in (metric_keys or list(PERFORMANCE_METRICS.keys()))]:
             target = FranchiseTarget.query.filter_by(
                 franchise_id=franchise_id,
                 metric=detail["metric"],
@@ -330,6 +333,73 @@ def save_growth_bracket_targets(month, year, franchise_ids, metric_keys=None):
             saved += 1
     db.session.commit()
     return saved
+
+
+
+def annual_gross_turnover(franchise_id, year):
+    total = (
+        db.session.query(func.coalesce(func.sum(MonthlyFigure.gross_turnover), 0))
+        .filter(MonthlyFigure.franchise_id == franchise_id, MonthlyFigure.year == year)
+        .scalar()
+    )
+    return round_money(total)
+
+def annual_gross_average(franchise_id, year):
+    return round_money(annual_gross_turnover(franchise_id, year) / Decimal("12"))
+
+def annual_gross_scale_percent(franchise_id, target_year):
+    # The following year's target uses the prior year's average monthly gross turnover
+    # to choose a fair scale percentage. Example: 2026 uses 2025 gross turnover / 12.
+    basis_value = annual_gross_average(franchise_id, target_year - 1)
+    brackets = active_growth_brackets("gross_turnover")
+    if not brackets:
+        defaults = [
+            (Decimal("0"), Decimal("100000"), Decimal("15")),
+            (Decimal("100000"), Decimal("200000"), Decimal("12")),
+            (Decimal("200000"), Decimal("400000"), Decimal("10")),
+            (Decimal("400000"), Decimal("700000"), Decimal("7")),
+            (Decimal("700000"), Decimal("1200000"), Decimal("4")),
+            (Decimal("1200000"), None, Decimal("3")),
+        ]
+        for low, high, pct in defaults:
+            if basis_value >= low and (high is None or basis_value < high):
+                return pct, basis_value, None
+        return Decimal("3"), basis_value, None
+    for bracket in brackets:
+        low = to_decimal(bracket.amount_from)
+        high = to_decimal(bracket.amount_to) if bracket.amount_to is not None else None
+        if basis_value >= low and (high is None or basis_value < high):
+            return to_decimal(bracket.growth_percent), basis_value, bracket
+    return to_decimal(brackets[-1].growth_percent), basis_value, brackets[-1]
+
+def annual_gross_scale_target(franchise_id, metric_key, month, target_year):
+    # Formula: prior-year same-month actual + prior-year same-month actual * scale %.
+    # The scale % is selected from prior-year annual gross turnover / 12.
+    prior_value = period_actuals(month, target_year - 1, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+    pct, basis_value, bracket = annual_gross_scale_percent(franchise_id, target_year)
+    growth_amount = prior_value * pct / Decimal("100")
+    return round_money(prior_value + growth_amount)
+
+def annual_gross_scale_details(franchise_id, metric_key, month, target_year):
+    prior_value = period_actuals(month, target_year - 1, [franchise_id], [metric_key]).get(franchise_id, {}).get(metric_key, Decimal("0"))
+    pct, basis_value, bracket = annual_gross_scale_percent(franchise_id, target_year)
+    growth_amount = round_money(prior_value * pct / Decimal("100"))
+    return {
+        "metric": metric_key,
+        "metric_label": PERFORMANCE_METRICS[metric_key]["label"],
+        "basis_metric": "gross_turnover",
+        "basis_metric_label": "Gross Turnover",
+        "basis_value": basis_value,
+        "growth_percent": pct,
+        "growth_amount": growth_amount,
+        "prior_year_value": round_money(prior_value),
+        "target_value": round_money(prior_value + growth_amount),
+        "bracket_id": bracket.id if bracket else None,
+        "bracket_label": growth_bracket_label(bracket) if bracket else f"{basis_value:,.2f}",
+        "formula": "Target = same month previous year + (same month previous year x scale %)",
+        "scale_formula": "Scale % = prior-year gross turnover / 12 looked up against the Admin scale table",
+        "growth_status": growth_status(pct),
+    }
 
 def round_money(value):
     return to_decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -624,6 +694,8 @@ def auto_target_for(franchise_id, metric_key, month, year, mode="previous_year_g
         return round_money(average)
     if mode == "growth_bracket":
         return bracket_target_details(franchise_id, metric_key, month, year)["target_value"]
+    if mode == "annual_gross_scale":
+        return annual_gross_scale_target(franchise_id, metric_key, month, year)
     return Decimal("0")
 
 
