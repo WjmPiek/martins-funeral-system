@@ -1,18 +1,18 @@
 {% extends "base.html" %}
-{% from "performance/_graph_charts.html" import chart_card, graph_assets %}
+{% from "performance/_graph_charts.html" import graph_assets %}
 {% block app_content %}
 <section class="page-section performance-graphs-page">
   <div class="section-header">
     <div>
       <h1>Performance Graphs</h1>
-      <p class="muted">Dedicated graph page. These graphs use the fast pre-calculated performance cache.</p>
+      <p class="muted">The page opens immediately. Graph data loads in the background from the pre-calculated performance cache.</p>
     </div>
     <div class="quick-actions">
       <a class="btn secondary button-auto" href="{{ url_for('performance.index', month=selected_month, year=selected_year) }}">Leaderboard</a>
     </div>
   </div>
 
-  <form class="performance-filter-card instant-filter-bar" method="get">
+  <form class="performance-filter-card instant-filter-bar" method="get" id="performanceGraphFilters">
     <label>Month
       <select name="month">
         {% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}
@@ -70,26 +70,64 @@
     <button class="btn button-auto" type="submit">Update Graphs</button>
   </form>
 
-  {% if graph_data %}
   <div class="graph-dashboard-title">
-    <h2>{{ graph_data.metric_label }} - {{ selected_label }}</h2>
-    <p class="muted">Selected period ending {{ selected_period_label }}. Target line uses the Admin-controlled South Africa GDP growth standard. The scale is managed only from the Admin portal and is not shown on the franchise site.</p>
+    <h2 id="graphTitle">{{ selected_label }}</h2>
+    <p class="muted" id="graphSubtitle">Loading graph data in the background. You can already use the menu while the data loads.</p>
   </div>
 
-  <div class="graph-grid-two">
-    {{ chart_card('Actual vs Target', 'Shows whether performance is above or below the fair target line.', graph_data.actual_vs_target, [{'key':'actual','label':'Actual'}, {'key':'target','label':'Target'}], 'R' if graph_data.metric_key in ['cash','sales','insurance_premiums'] else '', '', 'line') }}
-    {{ chart_card('Compare to Last Year', 'Compares this year against the same month last year.', graph_data.previous_year, [{'key':'actual','label':'This year'}, {'key':'previous_year','label':'Last year'}], 'R' if graph_data.metric_key in ['cash','sales','insurance_premiums'] else '', '', 'line') }}
-    {{ chart_card('Forecast vs Target', 'Current forecast compared to the target line.', graph_data.forecast, [{'key':'forecast','label':'Forecast'}, {'key':'target','label':'Target'}], 'R' if graph_data.metric_key in ['cash','sales','insurance_premiums'] else '', '', 'line') }}
-    {{ chart_card('Growth Trend', 'Month-on-month growth percentage for the selected KPI.', graph_data.growth_trend, [{'key':'growth_percent','label':'Growth %'}], '', '%', 'line') }}
+  <div id="graphLoading" class="panel-card graph-loading-card">
+    <div class="graph-loading-row"><span class="loading-dot"></span><strong>Loading cached graph data...</strong></div>
+    <p class="muted">If the cache was already built after import, this should finish quickly. If not, the first API request rebuilds only the missing period after the page is visible.</p>
   </div>
-  {% else %}
-  <div class="panel-card"><p class="muted">No graph data available yet. Import monthly figures and rebuild the performance cache.</p></div>
-  {% endif %}
+  <div id="graphError" class="panel-card graph-error-card" style="display:none;"><p class="muted">Graph data could not load. Try again, or rebuild the performance cache from Admin.</p></div>
+  <div id="graphGrid" class="graph-grid-two" data-money-metrics='["cash","sales","insurance_premiums"]'></div>
 </section>
 
 {{ graph_assets() }}
+<script>
+(function(){
+  var form = document.getElementById('performanceGraphFilters');
+  var grid = document.getElementById('graphGrid');
+  var loading = document.getElementById('graphLoading');
+  var error = document.getElementById('graphError');
+  var title = document.getElementById('graphTitle');
+  var subtitle = document.getElementById('graphSubtitle');
+  var moneyMetrics = JSON.parse(grid.dataset.moneyMetrics || '[]');
+
+  function esc(value){return String(value == null ? '' : value).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});}
+  function card(titleText, description, points, series, prefix, suffix, kind){
+    return '<div class="panel-card mfs-chart-card">'
+      + '<div class="mfs-chart-header"><div><h3>'+esc(titleText)+'</h3><p class="muted">'+esc(description)+'</p></div></div>'
+      + '<div class="mfs-svg-chart" data-points="'+esc(JSON.stringify(points || []))+'" data-series="'+esc(JSON.stringify(series || []))+'" data-prefix="'+esc(prefix || '')+'" data-suffix="'+esc(suffix || '')+'" data-kind="'+esc(kind || 'line')+'"><div class="mfs-chart-empty">Loading graph...</div></div>'
+      + '</div>';
+  }
+  function loadGraphs(){
+    loading.style.display = 'block';
+    error.style.display = 'none';
+    grid.innerHTML = '';
+    var params = new URLSearchParams(new FormData(form));
+    fetch('{{ url_for("performance.graphs_data") }}?' + params.toString(), {headers:{'Accept':'application/json'}})
+      .then(function(resp){if(!resp.ok){throw new Error('Graph request failed');} return resp.json();})
+      .then(function(data){
+        loading.style.display = 'none';
+        var g = data.graph_data;
+        if(!g){grid.innerHTML = '<div class="panel-card"><p class="muted">No graph data available yet. Import monthly figures and rebuild the performance cache.</p></div>'; return;}
+        var prefix = moneyMetrics.indexOf(g.metric_key) >= 0 ? 'R' : '';
+        title.textContent = g.metric_label + ' - ' + (data.selected_label || 'Selected franchise');
+        subtitle.textContent = 'Selected period ending ' + (data.selected_period_label || '') + '. Target line uses the Admin-controlled South Africa GDP growth standard.';
+        grid.innerHTML = card('Actual vs Target','Shows whether performance is above or below the fair target line.',g.actual_vs_target,[{key:'actual',label:'Actual'},{key:'target',label:'Target'}],prefix,'','line')
+          + card('Compare to Last Year','Compares this year against the same month last year.',g.previous_year,[{key:'actual',label:'This year'},{key:'previous_year',label:'Last year'}],prefix,'','line')
+          + card('Forecast vs Target','Current forecast compared to the target line.',g.forecast,[{key:'forecast',label:'Forecast'},{key:'target',label:'Target'}],prefix,'','line')
+          + card('Growth Trend','Month-on-month growth percentage for the selected KPI.',g.growth_trend,[{key:'growth_percent',label:'Growth %'}],'','%','line');
+        if(window.MFSCharts){window.MFSCharts.renderAll(grid);}
+      })
+      .catch(function(){loading.style.display = 'none'; error.style.display = 'block';});
+  }
+  if(document.readyState === 'loading'){document.addEventListener('DOMContentLoaded', loadGraphs);}else{loadGraphs();}
+})();
+</script>
 <style>
-.performance-graphs-page .graph-grid-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.graph-dashboard-title{margin:1rem 0}.performance-filter-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:.85rem;align-items:end;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:1rem 1.15rem;box-shadow:0 10px 28px rgba(15,23,42,.06);margin:1.2rem 0}.performance-filter-card label{display:flex;flex-direction:column;gap:.35rem;font-weight:700;color:#16243a;font-size:.92rem}.performance-filter-card select{width:100%;height:42px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:0 .75rem;font-size:.95rem}.performance-filter-card .btn{height:42px;white-space:nowrap}@media(max-width:1200px){.performance-filter-card{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.performance-graphs-page .graph-grid-two{grid-template-columns:1fr}.performance-filter-card{grid-template-columns:1fr}.performance-filter-card .btn{width:100%}}
+.performance-graphs-page .graph-grid-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.graph-dashboard-title{margin:1rem 0}.performance-filter-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:.85rem;align-items:end;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:1rem 1.15rem;box-shadow:0 10px 28px rgba(15,23,42,.06);margin:1.2rem 0}.performance-filter-card label{display:flex;flex-direction:column;gap:.35rem;font-weight:700;color:#16243a;font-size:.92rem}.performance-filter-card select{width:100%;height:42px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:0 .75rem;font-size:.95rem}.performance-filter-card .btn{height:42px;white-space:nowrap}.graph-loading-card{border-style:dashed}.graph-loading-row{display:flex;align-items:center;gap:.6rem}.loading-dot{width:12px;height:12px;border-radius:50%;background:#198754;box-shadow:0 0 0 rgba(25,135,84,.5);animation:pulseDot 1.1s infinite}@keyframes pulseDot{0%{box-shadow:0 0 0 0 rgba(25,135,84,.45)}70%{box-shadow:0 0 0 10px rgba(25,135,84,0)}100%{box-shadow:0 0 0 0 rgba(25,135,84,0)}}@media(max-width:1200px){.performance-filter-card{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:760px){.performance-graphs-page .graph-grid-two{grid-template-columns:1fr}.performance-filter-card{grid-template-columns:1fr}.performance-filter-card .btn{width:100%}}
 </style>
 
 {% endblock %}

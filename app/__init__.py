@@ -69,7 +69,7 @@ def create_app(config_class=Config):
         total = 0
         for month, year in periods:
             franchise_ids = [row[0] for row in db.session.query(MonthlyFigure.franchise_id).filter_by(month=month, year=year).distinct().all()]
-            saved = rebuild_performance_results(month, year, franchise_ids, "growth_bracket")
+            saved = rebuild_performance_results(month, year, franchise_ids, "annual_gross_scale")
             total += saved
             print(f"{year}-{month:02d}: {saved} rows")
         print(f"Performance cache rebuilt. Total rows saved: {total}")

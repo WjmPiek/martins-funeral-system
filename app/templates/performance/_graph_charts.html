@@ -70,7 +70,9 @@
     series.forEach(function(s){var sw=''; if(s.key==='target')sw=' mfs-swatch-target'; else if(s.key==='forecast')sw=' mfs-swatch-forecast'; else if(s.key==='previous_year')sw=' mfs-swatch-previous'; else if(s.key==='growth_percent')sw=' mfs-swatch-growth'; parts.push('<span class="mfs-legend-item"><span class="mfs-legend-swatch'+sw+'"></span>'+String(s.label||s.key)+'</span>');});
     parts.push('</div>');el.innerHTML=parts.join('');
   }
-  function init(){var tip=document.querySelector('.mfs-tooltip');if(!tip){tip=document.createElement('div');tip.className='mfs-tooltip';document.body.appendChild(tip);}document.querySelectorAll('.mfs-svg-chart').forEach(render);document.addEventListener('mousemove',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('mfs-point')){tip.innerHTML='<strong>'+t.dataset.label+'</strong><br>'+t.dataset.series+': '+t.dataset.value;tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY+12)+'px';tip.style.display='block';}else{tip.style.display='none';}});}
+  function renderAll(root){(root||document).querySelectorAll('.mfs-svg-chart').forEach(render);}
+  function init(){var tip=document.querySelector('.mfs-tooltip');if(!tip){tip=document.createElement('div');tip.className='mfs-tooltip';document.body.appendChild(tip);}renderAll(document);document.addEventListener('mousemove',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('mfs-point')){tip.innerHTML='<strong>'+t.dataset.label+'</strong><br>'+t.dataset.series+': '+t.dataset.value;tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY+12)+'px';tip.style.display='block';}else{tip.style.display='none';}});}
+  window.MFSCharts={renderAll:renderAll};
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
 })();
 </script>

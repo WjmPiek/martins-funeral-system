@@ -1160,7 +1160,7 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True):
         from app.performance.service import rebuild_performance_results
         for perf_month, perf_year in sorted(period_tuples, key=lambda item: (item[1], item[0])):
             performance_rows += rebuild_performance_results(
-                perf_month, perf_year, list(franchise_ids_touched), "growth_bracket"
+                perf_month, perf_year, list(franchise_ids_touched), "annual_gross_scale"
             )
     except Exception as exc:
         current_app.logger.exception("Performance pre-calculation failed after monthly Excel import: %s", exc)

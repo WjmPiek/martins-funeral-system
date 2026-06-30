@@ -1,7 +1,7 @@
 from decimal import Decimal
 from functools import wraps
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.audit import log_action
@@ -254,16 +254,19 @@ def franchise(franchise_id):
 
 
 
-@performance_bp.route("/graphs")
-@login_required
-@permission_required("performance:view")
-def graphs():
-    month, year = selected_period_from_request(request.args)
+def _graphs_scope(args):
+    """Resolve graph filters without building graph data.
+
+    This keeps the /performance/graphs page shell fast. Heavy graph payloads are
+    requested from /performance/graphs/data after the page is already visible.
+    """
+    month, year = selected_period_from_request(args)
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
-    selected_province = (request.args.get("province") or "").strip()
+    selected_province = (args.get("province") or "").strip()
     province_options = []
+
     if is_privileged_user() and ids:
         province_options = [row[0] for row in (
             db.session.query(HeatmapRecord.province)
@@ -280,11 +283,12 @@ def graphs():
                 .all()
             )]
             ids = [fid for fid in ids if fid in province_ids]
-    ensure_performance_results(month, year, ids, "annual_gross_scale")
-    metric_key = request.args.get("metric", "cash")
+
+    metric_key = args.get("metric", "cash")
     if metric_key not in PERFORMANCE_METRICS:
         metric_key = "cash"
-    periods = request.args.get("periods", 12, type=int)
+
+    periods = args.get("periods", 12, type=int) if hasattr(args, "get") else 12
     if periods not in (6, 12, 24, 36):
         periods = 12
 
@@ -292,49 +296,99 @@ def graphs():
     selected_franchise = None
     is_combined_view = False
     selected_label = "No franchise selected"
+    selected_franchise_id = None
 
-    raw_franchise_id = (request.args.get("franchise_id") or "").strip().lower()
+    raw_franchise_id = (args.get("franchise_id") or "").strip().lower()
     if is_privileged_user() and raw_franchise_id in ("", "all", "combined"):
-        # Admin / Mother Company users must see all franchise user data combined
-        # by default. Selecting a specific franchise switches the page to that
-        # franchise only.
         is_combined_view = True
         selected_label = "All Franchise Users Combined"
-        graph_data = graph_engine_payload_for_franchises(ids, metric_key, month, year, periods, mode, growth) if ids else None
     else:
-        franchise_id = request.args.get("franchise_id", type=int)
+        selected_franchise_id = args.get("franchise_id", type=int)
         selected = get_selected_franchise()
-        if franchise_id and franchise_id not in ids:
+        if selected_franchise_id and selected_franchise_id not in ids:
             abort(403)
-        if not franchise_id:
-            franchise_id = selected.id if selected and selected.id in ids else (franchises[0].id if franchises else None)
-        selected_franchise = Franchise.query.get(franchise_id) if franchise_id else None
+        if not selected_franchise_id:
+            selected_franchise_id = selected.id if selected and selected.id in ids else (franchises[0].id if franchises else None)
+        selected_franchise = Franchise.query.get(selected_franchise_id) if selected_franchise_id else None
         selected_label = selected_franchise.business_name if selected_franchise else selected_label
-        graph_data = graph_engine_payload(franchise_id, metric_key, month, year, periods, mode, growth) if franchise_id else None
 
+    return {
+        "month": month,
+        "year": year,
+        "mode": mode,
+        "growth": growth,
+        "ids": ids,
+        "selected_province": selected_province,
+        "province_options": province_options,
+        "metric_key": metric_key,
+        "periods": periods,
+        "franchises": franchises,
+        "selected_franchise": selected_franchise,
+        "selected_franchise_id": selected_franchise_id,
+        "selected_label": selected_label,
+        "is_combined_view": is_combined_view,
+    }
+
+
+@performance_bp.route("/graphs")
+@login_required
+@permission_required("performance:view")
+def graphs():
+    scope = _graphs_scope(request.args)
     return render_template(
         "performance/graphs.html",
-        graph_data=graph_data,
-        franchises=franchises,
-        selected_franchise=selected_franchise,
-        selected_label=selected_label,
-        is_combined_view=is_combined_view,
+        graph_data=None,
+        franchises=scope["franchises"],
+        selected_franchise=scope["selected_franchise"],
+        selected_label=scope["selected_label"],
+        is_combined_view=scope["is_combined_view"],
         show_combined_option=is_privileged_user(),
         metrics=PERFORMANCE_METRICS,
-        metric_key=metric_key,
-        periods=periods,
+        metric_key=scope["metric_key"],
+        periods=scope["periods"],
         target_modes=TARGET_MODES,
-        target_mode=mode,
-        growth=growth,
+        target_mode=scope["mode"],
+        growth=scope["growth"],
         month_options=MONTHS,
         year_options=reporting_years(),
-        selected_month=month,
-        selected_year=year,
-        selected_period_label=month_label(month, year),
-        province_options=province_options,
-        selected_province=selected_province,
+        selected_month=scope["month"],
+        selected_year=scope["year"],
+        selected_period_label=month_label(scope["month"], scope["year"]),
+        province_options=scope["province_options"],
+        selected_province=scope["selected_province"],
         show_manage_targets=current_user.has_permission("performance:manage_targets"),
     )
+
+
+@performance_bp.route("/graphs/data")
+@login_required
+@permission_required("performance:view")
+def graphs_data():
+    scope = _graphs_scope(request.args)
+    month = scope["month"]
+    year = scope["year"]
+    ids = scope["ids"]
+    metric_key = scope["metric_key"]
+    periods = scope["periods"]
+    mode = scope["mode"]
+    growth = scope["growth"]
+
+    # This endpoint may do work, but it runs after the page shell is displayed.
+    # In normal use it reads the pre-calculated performance_results cache.
+    ensure_performance_results(month, year, ids, "annual_gross_scale")
+
+    if scope["is_combined_view"]:
+        graph_data = graph_engine_payload_for_franchises(ids, metric_key, month, year, periods, mode, growth) if ids else None
+    else:
+        franchise_id = scope["selected_franchise_id"]
+        graph_data = graph_engine_payload(franchise_id, metric_key, month, year, periods, mode, growth) if franchise_id else None
+
+    return jsonify({
+        "ok": True,
+        "selected_label": scope["selected_label"],
+        "selected_period_label": month_label(month, year),
+        "graph_data": graph_data,
+    })
 
 
 @performance_bp.route("/decision-centre")
@@ -602,10 +656,10 @@ def growth_brackets():
 def recalculate():
     month, year = selected_period_from_request(request.form)
     hidden = auto_hide_inactive_franchises(month, year, accessible_franchise_ids(include_inactive=True), current_user.id)
-    saved = rebuild_performance_results(month, year, accessible_franchise_ids(), "growth_bracket")
+    saved = rebuild_performance_results(month, year, accessible_franchise_ids(), "annual_gross_scale")
     log_action("Performance", "Recalculated performance results", f"Rows saved: {saved}; Hidden inactive: {hidden}; Period: {month_label(month, year)}")
-    flash(f"Performance results recalculated for {month_label(month, year)}. Hidden inactive franchises: {hidden}.", "success")
-    return redirect(url_for("performance.index", month=month, year=year, target_mode="growth_bracket"))
+    flash(f"Performance cache rebuilt for {month_label(month, year)}. Hidden inactive franchises: {hidden}.", "success")
+    return redirect(url_for("performance.index", month=month, year=year, target_mode="annual_gross_scale"))
 
 
 @performance_bp.route("/recalculate-all", methods=["POST"])
@@ -624,11 +678,11 @@ def recalculate_all():
             .distinct()
             .all()
         ]
-        total_saved += rebuild_performance_results(period_month, period_year, franchise_ids, "growth_bracket")
+        total_saved += rebuild_performance_results(period_month, period_year, franchise_ids, "annual_gross_scale")
     log_action("Performance", "Recalculated all performance cache rows", f"Rows saved: {total_saved}; Periods: {len(periods)}")
     flash(f"All performance cache rows rebuilt. Rows saved: {total_saved}; periods: {len(periods)}.", "success")
     month, year = selected_period_from_request(request.form)
-    return redirect(url_for("performance.index", month=month, year=year, target_mode="growth_bracket"))
+    return redirect(url_for("performance.index", month=month, year=year, target_mode="annual_gross_scale"))
 
 
 @performance_bp.route("/history")
