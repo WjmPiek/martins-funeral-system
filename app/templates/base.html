@@ -3,10 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Martins Funerals System</title>
+    <title>Martins Funeral System</title>
+    <link rel="icon" href="{{ url_for('static', filename='img/logo.png') }}">
 
     <link rel="preload" href="{{ url_for('static', filename='img/logo.png') }}" as="image" fetchpriority="high">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v84-white-label-portal') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v='v86-branding-enterprise') }}">
 </head>
 <body class="app-body">
     {% if current_user.is_authenticated %}
@@ -29,14 +30,14 @@
                         {% else %}
                             <img
                                 src="{{ url_for('static', filename='img/logo.png') }}"
-                                alt="System Logo"
+                                alt="Martins Funerals Logo"
                                 width="180"
                                 height="81"
                                 loading="eager"
                                 decoding="async"
                                 fetchpriority="high"
                             >
-                            <span>Martins Funerals System</span>
+                            <span>Martins Funeral System</span>
                         {% endif %}
                     </a>
 
@@ -137,14 +138,16 @@
 
             <div class="main-panel">
                 <header class="topbar">
-                    <div class="page-title">
+                    <div class="page-title page-title-branded">
                         {% if pure_franchise_portal %}
                             {{ selected_franchise.business_name if selected_franchise else 'My Business' }}
                         {% else %}
-                            Martins Funerals System
-                            {% if franchise_view_mode and selected_franchise %}
-                                <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
-                            {% endif %}
+                            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Martins Funerals Logo" class="topbar-logo" width="1705" height="769" loading="eager" decoding="async">
+                            <span class="topbar-title-text">Martins Funeral System
+                                {% if franchise_view_mode and selected_franchise %}
+                                    <small class="selected-franchise-label">Viewing: {{ selected_franchise.business_name }}</small>
+                                {% endif %}
+                            </span>
                         {% endif %}
                     </div>
                     <div class="topbar-user">
@@ -174,7 +177,7 @@
         </div>
     {% else %}
         <nav class="nav">
-            <div class="brand">Martins Funerals System</div>
+            <div class="brand"><img src="{{ url_for('static', filename='img/logo.png') }}" alt="Martins Funerals Logo" class="auth-nav-logo"> Martins Funeral System</div>
             <div>
                 <a href="{{ url_for('auth.login') }}">Login</a>
                 <a href="{{ url_for('auth.register') }}">Register</a>

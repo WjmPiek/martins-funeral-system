@@ -1767,3 +1767,95 @@ body.app-body {
     .topbar-user { flex-wrap: wrap; justify-content: flex-start; }
     .action-buttons-inline { flex-wrap: wrap; }
 }
+
+
+/* V86 enterprise branding: crisp logo, shared headers, branded login and print exports */
+.brand-lockup {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+.brand-logo,
+.topbar-logo,
+.auth-nav-logo,
+.sidebar-logo img {
+    display: block;
+    height: auto;
+    object-fit: contain;
+    image-rendering: auto;
+    max-width: 100%;
+}
+.brand-logo {
+    width: min(360px, 78vw);
+}
+.brand-text strong {
+    display: block;
+    font-size: 1.25rem;
+    line-height: 1.15;
+    color: var(--text-main, #10233d);
+}
+.brand-text small {
+    display: block;
+    color: var(--text-muted, #64748b);
+    font-weight: 700;
+    margin-top: 0.2rem;
+}
+.auth-nav-logo {
+    width: 86px;
+    margin-right: .6rem;
+}
+.nav .brand {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+}
+.branded-login-card {
+    max-width: 560px;
+    padding-top: 2.2rem;
+}
+.login-branding {
+    justify-content: flex-start;
+    margin: 0 0 1.1rem 0;
+}
+.login-branding .brand-logo {
+    width: min(330px, 74vw);
+}
+.branded-login-card h1 {
+    margin-top: 0;
+    margin-bottom: 0.25rem;
+}
+.login-subtitle {
+    margin-top: 0;
+    color: var(--text-muted, #64748b);
+    font-weight: 700;
+}
+.page-title-branded {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    min-width: 0;
+}
+.topbar-logo {
+    width: clamp(90px, 12vw, 170px);
+    flex: 0 0 auto;
+}
+.topbar-title-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.12;
+}
+.sidebar-logo img {
+    width: clamp(112px, 11vw, 154px);
+}
+@media (max-width: 760px) {
+    .branded-login-card { padding: 1.35rem; }
+    .login-branding { justify-content: center; }
+    .login-branding .brand-logo { width: min(280px, 82vw); }
+    .page-title-branded { align-items: flex-start; }
+    .topbar-logo { width: 94px; }
+    .topbar-title-text { font-size: 1.05rem; }
+    .auth-nav-logo { width: 64px; }
+}
+@media print {
+    .topbar-logo, .brand-logo, .sidebar-logo img { max-height: 28mm; }
+}

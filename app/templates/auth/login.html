@@ -1,13 +1,17 @@
 {% extends "base.html" %}
 {% block auth_content %}
-<section class="card narrow">
-    <h1>Login</h1>
+<section class="card narrow login-card branded-login-card">
+    {% with extra_class='login-branding', show_text=false %}
+        {% include "includes/_branding.html" %}
+    {% endwith %}
+    <h1>Martins Funeral System</h1>
+    <p class="login-subtitle">Leaders in funeral industry</p>
     <form method="post">
         <label>Email address</label>
-        <input type="email" name="email" required>
+        <input type="email" name="email" required autocomplete="email">
 
         <label>Password</label>
-        <input type="password" name="password" required>
+        <input type="password" name="password" required autocomplete="current-password">
 
         <button type="submit">Login</button>
     </form>

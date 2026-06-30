@@ -1,0 +1,10 @@
+{% set brand_logo = url_for('static', filename='img/logo.png') %}
+<div class="brand-lockup {{ extra_class|default('') }}">
+    <img src="{{ brand_logo }}" alt="Martins Funerals" class="brand-logo" width="1705" height="769" loading="eager" decoding="async" fetchpriority="high">
+    {% if show_text|default(true) %}
+        <div class="brand-text">
+            <strong>{{ title|default('Martins Funeral System') }}</strong>
+            {% if subtitle|default('') %}<small>{{ subtitle }}</small>{% endif %}
+        </div>
+    {% endif %}
+</div>
