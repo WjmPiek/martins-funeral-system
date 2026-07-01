@@ -1495,6 +1495,41 @@ def imports_data():
     )
 
 
+
+
+def _import_job_report(job):
+    import json
+    if not job or not getattr(job, "extra_json", None):
+        return {}
+    try:
+        return json.loads(job.extra_json or "{}")
+    except Exception:
+        return {"raw": job.extra_json}
+
+
+@admin_bp.route("/imports/centre")
+@login_required
+def import_centre():
+    if not can_view_imports_data():
+        abort(403)
+    jobs = ImportJob.query.order_by(ImportJob.started_at.desc()).limit(50).all()
+    decorated_jobs = []
+    for job in jobs:
+        report = _import_job_report(job)
+        decorated_jobs.append({"job": job, "report": report})
+    return render_template("admin/import_centre.html", jobs=decorated_jobs)
+
+
+@admin_bp.route("/imports/centre/<int:job_id>")
+@login_required
+def import_centre_detail(job_id):
+    if not can_view_imports_data():
+        abort(403)
+    job = ImportJob.query.get_or_404(job_id)
+    report = _import_job_report(job)
+    return render_template("admin/import_centre_detail.html", job=job, report=report)
+
+
 @admin_bp.route("/imports/grouped-franchises", methods=["GET", "POST"])
 @login_required
 def import_grouped_franchises():

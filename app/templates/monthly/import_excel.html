@@ -25,6 +25,36 @@
         <div><span>New Franchise Users Created</span><strong>{{ result.users_created }}</strong></div>
       </div>
       <p class="muted">Existing records for the same franchise/month/year are updated, not duplicated.</p>
+
+      {% if result.pipeline %}
+      <div class="card" style="margin-top:1rem;">
+        <h3>Month-end import pipeline</h3>
+        <p><strong>Status:</strong> {{ result.pipeline.status|default('completed')|replace('_',' ')|title }}</p>
+        <p>
+          Matched franchises: <strong>{{ result.pipeline.matched_franchises|default(0) }}</strong><br>
+          Saved rows: <strong>{{ result.pipeline.saved_rows|default(0) }}</strong><br>
+          Recalculated royalty rows: <strong>{{ result.pipeline.recalculated_rows|default(0) }}</strong><br>
+          Royalties calculated: <strong>{{ result.pipeline.royalties_calculated|default(0) }}</strong><br>
+          Performance cache rows: <strong>{{ result.pipeline.performance_rows|default(0) }}</strong><br>
+          Published to graphs/leaderboard: <strong>{{ 'Yes' if result.pipeline.published else 'No' }}</strong>
+        </p>
+        {% if result.pipeline.warnings or result.pipeline.errors %}
+          <div class="alert alert-warning">
+            <strong>This import needs review before it can be trusted/published.</strong>
+            <ul>
+              {% for error in result.pipeline.errors or [] %}<li>{{ error }}</li>{% endfor %}
+              {% for item in result.pipeline.warnings[:20] %}
+                <li><strong>{{ item.franchise }}</strong>: {{ item.warnings|join(', ') }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          <a class="btn secondary button-auto" href="{{ url_for('admin.import_centre') }}">Open Import Centre</a>
+        {% else %}
+          <div class="alert alert-success">All rows matched, royalties recalculated, and performance summaries published.</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
       <div class="form-actions no-print">
         <a class="btn button-auto" href="{{ url_for('monthly.index') }}">View Monthly Figures</a>
         <a class="btn secondary button-auto" href="{{ url_for('monthly.import_excel') }}">Import Another Workbook</a>
@@ -59,27 +89,3 @@
   {% endif %}
 </section>
 {% endblock %}
-
-
-{% if result and result.pipeline %}
-<div class="card" style="margin-top:1rem;">
-  <h3>Month-end import pipeline</h3>
-  <p><strong>Status:</strong> {{ result.pipeline.status|default('completed') }}</p>
-  <p>
-    Recalculated royalty rows: <strong>{{ result.pipeline.recalculated_rows|default(0) }}</strong><br>
-    Performance cache rows: <strong>{{ result.pipeline.performance_rows|default(0) }}</strong>
-  </p>
-  {% if result.pipeline.warnings %}
-    <div class="alert alert-warning">
-      <strong>Items needing review:</strong>
-      <ul>
-        {% for item in result.pipeline.warnings[:20] %}
-          <li><strong>{{ item.franchise }}</strong>: {{ item.warnings|join(', ') }}</li>
-        {% endfor %}
-      </ul>
-    </div>
-  {% else %}
-    <div class="alert alert-success">All imported rows matched and royalty calculations completed.</div>
-  {% endif %}
-</div>
-{% endif %}

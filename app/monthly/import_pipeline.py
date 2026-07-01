@@ -49,31 +49,45 @@ def run_month_end_import_pipeline(
     franchise_ids: Iterable[int],
     progress_job=None,
 ) -> dict:
-    """Run the full month-end pipeline after an Excel import.
+    """Run a controlled month-end import pipeline.
 
-    This intentionally runs after the raw values are imported.  The raw import only
-    stores the figures.  This pipeline then makes the system business-ready:
-
-    1. Validate that each branch is matched to the correct franchise record.
-    2. Validate agreement date and royalty scale availability.
-    3. Recalculate monthly rows from the agreement-date formula.
-    4. Rebuild performance/leaderboard cache tables.
-    5. Store a compact report on the ImportJob so the progress block can show the
-       final result and support troubleshooting.
+    The raw Excel import stores only the submitted figures.  This pipeline then
+    validates, recalculates and publishes the data.  If a blocking validation
+    fails, the import is marked ``needs_review`` and performance/leaderboard
+    cache publishing is skipped until the issue is corrected and the import is
+    re-run or refreshed.
     """
     periods = sorted(set(tuple(item) for item in (period_tuples or [])), key=lambda item: (item[1], item[0]))
     ids: Set[int] = {int(item) for item in (franchise_ids or []) if item}
     report = {
         'status': 'completed',
+        'stage': 'published',
         'periods': [f'{year}-{month:02d}' for month, year in periods],
         'franchise_count': len(ids),
+        'matched_franchises': 0,
+        'saved_rows': 0,
         'recalculated_rows': 0,
+        'royalties_calculated': 0,
         'performance_rows': 0,
         'warnings': [],
+        'errors': [],
+        'published': False,
+        'publish_message': '',
     }
 
-    _stage(progress_job, 62, 'Pipeline stage 1/5: validating franchise matches...')
+    _stage(progress_job, 58, 'Stage 1/6: validating imported period and franchise matches...')
+    if not periods:
+        report['status'] = 'needs_review'
+        report['stage'] = 'validation_failed'
+        report['errors'].append('No valid month/year sheets were detected in the uploaded workbook.')
+    if not ids:
+        report['status'] = 'needs_review'
+        report['stage'] = 'validation_failed'
+        report['errors'].append('No franchise rows were imported from the workbook.')
+
     franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name).all() if ids else []
+    report['matched_franchises'] = len(franchises)
+
     for franchise in franchises:
         warnings = _franchise_warning(franchise)
         if warnings:
@@ -83,8 +97,12 @@ def run_month_end_import_pipeline(
                 'warnings': warnings,
             })
 
-    _stage(progress_job, 72, 'Pipeline stage 2/5: recalculating royalties from agreement dates...')
-    from app.monthly.routes import recalculate_monthly_figure
+    if report['warnings'] or report['errors']:
+        report['status'] = 'needs_review'
+        if report['stage'] == 'published':
+            report['stage'] = 'validation_needs_review'
+
+    _stage(progress_job, 70, 'Stage 2/6: loading imported monthly rows...')
     rows = []
     if periods and ids:
         clauses = []
@@ -94,22 +112,18 @@ def run_month_end_import_pipeline(
             MonthlyFigure.franchise_id.in_(ids),
             db.or_(*clauses),
         ).all()
+    report['saved_rows'] = len(rows)
+
+    _stage(progress_job, 78, 'Stage 3/6: recalculating royalties from agreement date and scale...')
+    from app.monthly.routes import recalculate_monthly_figure
     for monthly_figure in rows:
         recalculate_monthly_figure(monthly_figure)
         report['recalculated_rows'] += 1
+        if Decimal(monthly_figure.royalty_amount or 0) > 0 or Decimal(monthly_figure.royalty_percentage or 0) > 0:
+            report['royalties_calculated'] += 1
     db.session.commit()
 
-    _stage(progress_job, 84, 'Pipeline stage 3/5: rebuilding performance cache...')
-    try:
-        from app.performance.service import rebuild_performance_results
-        for month, year in periods:
-            report['performance_rows'] += int(rebuild_performance_results(month, year, list(ids), 'annual_gross_scale') or 0)
-    except Exception as exc:
-        current_app.logger.exception('Performance cache rebuild failed in import pipeline: %s', exc)
-        report['status'] = 'warning'
-        report['warnings'].append({'franchise': 'Performance cache', 'warnings': [str(exc)]})
-
-    _stage(progress_job, 92, 'Pipeline stage 4/5: checking royalty exceptions...')
+    _stage(progress_job, 86, 'Stage 4/6: checking royalty exceptions...')
     zero_royalty_rows = []
     for monthly_figure in rows:
         if Decimal(monthly_figure.gross_revenue or 0) > 0 and Decimal(monthly_figure.royalty_percentage or 0) <= 0:
@@ -119,15 +133,44 @@ def run_month_end_import_pipeline(
                 'gross': str(monthly_figure.gross_revenue or 0),
             })
     if zero_royalty_rows:
-        report['status'] = 'warning'
+        report['status'] = 'needs_review'
+        report['stage'] = 'royalty_needs_review'
         report['warnings'].append({
             'franchise': 'Royalty calculation',
             'warnings': [f'{len(zero_royalty_rows)} rows have gross revenue but 0% royalty. Check agreement date/scale.'],
-            'rows': zero_royalty_rows[:20],
+            'rows': zero_royalty_rows[:50],
         })
 
-    _stage(progress_job, 98, 'Pipeline stage 5/5: saving import report...')
+    _stage(progress_job, 92, 'Stage 5/6: reconciliation checks...')
+    expected_rows = len(rows)
+    if report['recalculated_rows'] != expected_rows:
+        report['status'] = 'needs_review'
+        report['stage'] = 'reconciliation_failed'
+        report['errors'].append(f'Recalculated rows ({report["recalculated_rows"]}) did not match saved rows ({expected_rows}).')
+
+    if report['status'] == 'completed':
+        _stage(progress_job, 96, 'Stage 6/6: publishing performance graphs and leaderboard cache...')
+        try:
+            from app.performance.service import rebuild_performance_results
+            for month, year in periods:
+                report['performance_rows'] += int(rebuild_performance_results(month, year, list(ids), 'annual_gross_scale') or 0)
+            report['published'] = True
+            report['publish_message'] = 'Graphs, leaderboard and performance summaries were refreshed.'
+        except Exception as exc:
+            current_app.logger.exception('Performance cache rebuild failed in import pipeline: %s', exc)
+            report['status'] = 'needs_review'
+            report['stage'] = 'publish_failed'
+            report['errors'].append(f'Performance cache publish failed: {exc}')
+    else:
+        report['published'] = False
+        report['publish_message'] = 'Not published. Fix the review items first, then re-run/recalculate the import.'
+
+    final_message = 'Import completed and published.' if report['status'] == 'completed' else 'Import needs review before publishing.'
+    _stage(progress_job, 99, final_message)
     if progress_job:
-        progress_job.extra_json = json.dumps(report, default=str)[:4000]
+        progress_job.extra_json = json.dumps(report, default=str)[:8000]
+        progress_job.status = report['status']
+        progress_job.message = final_message
         db.session.commit()
     return report
+

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-section">
+  <div class="section-header">
+    <div>
+      <h1>Import Centre</h1>
+      <p class="muted">Every month-end import is validated, recalculated and reconciled here before it is published to graphs, leaderboards and royalties.</p>
+    </div>
+    <div class="button-row">
+      <a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a>
+      <a class="btn button-auto" href="{{ url_for('monthly.import_excel') }}">New Month-End Import</a>
+    </div>
+  </div>
+
+  <div class="card-grid import-card-grid">
+    <article class="dashboard-card">
+      <h2>Controlled pipeline</h2>
+      <p>Validate file, match franchises, check agreements/scales, recalculate royalties, reconcile totals and only publish when clean.</p>
+    </article>
+    <article class="dashboard-card">
+      <h2>Needs Review</h2>
+      <p>Imports with missing agreements, missing scales, zero royalty warnings or publish errors are clearly marked before users rely on the data.</p>
+    </article>
+    <article class="dashboard-card">
+      <h2>Audit trail</h2>
+      <p>Finance can see who uploaded the file, what happened at each stage, and whether the import was published.</p>
+    </article>
+  </div>
+</section>
+
+<section class="page-card">
+  <h2>Import history</h2>
+  <div class="table-responsive compact-table">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Type</th><th>File</th><th>Status</th><th>Progress</th><th>Period(s)</th><th>Matched</th><th>Saved</th><th>Royalties</th><th>Published</th><th>Uploaded by</th><th>Started</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in jobs %}
+        {% set job = item.job %}
+        {% set report = item.report %}
+        <tr>
+          <td>{{ job.id }}</td>
+          <td>{{ job.kind }}</td>
+          <td>{{ job.filename }}</td>
+          <td><span class="status-pill {{ job.status }}">{{ job.status|replace('_',' ')|title }}</span></td>
+          <td>{{ job.progress_percent }}%</td>
+          <td>{{ (report.periods or [])|join(', ') if report else '-' }}</td>
+          <td>{{ report.matched_franchises|default('-') }}</td>
+          <td>{{ report.saved_rows|default('-') }}</td>
+          <td>{{ report.royalties_calculated|default('-') }}</td>
+          <td>{{ 'Yes' if report.published else 'No' }}</td>
+          <td>{{ job.created_by.full_name if job.created_by else '-' }}</td>
+          <td>{{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '' }}</td>
+          <td><a class="btn small button-auto" href="{{ url_for('admin.import_centre_detail', job_id=job.id) }}">View Report</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="13">No import jobs found yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

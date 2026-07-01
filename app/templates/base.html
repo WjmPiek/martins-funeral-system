@@ -93,6 +93,7 @@
                             {% if current_user.has_permission('audit_logs:view') %}<a href="{{ url_for('admin.audit_logs') }}">Audit Logs</a>{% endif %}
                             {% if current_user.has_permission('system_administration:view') %}<a href="#">System Administration</a>{% endif %}
                             {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.imports_data') }}">Imports & Data</a>{% endif %}
+                            {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.import_centre') }}">Import Centre</a>{% endif %}
                             {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.database_diagnostics') }}">Database Diagnostics</a>{% endif %}
                         {% endif %}
 

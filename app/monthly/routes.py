@@ -1345,7 +1345,10 @@ def import_excel():
             # Count sheets quickly for a realistic progress bar.
             progress_job = start_import_job("monthly_excel", file_storage.filename, total_steps=100)
             result = import_monthly_figures_excel_file(file_storage, allocate_users=allocate_users, progress_job=progress_job)
-            update_import_job(progress_job, 100, "Monthly figures import complete.", status="completed", commit=True)
+            pipeline = result.get("pipeline") or {}
+            final_status = "needs_review" if pipeline.get("status") == "needs_review" else "completed"
+            final_message = "Monthly figures import needs review before publishing." if final_status == "needs_review" else "Monthly figures import complete and published."
+            update_import_job(progress_job, 100, final_message, status=final_status, commit=True)
         except Exception as exc:
             db.session.rollback()
             try:

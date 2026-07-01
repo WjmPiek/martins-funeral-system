@@ -12,6 +12,14 @@
   </div>
 
   <div class="card-grid import-card-grid">
+    {% if is_import_admin or is_import_finance %}
+    <article class="dashboard-card">
+      <h2>Import Centre</h2>
+      <p>Review every month-end import, validation stage, reconciliation result and publish status.</p>
+      <a class="btn button-auto" href="{{ url_for('admin.import_centre') }}">Open Import Centre</a>
+    </article>
+    {% endif %}
+
     {% if is_import_admin %}
     <article class="dashboard-card">
       <h2>Monthly Figures Excel</h2>
