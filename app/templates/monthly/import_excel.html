@@ -59,3 +59,27 @@
   {% endif %}
 </section>
 {% endblock %}
+
+
+{% if result and result.pipeline %}
+<div class="card" style="margin-top:1rem;">
+  <h3>Month-end import pipeline</h3>
+  <p><strong>Status:</strong> {{ result.pipeline.status|default('completed') }}</p>
+  <p>
+    Recalculated royalty rows: <strong>{{ result.pipeline.recalculated_rows|default(0) }}</strong><br>
+    Performance cache rows: <strong>{{ result.pipeline.performance_rows|default(0) }}</strong>
+  </p>
+  {% if result.pipeline.warnings %}
+    <div class="alert alert-warning">
+      <strong>Items needing review:</strong>
+      <ul>
+        {% for item in result.pipeline.warnings[:20] %}
+          <li><strong>{{ item.franchise }}</strong>: {{ item.warnings|join(', ') }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% else %}
+    <div class="alert alert-success">All imported rows matched and royalty calculations completed.</div>
+  {% endif %}
+</div>
+{% endif %}

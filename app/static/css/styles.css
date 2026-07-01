@@ -1907,3 +1907,22 @@ body.app-body {
         transition: none !important;
     }
 }
+
+/* Database diagnostics */
+.page-header-row { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+.page-subtitle { color:#607089; margin-top:.35rem; }
+.diagnostic-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:1rem; margin-top:1rem; }
+.diagnostic-card { background:#f8fafc; border:1px solid #e3e8f0; border-radius:16px; padding:1rem; }
+.diagnostic-card span { display:block; color:#607089; font-weight:700; font-size:.9rem; }
+.diagnostic-card strong { display:block; margin-top:.45rem; font-size:2rem; color:#0b1f3a; }
+.diagnostic-card.ok { border-color:#ccf3dc; background:#f4fff8; }
+.diagnostic-card.warning { border-color:#ffe4a8; background:#fff9eb; }
+.diagnostic-card.danger { border-color:#ffc9c9; background:#fff5f5; }
+.diagnostic-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:1rem; }
+.compact-table table { width:100%; border-collapse:collapse; }
+.compact-table th, .compact-table td { padding:.65rem .75rem; vertical-align:middle; white-space:nowrap; }
+.status-pill { display:inline-flex; align-items:center; padding:.3rem .7rem; border-radius:999px; background:#e8edf5; font-weight:800; text-transform:capitalize; }
+.status-pill.completed, .status-pill.done, .status-pill.success { background:#dff7e8; color:#0f6b35; }
+.status-pill.failed, .status-pill.error { background:#ffe0e0; color:#9d1c1c; }
+.status-pill.running, .status-pill.processing { background:#fff0c2; color:#945900; }
+@media (max-width: 760px) { .page-header-row { flex-direction:column; } .diagnostic-grid { grid-template-columns:1fr; } .compact-table th, .compact-table td { white-space:normal; } }

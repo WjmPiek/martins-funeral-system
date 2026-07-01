@@ -80,7 +80,7 @@
                         {% if current_user.has_permission('users:view') or current_user.has_permission('user_roles:view') or current_user.has_permission('performance:manage_inactive') or is_admin_user or is_finance_user %}
                             <div class="nav-group-title">Admin</div>
                             <details class="nav-section" open>
-                                <summary>Users <span class="nav-count-badge">5</span></summary>
+                                <summary>Users <span class="nav-count-badge">6</span></summary>
                                 <div class="nav-subtabs">
                                     {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.users') }}">Users</a>{% endif %}
                                     {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.franchise_users') }}">Franchise Users</a>{% endif %}
@@ -93,6 +93,7 @@
                             {% if current_user.has_permission('audit_logs:view') %}<a href="{{ url_for('admin.audit_logs') }}">Audit Logs</a>{% endif %}
                             {% if current_user.has_permission('system_administration:view') %}<a href="#">System Administration</a>{% endif %}
                             {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.imports_data') }}">Imports & Data</a>{% endif %}
+                            {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.database_diagnostics') }}">Database Diagnostics</a>{% endif %}
                         {% endif %}
 
                         {# Operational/support modules in the middle. #}

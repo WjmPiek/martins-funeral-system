@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-card diagnostics-page">
+    <div class="page-header-row">
+        <div>
+            <h1>Database Diagnostics</h1>
+            <p class="page-subtitle">Admin-only health checks for imports, franchise links, agreement dates, royalty scales and monthly figures.</p>
+        </div>
+        <a class="btn-secondary" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a>
+    </div>
+
+    <div class="diagnostic-cards">
+        {% for card in summary_cards %}
+            <div class="diagnostic-card {{ card.tone }}">
+                <span>{{ card.label }}</span>
+                <strong>{{ card.value }}</strong>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="page-card">
+    <h2>Latest monthly imports</h2>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>Import</th><th>File</th><th>Status</th><th>Progress</th><th>Message</th><th>Started</th><th>Finished</th></tr></thead>
+            <tbody>
+            {% for job in latest_imports %}
+                <tr>
+                    <td>{{ job.kind }}</td>
+                    <td>{{ job.filename }}</td>
+                    <td><span class="status-pill {{ job.status }}">{{ job.status }}</span></td>
+                    <td>{{ job.progress_percent }}%</td>
+                    <td>{{ job.message }}</td>
+                    <td>{{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '' }}</td>
+                    <td>{{ job.finished_at.strftime('%Y-%m-%d %H:%M') if job.finished_at else '' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7">No import jobs found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="page-card">
+    <h2>Latest month totals</h2>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>Period</th><th>Rows</th><th>Gross turnover</th><th>Royalty amount</th><th>Payover</th></tr></thead>
+            <tbody>
+            {% for row in latest_month %}
+                <tr>
+                    <td>{{ row.year }}-{{ '%02d'|format(row.month) }}</td>
+                    <td>{{ row.rows }}</td>
+                    <td>{{ row.gross_turnover|rand }}</td>
+                    <td>{{ row.royalty_amount|rand }}</td>
+                    <td>{{ row.payover|rand }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5">No monthly figures found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Franchises missing royalty scales</h2>
+        <p class="page-subtitle">These branches cannot calculate royalty scale percentages correctly until scale rows are imported or added.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>ID</th><th>Business name</th><th>Code</th><th>Agreement start</th><th>Method</th></tr></thead>
+                <tbody>
+                {% for row in missing_scales %}
+                    <tr><td>{{ row.id }}</td><td>{{ row.business_name }}</td><td>{{ row.franchise_code }}</td><td>{{ row.agreement_start_date or '' }}</td><td>{{ row.royalty_gross_method }}</td></tr>
+                {% else %}
+                    <tr><td colspan="5">All checked franchises have royalty scales.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Franchises missing agreement dates</h2>
+        <p class="page-subtitle">Agreement dates drive the old/new formula decision. Missing dates must be corrected.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>ID</th><th>Business name</th><th>Code</th><th>Start</th><th>End</th></tr></thead>
+                <tbody>
+                {% for row in missing_agreements %}
+                    <tr><td>{{ row.id }}</td><td>{{ row.business_name }}</td><td>{{ row.franchise_code }}</td><td>{{ row.agreement_start_date or '' }}</td><td>{{ row.agreement_end_date or '' }}</td></tr>
+                {% else %}
+                    <tr><td colspan="5">All checked franchises have agreement dates.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Franchise users not linked to a franchise</h2>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Roles</th></tr></thead>
+                <tbody>
+                {% for row in franchise_users_without_links %}
+                    <tr><td>{{ row.id }}</td><td>{{ row.name }} {{ row.surname }}</td><td>{{ row.email }}</td><td>{{ row.roles }}</td></tr>
+                {% else %}
+                    <tr><td colspan="4">All franchise users are linked.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Franchise employees without parent franchise user</h2>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Roles</th></tr></thead>
+                <tbody>
+                {% for row in franchise_employees_without_parent %}
+                    <tr><td>{{ row.id }}</td><td>{{ row.name }} {{ row.surname }}</td><td>{{ row.email }}</td><td>{{ row.roles }}</td></tr>
+                {% else %}
+                    <tr><td colspan="4">All franchise employees are linked to a franchise user.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<section class="page-card">
+    <h2>Monthly figures with gross turnover but zero royalty</h2>
+    <p class="page-subtitle">These records usually indicate missing scales, wrong agreement formula, or a royalty recalculation issue.</p>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>Period</th><th>Franchise</th><th>Franchise ID</th><th>Gross turnover</th><th>Royalty %</th><th>Royalty amount</th><th>Payover</th></tr></thead>
+            <tbody>
+            {% for row in royalty_zero_checks %}
+                <tr>
+                    <td>{{ row.year }}-{{ '%02d'|format(row.month) }}</td>
+                    <td>{{ row.business_name }}</td>
+                    <td>{{ row.franchise_id }}</td>
+                    <td>{{ row.gross_turnover|rand }}</td>
+                    <td>{{ row.royalty_percentage }}%</td>
+                    <td>{{ row.royalty_amount|rand }}</td>
+                    <td>{{ row.payover|rand }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7">No zero-royalty warnings found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Duplicate franchise names</h2>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Name</th><th>Count</th><th>Franchise IDs</th></tr></thead>
+                <tbody>
+                {% for row in duplicate_franchises %}
+                    <tr><td>{{ row.normalized_name }}</td><td>{{ row.count }}</td><td>{{ row.franchise_ids }}</td></tr>
+                {% else %}
+                    <tr><td colspan="3">No duplicate franchise names found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Orphan monthly figures</h2>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>ID</th><th>Period</th><th>Franchise ID</th><th>Gross</th><th>Royalty</th><th>Payover</th></tr></thead>
+                <tbody>
+                {% for row in orphan_monthly_figures %}
+                    <tr><td>{{ row.id }}</td><td>{{ row.year }}-{{ '%02d'|format(row.month) }}</td><td>{{ row.franchise_id }}</td><td>{{ row.gross_turnover|rand }}</td><td>{{ row.royalty_amount|rand }}</td><td>{{ row.payover|rand }}</td></tr>
+                {% else %}
+                    <tr><td colspan="6">No orphan monthly figures found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

@@ -8,6 +8,7 @@ from difflib import SequenceMatcher
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
 from flask_login import login_required, current_user
 from app.extensions import db
+from sqlalchemy import text
 from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
@@ -1982,6 +1983,124 @@ def new_role():
         flash("Role created. You can now tick its permissions.", "success")
         return redirect(url_for("admin.edit_role", role_id=role.id))
     return render_template("admin/new_role.html")
+
+
+
+
+@admin_bp.route("/database-diagnostics")
+@login_required
+def database_diagnostics():
+    """Admin diagnostics page for import, franchise, royalty and user-link health checks."""
+    if not (is_current_user_admin() or current_user.has_role("Finance Manager") or current_user.has_permission("system_administration:view")):
+        abort(403)
+
+    # Franchises that cannot calculate royalties because no scale rows exist.
+    missing_scales = db.session.execute(text("""
+        SELECT f.id, f.business_name, f.franchise_code, f.agreement_start_date, f.royalty_gross_method, COUNT(rs.id) AS scale_count
+        FROM franchises f
+        LEFT JOIN royalty_scales rs ON rs.franchise_id = f.id
+        GROUP BY f.id, f.business_name, f.franchise_code, f.agreement_start_date, f.royalty_gross_method
+        HAVING COUNT(rs.id) = 0
+        ORDER BY f.business_name
+        LIMIT 250
+    """)).mappings().all()
+
+    missing_agreements = db.session.execute(text("""
+        SELECT id, business_name, franchise_code, agreement_start_date, agreement_end_date
+        FROM franchises
+        WHERE agreement_start_date IS NULL
+           OR agreement_end_date IS NULL
+        ORDER BY business_name
+        LIMIT 250
+    """)).mappings().all()
+
+    franchise_users_without_links = db.session.execute(text("""
+        SELECT u.id, u.name, u.surname, u.email, string_agg(r.name, ', ' ORDER BY r.name) AS roles
+        FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r ON r.id = ur.role_id
+        LEFT JOIN user_franchises uf ON uf.user_id = u.id
+        WHERE r.name = 'Franchise User'
+        GROUP BY u.id, u.name, u.surname, u.email
+        HAVING COUNT(uf.franchise_id) = 0
+        ORDER BY u.email
+        LIMIT 250
+    """)).mappings().all()
+
+    franchise_employees_without_parent = db.session.execute(text("""
+        SELECT u.id, u.name, u.surname, u.email, string_agg(r.name, ', ' ORDER BY r.name) AS roles
+        FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r ON r.id = ur.role_id
+        WHERE r.name IN ('Franchise Manager', 'Franchise Employee', 'Franchise Agent')
+          AND u.parent_franchise_user_id IS NULL
+        GROUP BY u.id, u.name, u.surname, u.email
+        ORDER BY u.email
+        LIMIT 250
+    """)).mappings().all()
+
+    duplicate_franchises = db.session.execute(text("""
+        SELECT lower(trim(business_name)) AS normalized_name, COUNT(*) AS count, string_agg(id::text, ', ' ORDER BY id) AS franchise_ids
+        FROM franchises
+        WHERE business_name IS NOT NULL AND trim(business_name) <> ''
+        GROUP BY lower(trim(business_name))
+        HAVING COUNT(*) > 1
+        ORDER BY count DESC, normalized_name
+        LIMIT 250
+    """)).mappings().all()
+
+    latest_imports = ImportJob.query.order_by(ImportJob.started_at.desc()).limit(20).all()
+
+    orphan_monthly_figures = db.session.execute(text("""
+        SELECT mf.id, mf.year, mf.month, mf.franchise_id, mf.gross_turnover, mf.royalty_amount, mf.payover
+        FROM monthly_figures mf
+        LEFT JOIN franchises f ON f.id = mf.franchise_id
+        WHERE f.id IS NULL
+        ORDER BY mf.year DESC, mf.month DESC, mf.id DESC
+        LIMIT 250
+    """)).mappings().all()
+
+    latest_month = db.session.execute(text("""
+        SELECT year, month, COUNT(*) AS rows, COALESCE(SUM(gross_turnover), 0) AS gross_turnover,
+               COALESCE(SUM(royalty_amount), 0) AS royalty_amount, COALESCE(SUM(payover), 0) AS payover
+        FROM monthly_figures
+        GROUP BY year, month
+        ORDER BY year DESC, month DESC
+        LIMIT 12
+    """)).mappings().all()
+
+    royalty_zero_checks = db.session.execute(text("""
+        SELECT mf.year, mf.month, f.business_name, mf.franchise_id, mf.gross_turnover, mf.royalty_percentage, mf.royalty_amount, mf.payover
+        FROM monthly_figures mf
+        JOIN franchises f ON f.id = mf.franchise_id
+        WHERE COALESCE(mf.gross_turnover, 0) > 0
+          AND COALESCE(mf.royalty_amount, 0) = 0
+        ORDER BY mf.year DESC, mf.month DESC, f.business_name
+        LIMIT 250
+    """)).mappings().all()
+
+    summary_cards = [
+        {"label": "Missing royalty scales", "value": len(missing_scales), "tone": "danger" if missing_scales else "ok"},
+        {"label": "Missing agreement dates", "value": len(missing_agreements), "tone": "warning" if missing_agreements else "ok"},
+        {"label": "Franchise users not linked", "value": len(franchise_users_without_links), "tone": "danger" if franchise_users_without_links else "ok"},
+        {"label": "Employees not linked", "value": len(franchise_employees_without_parent), "tone": "warning" if franchise_employees_without_parent else "ok"},
+        {"label": "Orphan monthly figures", "value": len(orphan_monthly_figures), "tone": "danger" if orphan_monthly_figures else "ok"},
+        {"label": "Zero royalty warnings", "value": len(royalty_zero_checks), "tone": "warning" if royalty_zero_checks else "ok"},
+    ]
+
+    return render_template(
+        "admin/database_diagnostics.html",
+        summary_cards=summary_cards,
+        missing_scales=missing_scales,
+        missing_agreements=missing_agreements,
+        franchise_users_without_links=franchise_users_without_links,
+        franchise_employees_without_parent=franchise_employees_without_parent,
+        duplicate_franchises=duplicate_franchises,
+        latest_imports=latest_imports,
+        orphan_monthly_figures=orphan_monthly_figures,
+        latest_month=latest_month,
+        royalty_zero_checks=royalty_zero_checks,
+    )
 
 
 @admin_bp.route("/audit-logs")

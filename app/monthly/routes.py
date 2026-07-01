@@ -288,20 +288,25 @@ def normalize_gross_method(value):
 
 
 def get_franchise_gross_method(franchise):
-    """Return the franchise's gross method.
+    """Return the royalty gross method from the agreement date.
 
-    Old Gross = SALES + INSURANCE RECEIPTS.
-    New Gross = SALES + ADMIN FEE.
-    If an older record has no stored method, fall back to the agreement start date:
-    2018 or newer = New; before 2018 or missing = Old.
+    The agreement date is the source of truth because imported franchise rows
+    often keep the model default ``royalty_gross_method='old'`` even when the
+    contract is a new-method agreement.  This caused month-end imports to show
+    figures but calculate the royalty payover with the wrong formula.
+
+    Formula rule:
+    * Agreement start year 2018 or later = New Gross Method = SALES + ADMIN FEE.
+    * Agreement start before 2018 = Old Gross Method = SALES + INSURANCE RECEIPTS.
+    * Missing agreement date = fall back to any explicit stored method, then old.
     """
+    start_date = getattr(franchise, "agreement_start_date", None)
+    if start_date:
+        return "new" if getattr(start_date, "year", 0) >= 2018 else "old"
+
     stored_method = normalize_gross_method(getattr(franchise, "royalty_gross_method", ""))
     if stored_method in {"new", "old"}:
         return stored_method
-
-    start_date = getattr(franchise, "agreement_start_date", None)
-    if start_date and getattr(start_date, "year", 0) >= 2018:
-        return "new"
     return "old"
 
 
@@ -1159,17 +1164,23 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
 
     db.session.commit()
 
-    # Performance speed phase: after an Excel import, calculate dashboard and
-    # decision-centre rows once so normal page loads only read saved results.
+    # Proper month-end import pipeline:
+    # 1) validate franchise matching and agreement data,
+    # 2) recalculate royalties from agreement dates/scales,
+    # 3) rebuild performance/leaderboard cache.
+    pipeline_result = {}
     performance_rows = 0
     try:
-        from app.performance.service import rebuild_performance_results
-        for perf_month, perf_year in sorted(period_tuples, key=lambda item: (item[1], item[0])):
-            performance_rows += rebuild_performance_results(
-                perf_month, perf_year, list(franchise_ids_touched), "annual_gross_scale"
-            )
+        from app.monthly.import_pipeline import run_month_end_import_pipeline
+        pipeline_result = run_month_end_import_pipeline(
+            period_tuples=period_tuples,
+            franchise_ids=franchise_ids_touched,
+            progress_job=progress_job,
+        )
+        performance_rows = int(pipeline_result.get("performance_rows", 0) or 0)
     except Exception as exc:
-        current_app.logger.exception("Performance pre-calculation failed after monthly Excel import: %s", exc)
+        current_app.logger.exception("Month-end import pipeline failed after Excel import: %s", exc)
+        pipeline_result = {"status": "warning", "error": str(exc)}
 
     return {
         "imported": imported,
@@ -1183,6 +1194,7 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
         "first_period": sorted(periods)[0] if periods else "",
         "last_period": sorted(periods)[-1] if periods else "",
         "performance_rows": performance_rows,
+        "pipeline": pipeline_result,
     }
 
 
@@ -1320,7 +1332,7 @@ def index():
 @monthly_bp.route("/import-excel", methods=["GET", "POST"])
 @login_required
 def import_excel():
-    if not is_current_user_admin():
+    if not can_import_monthly_figures():
         abort(403)
     if request.method == "POST":
         file_storage = request.files.get("excel_file")
