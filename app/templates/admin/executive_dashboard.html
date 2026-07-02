@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Executive Dashboard{% endblock %}
+{% block content %}
+<section class="page-shell executive-dashboard">
+    <div class="page-header split-header">
+        <div>
+            <p class="eyebrow">Phase 10 • Executive Dashboard</p>
+            <h1>Executive Dashboard</h1>
+            <p class="muted">High-level company performance, royalty health and operational status in one place.</p>
+        </div>
+        <form method="get" class="inline-form card compact-form">
+            <label>Month
+                <input type="number" name="month" min="1" max="12" value="{{ selected_month }}" required>
+            </label>
+            <label>Year
+                <input type="number" name="year" min="2000" max="2100" value="{{ selected_year }}" required>
+            </label>
+            <button class="btn btn-primary" type="submit">View Period</button>
+        </form>
+    </div>
+
+    <div class="section-title-row">
+        <h2>{{ selected_year }}-{{ "%02d"|format(selected_month) }} Executive Summary</h2>
+        <span class="badge badge-light">Previous period: {{ previous_period.year }}-{{ "%02d"|format(previous_period.month) if previous_period.month else 'n/a' }}</span>
+    </div>
+
+    <div class="stats-grid executive-kpi-grid">
+        {% for item in kpis %}
+            <div class="stat-card executive-kpi-card">
+                <span>{{ item.label }}</span>
+                <strong>
+                    {% if item.format == 'money' %}
+                        {{ item.value|rand }}
+                    {% else %}
+                        {{ item.value|count_value }}
+                    {% endif %}
+                </strong>
+                <small class="{{ 'text-danger' if item.delta.tone == 'danger' else 'text-success' }}">
+                    {{ '+' if item.delta.amount >= 0 else '' }}{% if item.format == 'money' %}{{ item.delta.amount|rand }}{% else %}{{ item.delta.amount|count_value }}{% endif %}
+                    · {{ '%.1f'|format(item.delta.percent) }}% vs previous period
+                </small>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="grid two-col">
+        <section class="card">
+            <div class="section-title-row">
+                <h2>Executive Alerts</h2>
+                <span class="badge badge-light">Live system health</span>
+            </div>
+            <div class="alert-list">
+                {% for warning in warnings %}
+                    <a class="alert-row alert-{{ warning.tone }}" href="{{ warning.url }}">
+                        <span>{{ warning.label }}</span>
+                        <strong>{{ warning.value }}</strong>
+                    </a>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title-row">
+                <h2>Quick Actions</h2>
+                <span class="badge badge-light">Admin / Finance</span>
+            </div>
+            <div class="quick-link-grid">
+                {% for link in quick_links %}
+                    <a class="quick-link-card" href="{{ link.url }}">
+                        <strong>{{ link.label }}</strong>
+                        <small>{{ link.detail }}</small>
+                    </a>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+
+    <div class="grid two-col">
+        <section class="card">
+            <div class="section-title-row">
+                <h2>Top 10 Franchises</h2>
+                <span class="badge badge-success">By gross turnover</span>
+            </div>
+            <table class="data-table compact-table">
+                <thead><tr><th>#</th><th>Franchise</th><th>Gross</th><th>Royalty</th><th>Funerals</th><th>Joinings</th></tr></thead>
+                <tbody>
+                {% for row in top_franchises %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ row.business_name }}</td>
+                        <td>{{ row.gross_turnover|rand }}</td>
+                        <td>{{ row.royalty_amount|rand }}</td>
+                        <td>{{ row.number_of_funerals|count_value }}</td>
+                        <td>{{ row.insurance_joinings|count_value }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="muted">No franchise figures for this period.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <div class="section-title-row">
+                <h2>Bottom 10 Franchises</h2>
+                <span class="badge badge-warning">Review candidates</span>
+            </div>
+            <table class="data-table compact-table">
+                <thead><tr><th>#</th><th>Franchise</th><th>Gross</th><th>Royalty</th><th>Funerals</th><th>Joinings</th></tr></thead>
+                <tbody>
+                {% for row in bottom_franchises %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ row.business_name }}</td>
+                        <td>{{ row.gross_turnover|rand }}</td>
+                        <td>{{ row.royalty_amount|rand }}</td>
+                        <td>{{ row.number_of_funerals|count_value }}</td>
+                        <td>{{ row.insurance_joinings|count_value }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="muted">No franchise figures for this period.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <section class="card">
+        <div class="section-title-row">
+            <h2>Province Performance</h2>
+            <span class="badge badge-light">All provinces combined / individual view</span>
+        </div>
+        <table class="data-table compact-table">
+            <thead><tr><th>Province</th><th>Franchises</th><th>Gross Turnover</th><th>Royalties</th><th>Funerals</th><th>Joinings</th></tr></thead>
+            <tbody>
+            {% for row in province_rows %}
+                <tr>
+                    <td>{{ row.province }}</td>
+                    <td>{{ row.franchises|count_value }}</td>
+                    <td>{{ row.gross_turnover|rand }}</td>
+                    <td>{{ row.royalty_amount|rand }}</td>
+                    <td>{{ row.funerals|count_value }}</td>
+                    <td>{{ row.joinings|count_value }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6" class="muted">No province-linked data for this period.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <div class="grid two-col">
+        <section class="card">
+            <h2>Recent Periods</h2>
+            <table class="data-table compact-table">
+                <thead><tr><th>Period</th><th>Rows</th><th>Gross</th><th>Royalties</th><th></th></tr></thead>
+                <tbody>
+                {% for row in periods %}
+                    <tr>
+                        <td>{{ row.year }}-{{ "%02d"|format(row.month) }}</td>
+                        <td>{{ row.rows|count_value }}</td>
+                        <td>{{ row.gross_turnover|rand }}</td>
+                        <td>{{ row.royalty_amount|rand }}</td>
+                        <td><a class="btn btn-light btn-sm" href="{{ url_for('admin.executive_dashboard', month=row.month, year=row.year) }}">View</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <h2>Latest Imports</h2>
+            <table class="data-table compact-table">
+                <thead><tr><th>ID</th><th>Status</th><th>Progress</th><th>File</th><th>Started</th></tr></thead>
+                <tbody>
+                {% for job in latest_imports %}
+                    <tr>
+                        <td><a href="{{ url_for('admin.import_centre_detail', job_id=job.id) }}">#{{ job.id }}</a></td>
+                        <td><span class="badge {{ 'badge-danger' if job.status in ['failed','needs_review'] else ('badge-warning' if job.is_active else 'badge-success') }}">{{ job.status }}</span></td>
+                        <td>{{ job.progress_percent }}%</td>
+                        <td>{{ job.filename or job.kind }}</td>
+                        <td>{{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5" class="muted">No imports found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+</section>
+
+<style>
+.executive-dashboard .alert-list{display:grid;gap:10px}.executive-dashboard .alert-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-radius:12px;background:#f7f7fb;text-decoration:none;color:inherit}.executive-dashboard .alert-row strong{font-size:1.25rem}.executive-dashboard .alert-danger{border-left:5px solid #c62828}.executive-dashboard .alert-warning{border-left:5px solid #f9a825}.executive-dashboard .alert-ok{border-left:5px solid #2e7d32}.quick-link-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.quick-link-card{display:block;padding:14px;border:1px solid #e7e2ef;border-radius:14px;background:#fff;text-decoration:none;color:inherit}.quick-link-card:hover{box-shadow:0 10px 30px rgba(28,18,55,.08);transform:translateY(-1px)}.quick-link-card small{display:block;margin-top:6px;color:#6b6577}.executive-kpi-card small{display:block;margin-top:8px}.text-danger{color:#c62828}.text-success{color:#2e7d32}
+</style>
+{% endblock %}

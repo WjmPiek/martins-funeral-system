@@ -2028,6 +2028,212 @@ def _latest_import_period():
     return dict(row)
 
 
+
+def _safe_scalar(sql, params=None, default=0):
+    """Run a small aggregate safely for executive dashboards."""
+    try:
+        value = db.session.execute(text(sql), params or {}).scalar()
+        return value if value is not None else default
+    except Exception:
+        db.session.rollback()
+        return default
+
+
+def _safe_rows(sql, params=None):
+    try:
+        return [dict(row) for row in db.session.execute(text(sql), params or {}).mappings().all()]
+    except Exception:
+        db.session.rollback()
+        return []
+
+
+def _exec_latest_period():
+    row = _safe_rows("""
+        SELECT year, month, COUNT(*) AS rows
+        FROM monthly_figures
+        GROUP BY year, month
+        ORDER BY year DESC, month DESC
+        LIMIT 1
+    """)
+    if row:
+        return row[0]
+    now = datetime.utcnow()
+    return {"year": now.year, "month": now.month, "rows": 0}
+
+
+def _exec_previous_period(year, month):
+    if not year or not month:
+        return {"year": None, "month": None}
+    if int(month) == 1:
+        return {"year": int(year) - 1, "month": 12}
+    return {"year": int(year), "month": int(month) - 1}
+
+
+def _period_totals(year, month):
+    rows = _safe_rows("""
+        SELECT
+            COUNT(*) AS rows,
+            COUNT(DISTINCT franchise_id) AS franchise_count,
+            COALESCE(SUM(gross_turnover), 0) AS gross_turnover,
+            COALESCE(SUM(royalty_amount), 0) AS royalty_amount,
+            COALESCE(SUM(payover), 0) AS payover,
+            COALESCE(SUM(sales), 0) AS sales,
+            COALESCE(SUM(number_of_funerals), 0) AS funerals,
+            COALESCE(SUM(insurance_joinings), 0) AS joinings,
+            COALESCE(AVG(NULLIF(royalty_percentage, 0)), 0) AS avg_royalty_percentage
+        FROM monthly_figures
+        WHERE year = :year AND month = :month
+    """, {"year": year, "month": month})
+    return rows[0] if rows else {}
+
+
+def _delta(current, previous):
+    try:
+        current = float(current or 0)
+        previous = float(previous or 0)
+    except Exception:
+        return {"amount": 0, "percent": 0, "tone": "neutral"}
+    amount = current - previous
+    percent = (amount / previous * 100) if previous else (100 if current else 0)
+    return {"amount": amount, "percent": percent, "tone": "ok" if amount >= 0 else "danger"}
+
+
+@admin_bp.route("/executive-dashboard")
+@login_required
+def executive_dashboard():
+    """Phase 10 executive dashboard: high-level KPIs and operational health."""
+    if not can_view_operations_centre():
+        abort(403)
+
+    latest_period = _exec_latest_period()
+    selected_year = int(request.args.get("year") or latest_period.get("year") or datetime.utcnow().year)
+    selected_month = int(request.args.get("month") or latest_period.get("month") or datetime.utcnow().month)
+    previous_period = _exec_previous_period(selected_year, selected_month)
+
+    totals = _period_totals(selected_year, selected_month)
+    previous_totals = _period_totals(previous_period.get("year"), previous_period.get("month")) if previous_period.get("year") else {}
+
+    kpis = [
+        {"label": "Gross Turnover", "value": totals.get("gross_turnover", 0), "format": "money", "delta": _delta(totals.get("gross_turnover"), previous_totals.get("gross_turnover"))},
+        {"label": "Royalties", "value": totals.get("royalty_amount", 0), "format": "money", "delta": _delta(totals.get("royalty_amount"), previous_totals.get("royalty_amount"))},
+        {"label": "Payover", "value": totals.get("payover", 0), "format": "money", "delta": _delta(totals.get("payover"), previous_totals.get("payover"))},
+        {"label": "Franchises Reporting", "value": totals.get("franchise_count", 0), "format": "number", "delta": _delta(totals.get("franchise_count"), previous_totals.get("franchise_count"))},
+        {"label": "Funerals", "value": totals.get("funerals", 0), "format": "number", "delta": _delta(totals.get("funerals"), previous_totals.get("funerals"))},
+        {"label": "Joinings", "value": totals.get("joinings", 0), "format": "number", "delta": _delta(totals.get("joinings"), previous_totals.get("joinings"))},
+    ]
+
+    top_franchises = _safe_rows("""
+        SELECT f.id, f.business_name, mf.gross_turnover, mf.royalty_amount, mf.payover,
+               mf.number_of_funerals, mf.insurance_joinings
+        FROM monthly_figures mf
+        JOIN franchises f ON f.id = mf.franchise_id
+        WHERE mf.year = :year AND mf.month = :month
+        ORDER BY COALESCE(mf.gross_turnover, 0) DESC, f.business_name
+        LIMIT 10
+    """, {"year": selected_year, "month": selected_month})
+
+    bottom_franchises = _safe_rows("""
+        SELECT f.id, f.business_name, mf.gross_turnover, mf.royalty_amount, mf.payover,
+               mf.number_of_funerals, mf.insurance_joinings
+        FROM monthly_figures mf
+        JOIN franchises f ON f.id = mf.franchise_id
+        WHERE mf.year = :year AND mf.month = :month
+        ORDER BY COALESCE(mf.gross_turnover, 0) ASC, f.business_name
+        LIMIT 10
+    """, {"year": selected_year, "month": selected_month})
+
+    province_rows = _safe_rows("""
+        WITH province_map AS (
+            SELECT franchise_id, MAX(NULLIF(province, '')) AS province
+            FROM heatmap_records
+            GROUP BY franchise_id
+        )
+        SELECT COALESCE(pm.province, 'Unassigned') AS province,
+               COUNT(DISTINCT mf.franchise_id) AS franchises,
+               COALESCE(SUM(mf.gross_turnover), 0) AS gross_turnover,
+               COALESCE(SUM(mf.royalty_amount), 0) AS royalty_amount,
+               COALESCE(SUM(mf.number_of_funerals), 0) AS funerals,
+               COALESCE(SUM(mf.insurance_joinings), 0) AS joinings
+        FROM monthly_figures mf
+        LEFT JOIN province_map pm ON pm.franchise_id = mf.franchise_id
+        WHERE mf.year = :year AND mf.month = :month
+        GROUP BY COALESCE(pm.province, 'Unassigned')
+        ORDER BY gross_turnover DESC
+        LIMIT 12
+    """, {"year": selected_year, "month": selected_month})
+
+    periods = _safe_rows("""
+        SELECT year, month, COUNT(*) AS rows,
+               COALESCE(SUM(gross_turnover), 0) AS gross_turnover,
+               COALESCE(SUM(royalty_amount), 0) AS royalty_amount
+        FROM monthly_figures
+        GROUP BY year, month
+        ORDER BY year DESC, month DESC
+        LIMIT 12
+    """)
+
+    latest_imports = ImportJob.query.order_by(ImportJob.started_at.desc()).limit(8).all()
+    running_imports = ImportJob.query.filter(ImportJob.status.in_(["queued", "running", "processing", "validating", "publishing"])).order_by(ImportJob.started_at.desc()).limit(8).all()
+    needs_review_imports = ImportJob.query.filter(ImportJob.status.in_(["needs_review", "failed", "warning"])).order_by(ImportJob.started_at.desc()).limit(8).all()
+    worker_heartbeats = WorkerHeartbeat.query.order_by(WorkerHeartbeat.heartbeat_at.desc()).limit(5).all()
+    online_workers = [w for w in worker_heartbeats if w.is_online and w.status != "stopped"]
+
+    try:
+        cache = cache_stats()
+    except Exception:
+        cache = {"valid": 0, "invalidated": 0}
+    event_stats_data = {}
+    try:
+        from app.events import event_stats
+        event_stats_data = event_stats()
+    except Exception:
+        event_stats_data = {}
+
+    warnings = [
+        {"label": "Imports needing review", "value": len(needs_review_imports), "tone": "danger" if needs_review_imports else "ok", "url": url_for("admin.import_centre")},
+        {"label": "Running import jobs", "value": len(running_imports), "tone": "warning" if running_imports else "ok", "url": url_for("admin.operations_centre")},
+        {"label": "Royalty rows needing review", "value": _safe_scalar("SELECT COUNT(*) FROM royalty_calculation_snapshots WHERE status = 'needs_review'", default=0), "tone": "danger", "url": url_for("admin.royalty_management")},
+        {"label": "Rows with gross turnover but zero royalty", "value": _safe_scalar("SELECT COUNT(*) FROM monthly_figures WHERE COALESCE(gross_turnover,0) > 0 AND COALESCE(royalty_amount,0) = 0", default=0), "tone": "warning", "url": url_for("admin.database_diagnostics")},
+        {"label": "Missing agreement dates", "value": _safe_scalar("SELECT COUNT(*) FROM franchises WHERE agreement_start_date IS NULL OR agreement_end_date IS NULL", default=0), "tone": "warning", "url": url_for("admin.database_diagnostics")},
+        {"label": "Failed events", "value": event_stats_data.get("failed", 0), "tone": "danger", "url": url_for("admin.operations_centre")},
+        {"label": "Online workers", "value": len(online_workers), "tone": "ok" if online_workers else "warning", "url": url_for("admin.operations_centre")},
+        {"label": "Valid cache rows", "value": cache.get("valid", 0), "tone": "ok" if cache.get("valid", 0) else "warning", "url": url_for("admin.operations_centre")},
+    ]
+
+    quick_links = [
+        {"label": "Import Centre", "detail": "Review uploads and import results", "url": url_for("admin.import_centre")},
+        {"label": "Royalty Management", "detail": "Recalculate and audit royalties", "url": url_for("admin.royalty_management")},
+        {"label": "Operations Centre", "detail": "Workers, events and system health", "url": url_for("admin.operations_centre")},
+        {"label": "Performance Graphs", "detail": "View company and franchise graphs", "url": url_for("performance.graphs")},
+        {"label": "Leaderboard", "detail": "Company-wide franchise ranking", "url": url_for("performance.index")},
+        {"label": "Database Diagnostics", "detail": "Find missing links and data issues", "url": url_for("admin.database_diagnostics")},
+    ]
+
+    return render_template(
+        "admin/executive_dashboard.html",
+        selected_year=selected_year,
+        selected_month=selected_month,
+        latest_period=latest_period,
+        previous_period=previous_period,
+        totals=totals,
+        previous_totals=previous_totals,
+        kpis=kpis,
+        top_franchises=top_franchises,
+        bottom_franchises=bottom_franchises,
+        province_rows=province_rows,
+        periods=periods,
+        latest_imports=latest_imports,
+        running_imports=running_imports,
+        needs_review_imports=needs_review_imports,
+        worker_heartbeats=worker_heartbeats,
+        online_workers=online_workers,
+        cache=cache,
+        event_stats=event_stats_data,
+        warnings=warnings,
+        quick_links=quick_links,
+    )
+
+
 @admin_bp.route("/operations")
 @login_required
 def operations_centre():
