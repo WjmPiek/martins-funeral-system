@@ -131,6 +131,32 @@
     </section>
 </div>
 
+
+<section class="page-card">
+    <h2>Worker monitor</h2>
+    <p class="page-subtitle">Persistent heartbeat from Render worker containers and manual CLI workers. If no worker is online, queued jobs will wait until Admin runs them or a worker starts.</p>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>Worker</th><th>Status</th><th>Queue</th><th>Current job</th><th>Heartbeat</th><th>Host</th><th>Message</th></tr></thead>
+            <tbody>
+            {% for worker in worker_heartbeats %}
+                <tr>
+                    <td>{{ worker.worker_id }}</td>
+                    <td><span class="status-pill {{ 'ok' if worker.is_online and worker.status != 'stopped' else 'warning' }}">{{ worker.status }}</span></td>
+                    <td>{{ worker.queue_name }}</td>
+                    <td>{{ worker.current_job_id or '' }}</td>
+                    <td>{{ worker.heartbeat_at.strftime('%Y-%m-%d %H:%M:%S') if worker.heartbeat_at else '' }}</td>
+                    <td>{{ worker.hostname or '' }}</td>
+                    <td>{{ worker.last_message or '' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7">No worker heartbeat found yet. Start the worker with <code>flask run-job-worker --forever --release-stale</code>.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
 <div class="diagnostic-grid">
     <section class="page-card">
         <h2>Stale / locked jobs</h2>

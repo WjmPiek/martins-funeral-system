@@ -155,28 +155,35 @@ def create_app(config_class=Config):
         Render Worker start command for continuous background processing.
         """
         import time
-        from app.jobs import queue_stats, release_stale_jobs, run_next_job
+        from app.jobs import queue_stats, register_worker_heartbeat, release_stale_jobs, run_next_job, stop_worker_heartbeat
 
         processed = 0
         empty_polls = 0
-        while True:
-            if release_stale:
-                released = release_stale_jobs(stale_after_minutes=stale_minutes, worker_id=worker_id)
-                if released:
-                    print(f"Released stale jobs: {released}")
-            job = run_next_job(queue_name=queue_name, worker_id=worker_id)
-            if job:
-                processed += 1
-                empty_polls = 0
-                print(f"Processed job {job.id}: {job.status} - {job.message}")
-                continue
+        register_worker_heartbeat(worker_id, queue_name=queue_name, status="starting", message="Worker starting", commit=True)
+        try:
+            while True:
+                register_worker_heartbeat(worker_id, queue_name=queue_name, status="polling", message="Polling for queued jobs", commit=True)
+                if release_stale:
+                    released = release_stale_jobs(stale_after_minutes=stale_minutes, worker_id=worker_id)
+                    if released:
+                        print(f"Released stale jobs: {released}")
 
-            stats = queue_stats(queue_name=queue_name)
-            if not forever:
-                break
-            empty_polls += 1
-            print(f"No queued jobs. Poll {empty_polls}. Stats: {stats}. Sleeping {sleep_seconds}s")
-            time.sleep(max(int(sleep_seconds or 5), 1))
+                job = run_next_job(queue_name=queue_name, worker_id=worker_id)
+                if job:
+                    processed += 1
+                    empty_polls = 0
+                    register_worker_heartbeat(worker_id, queue_name=queue_name, status="idle", message=f"Processed job {job.id}: {job.status}", commit=True)
+                    print(f"Processed job {job.id}: {job.status} - {job.message}")
+                    continue
+
+                stats = queue_stats(queue_name=queue_name)
+                if not forever:
+                    break
+                empty_polls += 1
+                print(f"No queued jobs. Poll {empty_polls}. Stats: {stats}. Sleeping {sleep_seconds}s")
+                time.sleep(max(int(sleep_seconds or 5), 1))
+        finally:
+            stop_worker_heartbeat(worker_id, message=f"Worker stopped after processing {processed} jobs", commit=True)
         print(f"Worker finished. Jobs processed: {processed}")
 
     @app.cli.command("release-stale-jobs")

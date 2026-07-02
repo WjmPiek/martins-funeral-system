@@ -6,6 +6,8 @@ Jobs can be processed from the Operations Centre or by running the CLI worker.
 from __future__ import annotations
 
 import json
+import os
+import socket
 import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -15,7 +17,7 @@ from flask import current_app
 from flask_login import current_user
 
 from app.extensions import db
-from app.models import ImportJob, ImportJobLog
+from app.models import ImportJob, ImportJobLog, WorkerHeartbeat
 
 JOB_STATUSES_ACTIVE = {"queued", "running", "processing", "validating", "publishing"}
 JOB_STATUSES_DONE = {"completed", "failed", "needs_review", "cancelled"}
@@ -39,6 +41,56 @@ def _json_loads(value: Optional[str], default: Any = None) -> Any:
 def _json_dumps(value: Any) -> str:
     return json.dumps(value or {}, default=str)
 
+
+
+def register_worker_heartbeat(
+    worker_id: str = "worker",
+    *,
+    queue_name: str = "default",
+    status: str = "idle",
+    current_job_id: Optional[int] = None,
+    message: str = "",
+    commit: bool = True,
+) -> WorkerHeartbeat:
+    """Create or update a persistent worker heartbeat row.
+
+    Render worker containers can restart or move. This row gives Admin a clear
+    answer to "is the background worker alive?" and which job it is processing.
+    """
+    now = utcnow()
+    worker_id = (worker_id or "worker")[:120]
+    hb = WorkerHeartbeat.query.filter_by(worker_id=worker_id).first()
+    if not hb:
+        hb = WorkerHeartbeat(worker_id=worker_id, started_at=now)
+        db.session.add(hb)
+    hb.queue_name = (queue_name or "default")[:80]
+    hb.status = (status or "idle")[:30]
+    hb.current_job_id = current_job_id
+    hb.hostname = socket.gethostname()[:160]
+    hb.process_id = os.getpid()
+    hb.last_message = (message or "")[:255]
+    hb.heartbeat_at = now
+    hb.stopped_at = None if hb.status not in {"stopped", "offline"} else now
+    if commit:
+        db.session.commit()
+    return hb
+
+
+def stop_worker_heartbeat(worker_id: str = "worker", *, message: str = "Worker stopped", commit: bool = True) -> Optional[WorkerHeartbeat]:
+    hb = WorkerHeartbeat.query.filter_by(worker_id=(worker_id or "worker")[:120]).first()
+    if hb:
+        hb.status = "stopped"
+        hb.current_job_id = None
+        hb.last_message = (message or "Worker stopped")[:255]
+        hb.heartbeat_at = utcnow()
+        hb.stopped_at = hb.heartbeat_at
+        if commit:
+            db.session.commit()
+    return hb
+
+
+def worker_heartbeat_rows(limit: int = 20) -> list[WorkerHeartbeat]:
+    return WorkerHeartbeat.query.order_by(WorkerHeartbeat.heartbeat_at.desc()).limit(limit).all()
 
 def register_job_handler(kind: str):
     """Decorator used by modules to register persistent job handlers."""
@@ -124,6 +176,19 @@ def update_job_progress(job: ImportJob, step: Optional[int] = None, message: Opt
     if status is not None:
         job.status = status
     job.heartbeat_at = utcnow()
+    if getattr(job, "locked_by", None):
+        try:
+            register_worker_heartbeat(
+                job.locked_by,
+                queue_name=getattr(job, "queue_name", "default") or "default",
+                status=status or job.status or "running",
+                current_job_id=job.id,
+                message=message or job.message or "Job heartbeat",
+                commit=False,
+            )
+        except Exception:
+            # The job heartbeat must never fail the import itself.
+            current_app.logger.debug("Worker heartbeat update skipped", exc_info=True)
     if status in JOB_STATUSES_DONE:
         job.finished_at = utcnow()
         job.locked_at = None
@@ -185,6 +250,10 @@ def claim_next_job(queue_name: str = "default", worker_id: str = "worker") -> Op
     job.heartbeat_at = now
     job.attempts = int(getattr(job, "attempts", 0) or 0) + 1
     add_job_log(job, "info", f"Job claimed by {worker_id}", commit=False)
+    try:
+        register_worker_heartbeat(worker_id, queue_name=queue_name, status="running", current_job_id=job.id, message=f"Claimed job {job.id}", commit=False)
+    except Exception:
+        current_app.logger.debug("Worker heartbeat claim update skipped", exc_info=True)
     db.session.commit()
     return job
 
@@ -203,8 +272,13 @@ def run_job(job: ImportJob, *, worker_id: str = "worker") -> ImportJob:
             job.progress_percent = 100
             job.finished_at = utcnow()
         job.result_json = _json_dumps(result if isinstance(result, dict) else {"result": result})[:20000]
+        completed_worker_id = job.locked_by or worker_id
         job.locked_at = None
         job.locked_by = None
+        try:
+            register_worker_heartbeat(completed_worker_id, queue_name=getattr(job, "queue_name", "default") or "default", status="idle", current_job_id=None, message=f"Completed job {job.id}", commit=False)
+        except Exception:
+            current_app.logger.debug("Worker heartbeat completion update skipped", exc_info=True)
         add_job_log(job, "info", "Job completed", commit=False)
         db.session.commit()
     except Exception as exc:

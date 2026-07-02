@@ -9,7 +9,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
-from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, user_franchises
+from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
@@ -2051,6 +2051,8 @@ def operations_centre():
     ).order_by(ImportJob.heartbeat_at.asc()).limit(12).all()
     latest_imports = ImportJob.query.order_by(ImportJob.started_at.desc()).limit(12).all()
     latest_job_logs = ImportJobLog.query.order_by(ImportJobLog.created_at.desc()).limit(20).all()
+    worker_heartbeats = WorkerHeartbeat.query.order_by(WorkerHeartbeat.heartbeat_at.desc()).limit(12).all()
+    online_workers = [worker for worker in worker_heartbeats if worker.is_online and worker.status != "stopped"]
 
     latest_period = _latest_import_period()
     monthly_period_rows = db.session.execute(text("""
@@ -2099,6 +2101,7 @@ def operations_centre():
         {"label": "Needs review", "value": sum(import_status.get(key, 0) for key in ("needs_review", "failed", "warning")), "tone": "danger" if sum(import_status.get(key, 0) for key in ("needs_review", "failed", "warning")) else "ok"},
         {"label": "Running imports", "value": len(running_imports), "tone": "warning" if running_imports else "ok"},
         {"label": "Stale jobs", "value": len(stuck_jobs), "tone": "danger" if stuck_jobs else "ok"},
+        {"label": "Online workers", "value": len(online_workers), "tone": "ok" if online_workers else "warning"},
         {"label": "Valid cache rows", "value": cache.get("valid", 0), "tone": "ok" if cache.get("valid", 0) else "warning"},
         {"label": "Unread notifications", "value": unread_notifications, "tone": "warning" if unread_notifications else "ok"},
     ]
@@ -2109,6 +2112,7 @@ def operations_centre():
         {"label": "Royalty calculation", "status": "Review" if diagnostics["zero_royalty_warnings"] else "OK", "tone": "warning" if diagnostics["zero_royalty_warnings"] else "ok", "detail": f"{diagnostics['zero_royalty_warnings']} gross-turnover rows have zero royalty."},
         {"label": "Franchise agreements", "status": "Review" if diagnostics["missing_agreements"] else "OK", "tone": "warning" if diagnostics["missing_agreements"] else "ok", "detail": f"{diagnostics['missing_agreements']} franchises have missing agreement dates."},
         {"label": "Performance cache", "status": "OK" if cache.get("valid", 0) else "Needs warmup", "tone": "ok" if cache.get("valid", 0) else "warning", "detail": f"{cache.get('valid', 0)} valid / {cache.get('invalidated', 0)} invalidated cache rows."},
+        {"label": "Background worker", "status": "Online" if online_workers else "Not detected", "tone": "ok" if online_workers else "warning", "detail": f"{len(online_workers)} active worker heartbeat row(s)."},
     ]
 
     table_counts = [
@@ -2117,6 +2121,7 @@ def operations_centre():
         {"table": "monthly_figures", "count": _ops_count("monthly_figures")},
         {"table": "royalty_scales", "count": _ops_count("royalty_scales")},
         {"table": "import_jobs", "count": _ops_count("import_jobs")},
+        {"table": "worker_heartbeats", "count": _ops_count("worker_heartbeats")},
         {"table": "live_events", "count": _ops_count("live_events")},
         {"table": "performance_page_cache", "count": _ops_count("performance_page_cache")},
         {"table": "audit_logs", "count": _ops_count("audit_logs")},
@@ -2133,6 +2138,8 @@ def operations_centre():
         latest_imports=latest_imports,
         stuck_jobs=stuck_jobs,
         latest_job_logs=latest_job_logs,
+        worker_heartbeats=worker_heartbeats,
+        online_workers=online_workers,
         monthly_period_rows=monthly_period_rows,
         cache=cache,
         latest_cache_rows=latest_cache_rows,

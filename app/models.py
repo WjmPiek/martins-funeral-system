@@ -327,6 +327,35 @@ class ImportJobLog(db.Model):
             return {}
 
 
+
+
+class WorkerHeartbeat(db.Model):
+    """Persistent heartbeat for Render/web/CLI job workers.
+
+    This lets the Operations Centre show whether a worker is alive, idle,
+    processing a job, stale, or offline after a Render restart.
+    """
+    __tablename__ = "worker_heartbeats"
+    id = db.Column(db.Integer, primary_key=True)
+    worker_id = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    queue_name = db.Column(db.String(80), nullable=False, default="default", index=True)
+    status = db.Column(db.String(30), nullable=False, default="idle", index=True)
+    current_job_id = db.Column(db.Integer, db.ForeignKey("import_jobs.id"), nullable=True, index=True)
+    hostname = db.Column(db.String(160), default="")
+    process_id = db.Column(db.Integer, nullable=True)
+    last_message = db.Column(db.String(255), default="")
+    started_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    heartbeat_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    stopped_at = db.Column(db.DateTime, nullable=True, index=True)
+
+    current_job = db.relationship("ImportJob", backref=db.backref("worker_heartbeats", lazy=True))
+
+    @property
+    def is_online(self):
+        if not self.heartbeat_at:
+            return False
+        return (datetime.now(timezone.utc) - self.heartbeat_at).total_seconds() < 180
+
 class LiveEvent(db.Model):
     __tablename__ = "live_events"
     id = db.Column(db.Integer, primary_key=True)
