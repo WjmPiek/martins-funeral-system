@@ -67,6 +67,9 @@ def create_app(config_class=Config):
     app.register_blueprint(performance_bp)
     app.register_blueprint(live_bp)
 
+    # Register persistent job handlers after blueprints/modules are importable.
+    from app import job_handlers  # noqa: F401
+
 
     @app.template_filter("rand")
     def format_rand(value):

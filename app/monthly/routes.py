@@ -8,10 +8,11 @@ from difflib import SequenceMatcher
 import shutil
 import zipfile
 import xml.etree.ElementTree as ET
+import uuid
 from io import BytesIO
 from werkzeug.utils import secure_filename
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, send_file, current_app, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, send_file, current_app, session, has_request_context
 from flask_login import login_required, current_user
 
 from app.audit import log_action
@@ -28,6 +29,36 @@ MONTHS = [
     (5, "May"), (6, "June"), (7, "July"), (8, "August"),
     (9, "September"), (10, "October"), (11, "November"), (12, "December"),
 ]
+
+
+JOB_UPLOAD_DIRNAME = "job_uploads"
+
+
+def current_actor_id(default=None):
+    """Return the authenticated user id when available.
+
+    Background workers do not have a Flask-Login current_user, so import helpers
+    accept an explicit actor_user_id and fall back through this helper only when
+    they are running inside a normal web request.
+    """
+    try:
+        if getattr(current_user, "is_authenticated", False):
+            return current_user.id
+    except Exception:
+        pass
+    return default
+
+
+def save_upload_for_job(file_storage, prefix="import"):
+    """Persist an uploaded file so a PostgreSQL job can process it later."""
+    upload_dir = Path(current_app.instance_path) / JOB_UPLOAD_DIRNAME
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    original = secure_filename(file_storage.filename or f"{prefix}-upload")
+    stored_name = f"{prefix}_{uuid.uuid4().hex}_{original}"
+    stored_path = upload_dir / stored_name
+    file_storage.stream.seek(0)
+    file_storage.save(stored_path)
+    return stored_path
 
 
 def current_reporting_period():
@@ -945,7 +976,7 @@ def iter_xlsx_import_sheets(file_storage):
             yield title, rows
 
 
-def import_monthly_figures_excel_file(file_storage, allocate_users=True, progress_job=None):
+def import_monthly_figures_excel_file(file_storage, allocate_users=True, progress_job=None, actor_user_id=None):
     suffix = Path(file_storage.filename or "").suffix.lower()
     if suffix not in {".xlsx", ".xlsm"}:
         raise ValueError("Please upload an Excel workbook (.xlsx or .xlsm).")
@@ -1012,7 +1043,7 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
                     franchise_id=franchise.id,
                     month=month,
                     year=year,
-                    created_by_id=current_user.id,
+                    created_by_id=current_actor_id(actor_user_id),
                     status="Imported",
                 )
                 db.session.add(monthly_figure)
@@ -1042,7 +1073,7 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
 
     db.session.commit()
 
-    if period_tuples:
+    if period_tuples and has_request_context():
         latest_month, latest_year = sorted(period_tuples, key=lambda item: (item[1], item[0]))[-1]
         session["last_imported_month"] = latest_month
         session["last_imported_year"] = latest_year
@@ -1081,13 +1112,14 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
     }
 
 
-def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, year=None, progress_job=None):
+def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, year=None, progress_job=None, actor_user_id=None, trusted_admin_import=False):
     franchise = None
     if franchise_id:
         candidate = Franchise.query.get(franchise_id)
-        if candidate and current_user.can_access_franchise(candidate.id):
+        if candidate and (trusted_admin_import or (has_request_context() and current_user.can_access_franchise(candidate.id))):
             franchise = candidate
-            session["selected_franchise_id"] = candidate.id
+            if has_request_context():
+                session["selected_franchise_id"] = candidate.id
     if not franchise:
         franchise = get_selected_franchise() or get_or_create_franchise()
     text, tmp_path = extract_pdf_text(file_storage)
@@ -1110,12 +1142,12 @@ def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, 
             franchise_id=franchise.id,
             month=month,
             year=year,
-            created_by_id=current_user.id,
+            created_by_id=current_actor_id(actor_user_id),
             status="Imported",
         )
         db.session.add(monthly_figure)
     else:
-        monthly_figure.created_by_id = current_user.id
+        monthly_figure.created_by_id = current_actor_id(actor_user_id)
         monthly_figure.status = "Published"
 
     monthly_figure.funeral_receipts = imported.get("funeral_receipts", Decimal("0"))
@@ -1156,8 +1188,9 @@ def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, 
     stored_pdf = upload_dir / f"{monthly_figure.id}_{safe_name}"
     shutil.move(str(tmp_path), stored_pdf)
 
-    session["last_imported_month"] = month
-    session["last_imported_year"] = year
+    if has_request_context():
+        session["last_imported_month"] = month
+        session["last_imported_year"] = year
     log_action("Monthly Figures", "Imported PDF monthly figures", f"Period: {monthly_figure.period_label}; Franchise: {franchise.business_name}; File: {safe_name}")
     db.session.commit()
     return monthly_figure
@@ -1251,36 +1284,30 @@ def import_excel():
             flash("Please select the Excel workbook to import.", "warning")
             return redirect(url_for("monthly.import_excel"))
         try:
-            from app.import_progress import start_import_job, update_import_job
-            # Count sheets quickly for a realistic progress bar.
-            progress_job = start_import_job("monthly_excel", file_storage.filename, total_steps=100)
-            result = import_monthly_figures_excel_file(file_storage, allocate_users=allocate_users, progress_job=progress_job)
-            pipeline = result.get("pipeline") or {}
-            final_status = "needs_review" if pipeline.get("status") == "needs_review" else "completed"
-            final_message = "Monthly figures import needs review before publishing." if final_status == "needs_review" else "Monthly figures import complete and published."
-            update_import_job(progress_job, 100, final_message, status=final_status, commit=True)
+            from app.jobs import enqueue_job
+            stored_path = save_upload_for_job(file_storage, "monthly_excel")
+            job = enqueue_job(
+                "monthly_excel_import",
+                filename=file_storage.filename,
+                payload={
+                    "stored_path": str(stored_path),
+                    "original_filename": file_storage.filename,
+                    "allocate_users": allocate_users,
+                    "created_by_id": current_actor_id(),
+                },
+                total_steps=100,
+                queue_name="default",
+                priority=50,
+            )
         except Exception as exc:
             db.session.rollback()
-            try:
-                update_import_job(progress_job, None, str(exc), status="failed", commit=True)
-            except Exception:
-                pass
             flash(str(exc), "danger")
             return redirect(url_for("monthly.import_excel"))
 
-        log_action(
-            "Monthly Figures",
-            "Imported Excel monthly figures",
-            f"New: {result['imported']}, Updated: {result['updated']}, Franchises: {result['franchise_count']}, Periods: {result['period_count']}",
-        )
+        log_action("Monthly Figures", "Queued Excel monthly import", f"Job {job.id}: {file_storage.filename}")
         db.session.commit()
-        flash(
-            f"Excel import complete. {result['imported']} new records created, {result['updated']} records updated, "
-            f"{result['franchise_count']} franchises allocated across {result['period_count']} period(s). "
-            f"Performance cache rows prepared: {result.get('performance_rows', 0)}.",
-            "success",
-        )
-        return render_template("monthly/import_excel.html", result=result)
+        flash(f"Excel import queued as Job #{job.id}. You can monitor progress in Import Centre or Operations Centre.", "success")
+        return redirect(url_for("admin.import_centre_detail", job_id=job.id))
 
     return render_template("monthly/import_excel.html", result=None)
 
@@ -1302,29 +1329,33 @@ def import_pdf():
             flash("Please select the Reporting Month and Reporting Year. The PDF date/upload date is not used.", "warning")
             return redirect(url_for("monthly.import_pdf"))
 
-        progress_job = None
         try:
-            from app.import_progress import start_import_job, update_import_job
-            progress_job = start_import_job("monthly_pdf", file_storage.filename, total_steps=100)
-            monthly_figure = create_monthly_figure_from_pdf(
-                file_storage,
-                request.form.get('franchise_id', type=int),
-                month=selected_month,
-                year=selected_year,
-                progress_job=progress_job,
+            from app.jobs import enqueue_job
+            stored_path = save_upload_for_job(file_storage, "monthly_pdf")
+            job = enqueue_job(
+                "monthly_pdf_import",
+                filename=file_storage.filename,
+                payload={
+                    "stored_path": str(stored_path),
+                    "original_filename": file_storage.filename,
+                    "franchise_id": request.form.get('franchise_id', type=int),
+                    "month": selected_month,
+                    "year": selected_year,
+                    "created_by_id": current_actor_id(),
+                },
+                total_steps=100,
+                queue_name="default",
+                priority=40,
             )
-            update_import_job(progress_job, 100, "PDF import completed and published.", status="completed", commit=True)
         except Exception as exc:
             db.session.rollback()
-            try:
-                update_import_job(progress_job, None, str(exc), status="failed", commit=True)
-            except Exception:
-                pass
             flash(str(exc), "danger")
             return redirect(url_for("monthly.import_pdf"))
 
-        flash(f"PDF imported and published for {monthly_figure.franchise.business_name} - {monthly_figure.period_label}. All Admin/Finance users can now see the figures; the franchise user can see only their own data.", "success")
-        return redirect(url_for("monthly.index", month=monthly_figure.month, year=monthly_figure.year))
+        log_action("Monthly Figures", "Queued PDF monthly import", f"Job {job.id}: {file_storage.filename}; Period: {selected_year}-{selected_month:02d}")
+        db.session.commit()
+        flash(f"PDF import queued as Job #{job.id}. It will publish after validation and royalty recalculation.", "success")
+        return redirect(url_for("admin.import_centre_detail", job_id=job.id))
 
     default_month, default_year = None, None
     return render_template("monthly/import.html", franchises=get_accessible_franchises(), selected_franchise=get_selected_franchise(), month_options=MONTHS, year_options=reporting_years(), default_month=default_month, default_year=default_year)
