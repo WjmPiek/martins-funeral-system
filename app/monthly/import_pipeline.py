@@ -151,9 +151,18 @@ def run_month_end_import_pipeline(
 
     _stage(progress_job, 78, 'Stage 3/6: recalculating royalties from agreement date and scale...')
     from app.monthly.routes import recalculate_monthly_figure
+    from app.royalty_management import snapshot_monthly_figure
     report['royalty_engine_reviews'] = []
+    report['royalty_snapshots'] = 0
     for monthly_figure in rows:
         result = recalculate_monthly_figure(monthly_figure)
+        try:
+            snapshot_monthly_figure(monthly_figure, commit=False)
+            report['royalty_snapshots'] += 1
+        except Exception as snap_exc:
+            report['warnings'].append({'franchise': getattr(getattr(monthly_figure, 'franchise', None), 'business_name', monthly_figure.franchise_id), 'warnings': [f'Royalty snapshot failed: {snap_exc}'], 'blocking': True})
+            report['status'] = 'needs_review'
+            report['stage'] = 'royalty_snapshot_needs_review'
         report['recalculated_rows'] += 1
         if Decimal(monthly_figure.royalty_amount or 0) > 0 or Decimal(monthly_figure.royalty_percentage or 0) > 0:
             report['royalties_calculated'] += 1

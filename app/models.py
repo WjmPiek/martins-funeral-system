@@ -949,6 +949,114 @@ class UserDashboardPreference(db.Model):
     user = db.relationship("User", backref=db.backref("dashboard_preference", uselist=False, lazy=True, cascade="all, delete-orphan"))
 
 
+class RoyaltyGrowthProfile(db.Model):
+    """Admin-managed growth policy used by target and royalty snapshots.
+
+    Phase 9 keeps the existing royalty formula intact, but records the growth
+    policy used when targets are generated so calculations are auditable.
+    """
+    __tablename__ = "royalty_growth_profiles"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    source = db.Column(db.String(120), nullable=False, default="SA GDP standard")
+    default_growth_percent = db.Column(db.Numeric(8, 4), nullable=False, default=0)
+    scope_type = db.Column(db.String(40), nullable=False, default="global", index=True)
+    scope_id = db.Column(db.Integer, nullable=True, index=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    notes = db.Column(db.Text, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class RoyaltyAgreementProfile(db.Model):
+    """Versioned royalty agreement profile for a franchise.
+
+    This does not change the existing formula by itself. It stores which method
+    should be used for a reporting period and lets the system snapshot the rule
+    that was applied at calculation time.
+    """
+    __tablename__ = "royalty_agreement_profiles"
+    id = db.Column(db.Integer, primary_key=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
+    agreement_version = db.Column(db.String(80), nullable=False, default="legacy", index=True)
+    formula_version = db.Column(db.String(80), nullable=False, default="current_scale", index=True)
+    royalty_method = db.Column(db.String(20), nullable=False, default="old", index=True)
+    target_method = db.Column(db.String(80), nullable=False, default="previous_year_average_plus_growth")
+    growth_profile_id = db.Column(db.Integer, db.ForeignKey("royalty_growth_profiles.id"), nullable=True, index=True)
+    custom_growth_percent = db.Column(db.Numeric(8, 4), nullable=True)
+    effective_start_date = db.Column(db.Date, nullable=True, index=True)
+    effective_end_date = db.Column(db.Date, nullable=True, index=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    notes = db.Column(db.Text, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    franchise = db.relationship("Franchise", backref=db.backref("royalty_agreement_profiles", lazy=True, cascade="all, delete-orphan"))
+    growth_profile = db.relationship("RoyaltyGrowthProfile", backref=db.backref("agreement_profiles", lazy=True))
+
+
+class RoyaltyCalculationSnapshot(db.Model):
+    """Immutable-style audit snapshot for one monthly royalty calculation."""
+    __tablename__ = "royalty_calculation_snapshots"
+    id = db.Column(db.Integer, primary_key=True)
+    monthly_figure_id = db.Column(db.Integer, db.ForeignKey("monthly_figures.id"), nullable=False, unique=True, index=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
+    year = db.Column(db.Integer, nullable=False, index=True)
+    month = db.Column(db.Integer, nullable=False, index=True)
+    agreement_profile_id = db.Column(db.Integer, db.ForeignKey("royalty_agreement_profiles.id"), nullable=True, index=True)
+    agreement_version = db.Column(db.String(80), nullable=False, default="")
+    formula_version = db.Column(db.String(80), nullable=False, default="current_scale")
+    royalty_method = db.Column(db.String(20), nullable=False, default="old")
+    method_source = db.Column(db.String(80), nullable=False, default="")
+    royalty_base = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    royalty_percentage = db.Column(db.Numeric(8, 4), nullable=False, default=0)
+    royalty_amount = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    minimum_royalty_amount = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    minimum_royalty_applied = db.Column(db.Boolean, nullable=False, default=False)
+    scale_source_franchise_id = db.Column(db.Integer, nullable=True, index=True)
+    scale_source_franchise_name = db.Column(db.String(180), nullable=False, default="")
+    growth_profile_id = db.Column(db.Integer, db.ForeignKey("royalty_growth_profiles.id"), nullable=True, index=True)
+    growth_percent = db.Column(db.Numeric(8, 4), nullable=False, default=0)
+    target_amount = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    previous_year_average = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    status = db.Column(db.String(30), nullable=False, default="calculated", index=True)
+    diagnostics_json = db.Column(db.Text, nullable=False, default="{}")
+    calculated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    monthly_figure = db.relationship("MonthlyFigure", backref=db.backref("royalty_snapshot", uselist=False, lazy=True, cascade="all, delete-orphan"))
+    franchise = db.relationship("Franchise", backref=db.backref("royalty_snapshots", lazy=True, cascade="all, delete-orphan"))
+    agreement_profile = db.relationship("RoyaltyAgreementProfile", backref=db.backref("calculation_snapshots", lazy=True))
+    growth_profile = db.relationship("RoyaltyGrowthProfile", backref=db.backref("calculation_snapshots", lazy=True))
+
+    @property
+    def diagnostics(self):
+        try:
+            return json.loads(self.diagnostics_json or "{}")
+        except Exception:
+            return {}
+
+
+class RoyaltyOverride(db.Model):
+    """Admin override audit trail for growth, method or scale-related royalty rules."""
+    __tablename__ = "royalty_overrides"
+    id = db.Column(db.Integer, primary_key=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
+    override_type = db.Column(db.String(80), nullable=False, index=True)
+    field_name = db.Column(db.String(120), nullable=False, default="")
+    old_value = db.Column(db.String(500), nullable=False, default="")
+    new_value = db.Column(db.String(500), nullable=False, default="")
+    reason = db.Column(db.Text, nullable=False, default="")
+    effective_month = db.Column(db.Integer, nullable=True, index=True)
+    effective_year = db.Column(db.Integer, nullable=True, index=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+
+    franchise = db.relationship("Franchise", backref=db.backref("royalty_overrides", lazy=True, cascade="all, delete-orphan"))
+    created_by = db.relationship("User", backref=db.backref("royalty_overrides", lazy=True))
+
+
 class SystemEvent(db.Model):
     """Durable enterprise event bus row.
 

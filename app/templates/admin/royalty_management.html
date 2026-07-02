@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Royalty Management{% endblock %}
+{% block content %}
+<section class="page-shell">
+    <div class="page-header split-header">
+        <div>
+            <p class="eyebrow">Enterprise Royalty Management</p>
+            <h1>Royalty Management</h1>
+            <p class="muted">Current royalty formula is preserved. This page adds snapshots, diagnostics and controlled recalculation.</p>
+        </div>
+        <form method="post" action="{{ url_for('admin.royalty_management_recalculate') }}" class="inline-form card compact-form">
+            <label>Month
+                <input type="number" name="month" min="1" max="12" value="{{ selected_month }}" required>
+            </label>
+            <label>Year
+                <input type="number" name="year" min="2000" max="2100" value="{{ selected_year }}" required>
+            </label>
+            <button type="submit" class="btn btn-primary">Recalculate Royalties</button>
+        </form>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card"><span>Snapshots</span><strong>{{ summary.snapshot_total }}</strong><small>All stored calculations</small></div>
+        <div class="stat-card"><span>Needs Review</span><strong>{{ summary.snapshots.get('needs_review', 0) }}</strong><small>Missing agreement/scale or blocked rows</small></div>
+        <div class="stat-card"><span>Missing Snapshots</span><strong>{{ summary.missing_snapshot_count }}</strong><small>Monthly rows not snapshotted yet</small></div>
+        <div class="stat-card"><span>Agreement Profiles</span><strong>{{ summary.agreement_profiles }}</strong><small>Versioned agreement records</small></div>
+    </div>
+
+    <div class="grid two-col">
+        <section class="card">
+            <h2>Growth Profiles</h2>
+            <p class="muted">Admin-only policy used for targets. Franchise users cannot see or edit this.</p>
+            {% for profile in growth_profiles %}
+                <form method="post" action="{{ url_for('admin.royalty_management_update_growth_profile', profile_id=profile.id) }}" class="stack-form">
+                    <strong>{{ profile.name }}</strong>
+                    <label>Growth %
+                        <input type="number" step="0.0001" name="default_growth_percent" value="{{ profile.default_growth_percent }}">
+                    </label>
+                    <label>Reason
+                        <input type="text" name="reason" placeholder="Reason for change">
+                    </label>
+                    <label>Notes
+                        <textarea name="notes" rows="2">{{ profile.notes or '' }}</textarea>
+                    </label>
+                    <button class="btn btn-secondary" type="submit">Update Growth Profile</button>
+                </form>
+            {% else %}
+                <p>No growth profiles found. Run <code>flask seed-royalty-growth-profile</code>.</p>
+            {% endfor %}
+        </section>
+
+        <section class="card">
+            <h2>Reporting Periods</h2>
+            <table class="data-table compact-table">
+                <thead><tr><th>Period</th><th>Rows</th><th>Gross</th><th>Royalties</th><th></th></tr></thead>
+                <tbody>
+                {% for row in period_rows %}
+                    <tr>
+                        <td>{{ row.year }}-{{ "%02d"|format(row.month) }}</td>
+                        <td>{{ row.rows }}</td>
+                        <td>{{ row.gross_turnover|rand }}</td>
+                        <td>{{ row.royalty_amount|rand }}</td>
+                        <td><a class="btn btn-light btn-sm" href="{{ url_for('admin.royalty_management', month=row.month, year=row.year) }}">View</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <section class="card">
+        <div class="section-title-row">
+            <h2>Snapshots for {{ selected_year }}-{{ "%02d"|format(selected_month) }}</h2>
+            <span class="badge {{ 'badge-danger' if needs_review else 'badge-success' }}">{{ needs_review|length }} need review</span>
+        </div>
+        <table class="data-table compact-table">
+            <thead>
+                <tr>
+                    <th>Franchise</th>
+                    <th>Status</th>
+                    <th>Method</th>
+                    <th>Base</th>
+                    <th>%</th>
+                    <th>Royalty</th>
+                    <th>Target</th>
+                    <th>Diagnostics</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for snap in period_snapshots %}
+                <tr>
+                    <td>{{ snap.franchise.business_name if snap.franchise else snap.franchise_id }}</td>
+                    <td><span class="badge {{ 'badge-danger' if snap.status == 'needs_review' else 'badge-success' }}">{{ snap.status }}</span></td>
+                    <td>{{ snap.royalty_method }}<br><small>{{ snap.agreement_version }}</small></td>
+                    <td>{{ snap.royalty_base|rand }}</td>
+                    <td>{{ snap.royalty_percentage }}%</td>
+                    <td>{{ snap.royalty_amount|rand }}</td>
+                    <td>{{ snap.target_amount|rand }}</td>
+                    <td>
+                        {% set diag = snap.diagnostics %}
+                        {% if diag.blocking_errors %}<strong>Errors:</strong> {{ diag.blocking_errors|join('; ') }}<br>{% endif %}
+                        {% if diag.warnings %}<strong>Warnings:</strong> {{ diag.warnings|join('; ') }}<br>{% endif %}
+                        <small>Scale: {{ snap.scale_source_franchise_name or 'n/a' }}</small>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8" class="muted">No snapshots yet for this period. Use Recalculate Royalties.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</section>
+{% endblock %}

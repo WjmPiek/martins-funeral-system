@@ -209,6 +209,8 @@ def ensure_default_subscriptions(commit: bool = False) -> int:
         ("cache-rebuilt", "cache.rebuilt", "performance.cache", "Record performance cache rebuilds."),
         ("attendance-updated", "attendance.updated", "attendance", "Future hook for Attendance module live sync."),
         ("claim-created", "claim.created", "insurance_claims", "Future hook for Claims module live sync."),
+        ("royalty-recalculated", "royalty.recalculated", "royalty_management", "Record and publish royalty recalculation results."),
+        ("royalty-needs-review", "royalty.needs_review", "royalty_management", "Track royalty rows that require Admin/Finance review."),
     ]
     created = 0
     for name, event_type, handler, description in defaults:

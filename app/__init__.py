@@ -230,6 +230,23 @@ def create_app(config_class=Config):
             print(f"{year}-{month:02d}: {saved} rows")
         print(f"Performance cache rebuilt. Total rows saved: {total}")
 
+
+    @app.cli.command("recalculate-royalties")
+    @click.option("--month", type=int, required=True, help="Reporting month number, 1-12.")
+    @click.option("--year", type=int, required=True, help="Reporting year, e.g. 2026.")
+    def recalculate_royalties_command(month, year):
+        """Rebuild Phase 9 royalty snapshots and existing royalty amounts for a period."""
+        from app.royalty_management import recalculate_royalties_for_period
+        result = recalculate_royalties_for_period(month, year, commit=True)
+        print(f"Royalties recalculated for {year}-{month:02d}: {result}")
+
+    @app.cli.command("seed-royalty-growth-profile")
+    def seed_royalty_growth_profile_command():
+        """Ensure the default SA GDP growth royalty profile exists."""
+        from app.royalty_management import ensure_default_growth_profile
+        profile = ensure_default_growth_profile(commit=True)
+        print(f"Royalty growth profile ready: {profile.name} ({profile.default_growth_percent}%)")
+
     @app.cli.command("check-franchise-expiry")
     def check_franchise_expiry():
         from app.franchise.notifications import send_agreement_expiry_reminders

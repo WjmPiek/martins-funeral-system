@@ -9,7 +9,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
-from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, SystemEvent, EventSubscription, EventProcessingLog, user_franchises
+from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, SystemEvent, EventSubscription, EventProcessingLog, RoyaltyGrowthProfile, RoyaltyAgreementProfile, RoyaltyCalculationSnapshot, RoyaltyOverride, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
@@ -2343,6 +2343,100 @@ def new_role():
     return render_template("admin/new_role.html")
 
 
+
+
+
+
+@admin_bp.route("/royalty-management")
+@login_required
+def royalty_management():
+    """Admin-only Enterprise Royalty Management dashboard."""
+    if not can_view_operations_centre():
+        abort(403)
+    from app.royalty_management import royalty_management_summary
+    month = request.args.get("month", type=int)
+    year = request.args.get("year", type=int)
+    if not month or not year:
+        latest = _latest_import_period()
+        month = int(latest.get("month") or datetime.utcnow().month)
+        year = int(latest.get("year") or datetime.utcnow().year)
+    summary = royalty_management_summary()
+    period_snapshots = (RoyaltyCalculationSnapshot.query
+        .filter_by(month=month, year=year)
+        .order_by(RoyaltyCalculationSnapshot.status.desc(), RoyaltyCalculationSnapshot.royalty_amount.desc())
+        .limit(200).all())
+    needs_review = [item for item in period_snapshots if item.status == "needs_review"]
+    period_rows = db.session.execute(text("""
+        SELECT year, month, COUNT(*) AS rows, COALESCE(SUM(royalty_amount), 0) AS royalty_amount,
+               COALESCE(SUM(gross_turnover), 0) AS gross_turnover
+        FROM monthly_figures
+        GROUP BY year, month
+        ORDER BY year DESC, month DESC
+        LIMIT 18
+    """)).mappings().all()
+    return render_template(
+        "admin/royalty_management.html",
+        selected_month=month,
+        selected_year=year,
+        summary=summary,
+        period_snapshots=period_snapshots,
+        needs_review=needs_review,
+        period_rows=period_rows,
+        growth_profiles=summary.get("growth_profiles", []),
+    )
+
+
+@admin_bp.route("/royalty-management/recalculate", methods=["POST"])
+@login_required
+def royalty_management_recalculate():
+    """Rebuild royalty snapshots and existing royalty amounts for one period."""
+    if not can_view_operations_centre():
+        abort(403)
+    from app.royalty_management import recalculate_royalties_for_period
+    month = request.form.get("month", type=int)
+    year = request.form.get("year", type=int)
+    if not month or not year:
+        latest = _latest_import_period()
+        month = int(latest.get("month") or datetime.utcnow().month)
+        year = int(latest.get("year") or datetime.utcnow().year)
+    result = recalculate_royalties_for_period(month, year, commit=True)
+    log_action("Royalty Management", "Recalculated royalties", f"Period {year}-{month:02d}: {result}")
+    if result.get("needs_review"):
+        flash(f"Royalties recalculated for {year}-{month:02d}. {result['calculated']} calculated, {result['needs_review']} need review.", "warning")
+    else:
+        flash(f"Royalties recalculated for {year}-{month:02d}. {result['calculated']} rows calculated successfully.", "success")
+    return redirect(url_for("admin.royalty_management", month=month, year=year))
+
+
+@admin_bp.route("/royalty-management/growth-profile/<int:profile_id>", methods=["POST"])
+@login_required
+def royalty_management_update_growth_profile(profile_id):
+    """Admin-only GDP/growth standard update."""
+    if not is_current_user_admin():
+        abort(403)
+    profile = RoyaltyGrowthProfile.query.get_or_404(profile_id)
+    old = str(profile.default_growth_percent)
+    raw = (request.form.get("default_growth_percent") or "").replace(",", ".").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        flash("Invalid growth percentage.", "danger")
+        return redirect(url_for("admin.royalty_management"))
+    profile.default_growth_percent = value
+    profile.notes = request.form.get("notes", profile.notes) or profile.notes
+    db.session.add(RoyaltyOverride(
+        franchise_id=None,
+        override_type="growth_profile",
+        field_name="default_growth_percent",
+        old_value=old,
+        new_value=str(value),
+        reason=request.form.get("reason", "Admin updated global growth profile") or "Admin updated global growth profile",
+        created_by_id=current_user.id,
+    ))
+    db.session.commit()
+    log_action("Royalty Management", "Updated growth profile", f"{profile.name}: {old} -> {value}")
+    flash("Growth profile updated. Recalculate royalties for the affected periods when you are ready.", "success")
+    return redirect(url_for("admin.royalty_management"))
 
 
 @admin_bp.route("/database-diagnostics")
