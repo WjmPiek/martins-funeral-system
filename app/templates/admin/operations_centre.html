@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-card diagnostics-page">
+    <div class="page-header-row">
+        <div>
+            <h1>Enterprise Operations Centre</h1>
+            <p class="page-subtitle">Admin control room for imports, live publishing, cache, database health and system activity.</p>
+        </div>
+        <div class="action-row">
+            <a class="btn-secondary" href="{{ url_for('admin.import_centre') }}">Import Centre</a>
+            <a class="btn-secondary" href="{{ url_for('admin.database_diagnostics') }}">Database Diagnostics</a>
+        </div>
+    </div>
+
+    <div class="diagnostic-cards">
+        {% for card in admin_cards %}
+            <div class="diagnostic-card {{ card.tone }}">
+                <span>{{ card.label }}</span>
+                <strong>{{ card.value }}</strong>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="page-card">
+    <div class="page-header-row">
+        <div>
+            <h2>System health</h2>
+            <p class="page-subtitle">High-level checks that indicate whether the live system is ready for daily operation.</p>
+        </div>
+        <div class="action-row">
+            <form method="post" action="{{ url_for('admin.operations_rebuild_cache') }}" class="inline-form">
+                <input type="hidden" name="year" value="{{ latest_period.year }}">
+                <input type="hidden" name="month" value="{{ latest_period.month }}">
+                <button class="btn-primary" type="submit">Rebuild Latest Cache</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.operations_invalidate_cache') }}" class="inline-form">
+                <button class="btn-secondary" type="submit">Invalidate Cache</button>
+            </form>
+        </div>
+    </div>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>Check</th><th>Status</th><th>Details</th></tr></thead>
+            <tbody>
+            {% for check in health_checks %}
+                <tr>
+                    <td>{{ check.label }}</td>
+                    <td><span class="status-pill {{ check.tone }}">{{ check.status }}</span></td>
+                    <td>{{ check.detail }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Import status</h2>
+        <p class="page-subtitle">Live view of import job states. Anything failed or needs review must be checked before trusting financial outputs.</p>
+        <div class="diagnostic-cards small-cards">
+            {% for status, count in import_status.items() %}
+                <div class="diagnostic-card {% if status in ['failed','needs_review','warning'] %}danger{% elif status in ['running','queued','processing','validating','publishing'] %}warning{% else %}ok{% endif %}">
+                    <span>{{ status|replace('_',' ')|title }}</span>
+                    <strong>{{ count }}</strong>
+                </div>
+            {% else %}
+                <div class="diagnostic-card warning"><span>Import jobs</span><strong>0</strong></div>
+            {% endfor %}
+        </div>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Kind</th><th>File</th><th>Status</th><th>Progress</th><th>Started</th></tr></thead>
+                <tbody>
+                {% for job in latest_imports %}
+                    <tr>
+                        <td>{{ job.kind }}</td>
+                        <td>{{ job.filename }}</td>
+                        <td><span class="status-pill {{ job.status }}">{{ job.status }}</span></td>
+                        <td>{{ job.progress_percent }}%</td>
+                        <td>{{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5">No imports found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Needs review</h2>
+        <p class="page-subtitle">Imports that need attention before the month-end figures can be treated as trusted.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>ID</th><th>File</th><th>Status</th><th>Message</th><th>Action</th></tr></thead>
+                <tbody>
+                {% for job in needs_review_imports %}
+                    <tr>
+                        <td>{{ job.id }}</td>
+                        <td>{{ job.filename }}</td>
+                        <td><span class="status-pill {{ job.status }}">{{ job.status }}</span></td>
+                        <td>{{ job.message }}</td>
+                        <td><a class="btn-small" href="{{ url_for('admin.import_centre_detail', job_id=job.id) }}">Open</a></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5">No imports need review.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<section class="page-card">
+    <h2>Published monthly periods</h2>
+    <p class="page-subtitle">Latest stored figures that Admin, Finance and franchise users can see according to their role scope.</p>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>Period</th><th>Rows</th><th>Gross turnover</th><th>Royalty</th><th>Payover</th><th>Last update</th></tr></thead>
+            <tbody>
+            {% for row in monthly_period_rows %}
+                <tr>
+                    <td>{{ row.year }}-{{ '%02d'|format(row.month) }}</td>
+                    <td>{{ row.rows }}</td>
+                    <td>{{ row.gross_turnover|rand }}</td>
+                    <td>{{ row.royalty_amount|rand }}</td>
+                    <td>{{ row.payover|rand }}</td>
+                    <td>{{ row.last_updated.strftime('%Y-%m-%d %H:%M') if row.last_updated else '' }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6">No monthly figures found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Performance cache</h2>
+        <div class="diagnostic-cards small-cards">
+            <div class="diagnostic-card ok"><span>Valid</span><strong>{{ cache.valid }}</strong></div>
+            <div class="diagnostic-card warning"><span>Invalidated</span><strong>{{ cache.invalidated }}</strong></div>
+            <div class="diagnostic-card"><span>Total</span><strong>{{ cache.total }}</strong></div>
+        </div>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Type</th><th>Period</th><th>Metric</th><th>Rows</th><th>Status</th></tr></thead>
+                <tbody>
+                {% for row in latest_cache_rows %}
+                    <tr>
+                        <td>{{ row.cache_type }}</td>
+                        <td>{{ row.year or '' }}{% if row.month %}-{{ '%02d'|format(row.month) }}{% endif %}</td>
+                        <td>{{ row.metric or '' }}</td>
+                        <td>{{ row.row_count }}</td>
+                        <td>{% if row.invalidated_at %}<span class="status-pill warning">Invalidated</span>{% else %}<span class="status-pill ok">Valid</span>{% endif %}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5">No cache rows found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Diagnostics summary</h2>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Issue</th><th>Count</th><th>Open</th></tr></thead>
+                <tbody>
+                    <tr><td>Missing royalty scales</td><td>{{ diagnostics.missing_scales }}</td><td><a href="{{ url_for('admin.database_diagnostics') }}">View</a></td></tr>
+                    <tr><td>Missing agreement dates</td><td>{{ diagnostics.missing_agreements }}</td><td><a href="{{ url_for('admin.database_diagnostics') }}">View</a></td></tr>
+                    <tr><td>Orphan monthly figures</td><td>{{ diagnostics.orphan_monthly_figures }}</td><td><a href="{{ url_for('admin.database_diagnostics') }}">View</a></td></tr>
+                    <tr><td>Zero royalty warnings</td><td>{{ diagnostics.zero_royalty_warnings }}</td><td><a href="{{ url_for('admin.database_diagnostics') }}">View</a></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Live events</h2>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Time</th><th>Kind</th><th>Title</th><th>Scope</th></tr></thead>
+                <tbody>
+                {% for event in latest_events %}
+                    <tr><td>{{ event.created_at.strftime('%Y-%m-%d %H:%M') if event.created_at else '' }}</td><td>{{ event.kind }}</td><td>{{ event.title }}</td><td>{{ event.visibility }}</td></tr>
+                {% else %}
+                    <tr><td colspan="4">No live events found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Audit log</h2>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Time</th><th>User</th><th>Module</th><th>Action</th></tr></thead>
+                <tbody>
+                {% for log in latest_audit_logs %}
+                    <tr><td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') if log.created_at else '' }}</td><td>{{ log.user.full_name if log.user else '' }}</td><td>{{ log.module }}</td><td>{{ log.action }}</td></tr>
+                {% else %}
+                    <tr><td colspan="4">No audit logs found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<section class="page-card">
+    <h2>Core table counts</h2>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>Table</th><th>Rows</th></tr></thead>
+            <tbody>
+            {% for row in table_counts %}
+                <tr><td>{{ row.table }}</td><td>{{ row.count }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

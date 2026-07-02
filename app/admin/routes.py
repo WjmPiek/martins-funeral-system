@@ -9,12 +9,12 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
-from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, PerformancePageCache, user_franchises
+from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
-from app.performance.cache import cache_stats
-from app.performance.service import auto_hide_inactive_franchises, inactive_franchise_candidates, reactivate_franchise_performance, has_recent_performance_data
+from app.performance.cache import cache_stats, invalidate_performance_cache
+from app.performance.service import auto_hide_inactive_franchises, inactive_franchise_candidates, reactivate_franchise_performance, has_recent_performance_data, warm_performance_cache_for_period
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -1997,6 +1997,171 @@ def edit_role(role_id):
 
     selected = {permission.id for permission in role.permissions}
     return render_template("admin/edit_role.html", role=role, grouped_permissions=grouped, actions=ACTIONS, selected=selected)
+
+
+
+
+
+def can_view_operations_centre():
+    names = current_user_role_names()
+    return bool(names & {"Admin", "Super Admin", "Finance Manager"}) or current_user.has_permission("system_administration:view")
+
+
+def _ops_count(table_name):
+    try:
+        return int(db.session.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar() or 0)
+    except Exception:
+        return 0
+
+
+def _latest_import_period():
+    row = db.session.execute(text("""
+        SELECT year, month, COUNT(*) AS rows
+        FROM monthly_figures
+        GROUP BY year, month
+        ORDER BY year DESC, month DESC
+        LIMIT 1
+    """)).mappings().first()
+    if not row:
+        now = datetime.utcnow()
+        return {"year": now.year, "month": now.month, "rows": 0}
+    return dict(row)
+
+
+@admin_bp.route("/operations")
+@login_required
+def operations_centre():
+    """Enterprise Operations Centre for live system monitoring and recovery."""
+    if not can_view_operations_centre():
+        abort(403)
+
+    import_status_rows = db.session.execute(text("""
+        SELECT status, COUNT(*) AS count
+        FROM import_jobs
+        GROUP BY status
+        ORDER BY status
+    """)).mappings().all()
+    import_status = {row["status"] or "unknown": row["count"] for row in import_status_rows}
+    needs_review_imports = ImportJob.query.filter(ImportJob.status.in_(["needs_review", "failed", "warning"])).order_by(ImportJob.started_at.desc()).limit(12).all()
+    running_imports = ImportJob.query.filter(ImportJob.status.in_(["queued", "running", "processing", "validating", "publishing"])).order_by(ImportJob.started_at.desc()).limit(12).all()
+    latest_imports = ImportJob.query.order_by(ImportJob.started_at.desc()).limit(12).all()
+
+    latest_period = _latest_import_period()
+    monthly_period_rows = db.session.execute(text("""
+        SELECT year, month, COUNT(*) AS rows, COALESCE(SUM(gross_turnover), 0) AS gross_turnover,
+               COALESCE(SUM(royalty_amount), 0) AS royalty_amount, COALESCE(SUM(payover), 0) AS payover,
+               MAX(updated_at) AS last_updated
+        FROM monthly_figures
+        GROUP BY year, month
+        ORDER BY year DESC, month DESC
+        LIMIT 6
+    """)).mappings().all()
+
+    diagnostics = {
+        "missing_scales": db.session.execute(text("""
+            SELECT COUNT(*) FROM franchises f
+            LEFT JOIN royalty_scales rs ON rs.franchise_id = f.id
+            GROUP BY f.id
+            HAVING COUNT(rs.id) = 0
+        """)).fetchall(),
+        "missing_agreements": db.session.execute(text("""
+            SELECT COUNT(*) FROM franchises
+            WHERE agreement_start_date IS NULL OR agreement_end_date IS NULL
+        """)).scalar() or 0,
+        "orphan_monthly_figures": db.session.execute(text("""
+            SELECT COUNT(*) FROM monthly_figures mf
+            LEFT JOIN franchises f ON f.id = mf.franchise_id
+            WHERE f.id IS NULL
+        """)).scalar() or 0,
+        "zero_royalty_warnings": db.session.execute(text("""
+            SELECT COUNT(*) FROM monthly_figures
+            WHERE COALESCE(gross_turnover, 0) > 0 AND COALESCE(royalty_amount, 0) = 0
+        """)).scalar() or 0,
+    }
+    diagnostics["missing_scales"] = len(diagnostics["missing_scales"])
+
+    cache = cache_stats()
+    latest_cache_rows = PerformancePageCache.query.order_by(PerformancePageCache.built_at.desc()).limit(8).all()
+    latest_events = LiveEvent.query.order_by(LiveEvent.created_at.desc()).limit(12).all()
+    latest_notifications = LiveNotification.query.order_by(LiveNotification.created_at.desc()).limit(12).all()
+    latest_audit_logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(12).all()
+
+    unread_notifications = LiveNotification.query.filter(LiveNotification.read_at.is_(None)).count()
+    admin_cards = [
+        {"label": "Latest period", "value": f"{latest_period['year']}-{int(latest_period['month']):02d}", "tone": "ok" if latest_period.get("rows") else "warning"},
+        {"label": "Import jobs", "value": _ops_count("import_jobs"), "tone": "ok"},
+        {"label": "Needs review", "value": sum(import_status.get(key, 0) for key in ("needs_review", "failed", "warning")), "tone": "danger" if sum(import_status.get(key, 0) for key in ("needs_review", "failed", "warning")) else "ok"},
+        {"label": "Running imports", "value": len(running_imports), "tone": "warning" if running_imports else "ok"},
+        {"label": "Valid cache rows", "value": cache.get("valid", 0), "tone": "ok" if cache.get("valid", 0) else "warning"},
+        {"label": "Unread notifications", "value": unread_notifications, "tone": "warning" if unread_notifications else "ok"},
+    ]
+
+    health_checks = [
+        {"label": "Database connection", "status": "OK", "tone": "ok", "detail": "The application can query PostgreSQL."},
+        {"label": "Import pipeline", "status": "Review" if admin_cards[2]["value"] else "OK", "tone": "danger" if admin_cards[2]["value"] else "ok", "detail": f"{admin_cards[2]['value']} jobs require attention."},
+        {"label": "Royalty calculation", "status": "Review" if diagnostics["zero_royalty_warnings"] else "OK", "tone": "warning" if diagnostics["zero_royalty_warnings"] else "ok", "detail": f"{diagnostics['zero_royalty_warnings']} gross-turnover rows have zero royalty."},
+        {"label": "Franchise agreements", "status": "Review" if diagnostics["missing_agreements"] else "OK", "tone": "warning" if diagnostics["missing_agreements"] else "ok", "detail": f"{diagnostics['missing_agreements']} franchises have missing agreement dates."},
+        {"label": "Performance cache", "status": "OK" if cache.get("valid", 0) else "Needs warmup", "tone": "ok" if cache.get("valid", 0) else "warning", "detail": f"{cache.get('valid', 0)} valid / {cache.get('invalidated', 0)} invalidated cache rows."},
+    ]
+
+    table_counts = [
+        {"table": "users", "count": _ops_count("users")},
+        {"table": "franchises", "count": _ops_count("franchises")},
+        {"table": "monthly_figures", "count": _ops_count("monthly_figures")},
+        {"table": "royalty_scales", "count": _ops_count("royalty_scales")},
+        {"table": "import_jobs", "count": _ops_count("import_jobs")},
+        {"table": "live_events", "count": _ops_count("live_events")},
+        {"table": "performance_page_cache", "count": _ops_count("performance_page_cache")},
+        {"table": "audit_logs", "count": _ops_count("audit_logs")},
+    ]
+
+    return render_template(
+        "admin/operations_centre.html",
+        admin_cards=admin_cards,
+        health_checks=health_checks,
+        diagnostics=diagnostics,
+        import_status=import_status,
+        running_imports=running_imports,
+        needs_review_imports=needs_review_imports,
+        latest_imports=latest_imports,
+        monthly_period_rows=monthly_period_rows,
+        cache=cache,
+        latest_cache_rows=latest_cache_rows,
+        latest_events=latest_events,
+        latest_notifications=latest_notifications,
+        latest_audit_logs=latest_audit_logs,
+        table_counts=table_counts,
+        latest_period=latest_period,
+    )
+
+
+@admin_bp.route("/operations/cache/invalidate", methods=["POST"])
+@login_required
+def operations_invalidate_cache():
+    if not can_view_operations_centre():
+        abort(403)
+    count = invalidate_performance_cache(commit=True)
+    log_action("Operations", "Invalidated performance cache", f"Rows invalidated: {count}")
+    flash(f"Performance cache invalidated ({count} rows). It will rebuild after the next import or graph request.", "success")
+    return redirect(url_for("admin.operations_centre"))
+
+
+@admin_bp.route("/operations/cache/rebuild", methods=["POST"])
+@login_required
+def operations_rebuild_cache():
+    if not can_view_operations_centre():
+        abort(403)
+    month = request.form.get("month", type=int)
+    year = request.form.get("year", type=int)
+    if not month or not year:
+        latest = _latest_import_period()
+        month = int(latest.get("month") or datetime.utcnow().month)
+        year = int(latest.get("year") or datetime.utcnow().year)
+    franchise_ids = [fid for (fid,) in db.session.query(Franchise.id).filter(Franchise.is_performance_active == True).all()]
+    result = warm_performance_cache_for_period(month, year, franchise_ids=franchise_ids)
+    log_action("Operations", "Rebuilt performance cache", f"Period: {year}-{month:02d}; Result: {result}")
+    flash(f"Performance cache rebuilt for {year}-{month:02d}: {result.get('cache_rows', 0)} cache rows and {result.get('performance_rows', 0)} performance rows.", "success")
+    return redirect(url_for("admin.operations_centre"))
 
 
 @admin_bp.route("/roles/new", methods=["GET", "POST"])
