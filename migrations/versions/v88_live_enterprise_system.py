@@ -8,7 +8,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'v88_live_system'
-down_revision = 'v87_import_progress_ui_currency'
+down_revision = "v87_import_ui"
 branch_labels = None
 depends_on = None
 
