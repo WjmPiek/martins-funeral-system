@@ -17,7 +17,8 @@
     <div><span>Rows recalculated</span><strong>{{ report.recalculated_rows|default(0) }}</strong></div>
     <div><span>Royalties calculated</span><strong>{{ report.royalties_calculated|default(0) }}</strong></div>
     <div><span>Performance rows</span><strong>{{ report.performance_rows|default(0) }}</strong></div>
-    <div><span>Published</span><strong>{{ 'Yes' if report.published else 'No' }}</strong></div>
+    <div><span>Figures visible</span><strong>{{ 'Yes' if report.figures_visible else 'No' }}</strong></div>
+    <div><span>Trusted financials</span><strong>{{ 'Yes' if report.trusted_financials else 'No' }}</strong></div>
   </div>
 </section>
 
@@ -76,7 +77,7 @@
     <li>Imported branches were matched to franchise records.</li>
     <li>Agreement dates and royalty scales were checked.</li>
     <li>Royalty percentages and amounts were recalculated from the current franchise agreement data.</li>
-    <li>Graphs and leaderboards were refreshed only when the import completed without blocking review items.</li>
+    <li>Imported figures are visible immediately to Admin/Finance and to the matching franchise user. Graphs, leaderboards and trusted financial summaries are refreshed only when the import completed without blocking review items.</li>
   </ul>
 </section>
 {% endblock %}

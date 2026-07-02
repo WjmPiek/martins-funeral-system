@@ -656,13 +656,13 @@ def extract_pdf_text(file_storage):
         raise
 
 
-def parse_pdf_month_year(text, filename="", override_month=None, override_year=None):
+def parse_pdf_month_year(text, filename="", override_month=None, override_year=None, require_explicit=False):
     """Return the intended reporting month/year for a PDF import.
 
-    Finance imports are often done after month end, so using the current date is
-    unsafe.  The explicit form month/year is the source of truth.  If omitted,
-    the parser prefers the filename and then report-like month/year patterns in
-    the PDF text before falling back to the latest imported period/current date.
+    The upload form's reporting month/year is the source of truth.  Month-end
+    reports are often uploaded after the reporting month, so current date and
+    weak PDF text guesses are unsafe.  When ``require_explicit`` is true, the
+    import fails unless the user selected a valid reporting period.
     """
     try:
         if override_month and override_year:
@@ -672,6 +672,9 @@ def parse_pdf_month_year(text, filename="", override_month=None, override_year=N
                 return month, year
     except (TypeError, ValueError):
         pass
+
+    if require_explicit:
+        raise ValueError("Please select the Reporting Month and Reporting Year before importing this PDF. The PDF/upload date will not be used as a fallback.")
 
     combined = f"{filename or ''}\n{text or ''}"
     month_names = {name.lower(): value for value, name in MONTHS}
@@ -1256,6 +1259,7 @@ def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, 
         filename=file_storage.filename,
         override_month=month,
         override_year=year,
+        require_explicit=True,
     )
 
     monthly_figure = MonthlyFigure.query.filter_by(
@@ -1269,7 +1273,7 @@ def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, 
             month=month,
             year=year,
             created_by_id=current_user.id,
-            status="Published",
+            status="Imported",
         )
         db.session.add(monthly_figure)
     else:
@@ -1454,6 +1458,12 @@ def import_pdf():
             flash("Please select a PDF file to import.", "warning")
             return redirect(url_for("monthly.import_pdf"))
 
+        selected_month = request.form.get('month', type=int)
+        selected_year = request.form.get('year', type=int)
+        if not selected_month or not selected_year:
+            flash("Please select the Reporting Month and Reporting Year. The PDF date/upload date is not used.", "warning")
+            return redirect(url_for("monthly.import_pdf"))
+
         progress_job = None
         try:
             from app.import_progress import start_import_job, update_import_job
@@ -1461,8 +1471,8 @@ def import_pdf():
             monthly_figure = create_monthly_figure_from_pdf(
                 file_storage,
                 request.form.get('franchise_id', type=int),
-                month=request.form.get('month', type=int),
-                year=request.form.get('year', type=int),
+                month=selected_month,
+                year=selected_year,
                 progress_job=progress_job,
             )
             update_import_job(progress_job, 100, "PDF import completed and published.", status="completed", commit=True)
@@ -1478,7 +1488,7 @@ def import_pdf():
         flash(f"PDF imported and published for {monthly_figure.franchise.business_name} - {monthly_figure.period_label}. All Admin/Finance users can now see the figures; the franchise user can see only their own data.", "success")
         return redirect(url_for("monthly.index", month=monthly_figure.month, year=monthly_figure.year))
 
-    default_month, default_year = latest_imported_reporting_period()
+    default_month, default_year = None, None
     return render_template("monthly/import.html", franchises=get_accessible_franchises(), selected_franchise=get_selected_franchise(), month_options=MONTHS, year_options=reporting_years(), default_month=default_month, default_year=default_year)
 
 

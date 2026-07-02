@@ -72,6 +72,9 @@ def run_month_end_import_pipeline(
         'warnings': [],
         'errors': [],
         'published': False,
+        'figures_visible': False,
+        'trusted_financials': False,
+        'blocking_issue_count': 0,
         'publish_message': '',
     }
 
@@ -88,17 +91,27 @@ def run_month_end_import_pipeline(
     franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name).all() if ids else []
     report['matched_franchises'] = len(franchises)
 
+    # Franchise validation.  Missing agreement/scale can change royalty totals and
+    # therefore blocks trusted publishing.  Missing login is a warning only: Admin
+    # and Finance must still see the imported figures immediately, while the
+    # franchise-user visibility can be fixed from User Management.
+    blocking_validation_count = 0
     for franchise in franchises:
         warnings = _franchise_warning(franchise)
         if warnings:
+            blocking = [item for item in warnings if item in {'missing agreement start date', 'missing royalty scale'}]
+            if blocking:
+                blocking_validation_count += 1
             report['warnings'].append({
                 'franchise_id': franchise.id,
                 'franchise': franchise.business_name,
                 'warnings': warnings,
+                'blocking': bool(blocking),
             })
 
-    if report['warnings'] or report['errors']:
+    if report['errors'] or blocking_validation_count:
         report['status'] = 'needs_review'
+        report['blocking_issue_count'] = blocking_validation_count + len(report['errors'])
         if report['stage'] == 'published':
             report['stage'] = 'validation_needs_review'
 
@@ -114,13 +127,16 @@ def run_month_end_import_pipeline(
         ).all()
     report['saved_rows'] = len(rows)
 
-    _stage(progress_job, 74, 'Publishing rows to live system visibility...')
+    _stage(progress_job, 74, 'Publishing imported figures to role-filtered visibility...')
     try:
         from app.live import mark_import_visible
         report['published_rows'] = mark_import_visible(rows, status='Published')
+        report['figures_visible'] = True
     except Exception as exc:
         current_app.logger.exception('Could not mark imported rows as visible: %s', exc)
-        report['warnings'].append({'franchise': 'Live visibility', 'warnings': [f'Could not mark imported rows as Published: {exc}']})
+        report['warnings'].append({'franchise': 'Live visibility', 'warnings': [f'Could not mark imported rows as Published: {exc}'], 'blocking': True})
+        report['status'] = 'needs_review'
+        report['blocking_issue_count'] = int(report.get('blocking_issue_count', 0) or 0) + 1
 
     _stage(progress_job, 78, 'Stage 3/6: recalculating royalties from agreement date and scale...')
     from app.monthly.routes import recalculate_monthly_figure
@@ -156,19 +172,24 @@ def run_month_end_import_pipeline(
         report['stage'] = 'reconciliation_failed'
         report['errors'].append(f'Recalculated rows ({report["recalculated_rows"]}) did not match saved rows ({expected_rows}).')
 
+    # Always notify users that new monthly figures are visible.  Trusted financial
+    # publishing (graphs/cache/leaderboard) only happens when reconciliation is clean.
+    try:
+        from app.live import publish_monthly_import
+        for month, year in periods:
+            publish_monthly_import(month, year, ids, import_job=progress_job, source='month_end_import', report=report)
+    except Exception as live_exc:
+        current_app.logger.exception('Could not publish live import event: %s', live_exc)
+
     if report['status'] == 'completed':
         _stage(progress_job, 96, 'Stage 6/6: publishing performance graphs and leaderboard cache...')
         try:
             from app.performance.service import rebuild_performance_results
             for month, year in periods:
                 report['performance_rows'] += int(rebuild_performance_results(month, year, list(ids), 'annual_gross_scale') or 0)
-                try:
-                    from app.live import publish_monthly_import
-                    publish_monthly_import(month, year, ids, import_job=progress_job, source='month_end_import', report=report)
-                except Exception as live_exc:
-                    current_app.logger.exception('Could not publish live import event: %s', live_exc)
             report['published'] = True
-            report['publish_message'] = 'Graphs, leaderboard and performance summaries were refreshed. Live users were notified.'
+            report['trusted_financials'] = True
+            report['publish_message'] = 'Imported figures are visible. Royalties reconciled. Graphs, leaderboard and performance summaries were refreshed.'
         except Exception as exc:
             current_app.logger.exception('Performance cache rebuild failed in import pipeline: %s', exc)
             report['status'] = 'needs_review'
@@ -176,7 +197,8 @@ def run_month_end_import_pipeline(
             report['errors'].append(f'Performance cache publish failed: {exc}')
     else:
         report['published'] = False
-        report['publish_message'] = 'Not published. Fix the review items first, then re-run/recalculate the import.'
+        report['trusted_financials'] = False
+        report['publish_message'] = 'Imported figures are visible, but trusted royalty/performance publishing is blocked by review items.'
 
     final_message = 'Import completed and published.' if report['status'] == 'completed' else 'Import needs review before publishing.'
     _stage(progress_job, 99, final_message)

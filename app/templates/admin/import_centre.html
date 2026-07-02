@@ -34,7 +34,7 @@
     <table>
       <thead>
         <tr>
-          <th>ID</th><th>Type</th><th>File</th><th>Status</th><th>Progress</th><th>Period(s)</th><th>Matched</th><th>Saved</th><th>Royalties</th><th>Published</th><th>Uploaded by</th><th>Started</th><th>Action</th>
+          <th>ID</th><th>Type</th><th>File</th><th>Status</th><th>Progress</th><th>Period(s)</th><th>Matched</th><th>Saved</th><th>Royalties</th><th>Visible</th><th>Trusted</th><th>Uploaded by</th><th>Started</th><th>Action</th>
         </tr>
       </thead>
       <tbody>
@@ -51,13 +51,13 @@
           <td>{{ report.matched_franchises|default('-') }}</td>
           <td>{{ report.saved_rows|default('-') }}</td>
           <td>{{ report.royalties_calculated|default('-') }}</td>
-          <td>{{ 'Yes' if report.published else 'No' }}</td>
+          <td>{{ 'Yes' if report.figures_visible else 'No' }}</td><td>{{ 'Yes' if report.trusted_financials else 'No' }}</td>
           <td>{{ job.created_by.full_name if job.created_by else '-' }}</td>
           <td>{{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '' }}</td>
           <td><a class="btn small button-auto" href="{{ url_for('admin.import_centre_detail', job_id=job.id) }}">View Report</a></td>
         </tr>
       {% else %}
-        <tr><td colspan="13">No import jobs found yet.</td></tr>
+        <tr><td colspan="14">No import jobs found yet.</td></tr>
       {% endfor %}
       </tbody>
     </table>
