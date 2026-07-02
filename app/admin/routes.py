@@ -9,7 +9,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
-from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, SystemEvent, EventSubscription, EventProcessingLog, RoyaltyGrowthProfile, RoyaltyAgreementProfile, RoyaltyCalculationSnapshot, RoyaltyOverride, FranchiseHealthSnapshot, BusinessInsight, user_franchises
+from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, SystemEvent, EventSubscription, EventProcessingLog, RoyaltyGrowthProfile, RoyaltyAgreementProfile, RoyaltyCalculationSnapshot, RoyaltyOverride, FranchiseHealthSnapshot, BusinessInsight, InsightNarrative, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
@@ -2212,6 +2212,7 @@ def executive_dashboard():
         {"label": "Import Centre", "detail": "Review uploads and import results", "url": url_for("admin.import_centre")},
         {"label": "Royalty Management", "detail": "Recalculate and audit royalties", "url": url_for("admin.royalty_management")},
         {"label": "Business Intelligence", "detail": "Health scoring, trends and insights", "url": url_for("admin.business_intelligence", year=selected_year, month=selected_month)},
+        {"label": "Insight Explanations", "detail": "Plain-language explanations and monthly summaries", "url": url_for("admin.insights_dashboard", year=selected_year, month=selected_month)},
         {"label": "Operations Centre", "detail": "Workers, events and system health", "url": url_for("admin.operations_centre")},
         {"label": "Performance Graphs", "detail": "View company and franchise graphs", "url": url_for("performance.graphs")},
         {"label": "Leaderboard", "detail": "Company-wide franchise ranking", "url": url_for("performance.index")},
@@ -2351,6 +2352,65 @@ def business_intelligence_rebuild():
     log_action("Business Intelligence", "Rebuilt BI", f"Period {selected_year}-{selected_month:02d}; snapshots {result.get('snapshots', 0)}")
     flash(f"Business Intelligence rebuilt for {selected_year}-{selected_month:02d}.", "success")
     return redirect(url_for("admin.business_intelligence", year=selected_year, month=selected_month))
+
+
+@admin_bp.route("/insights")
+@login_required
+def insights_dashboard():
+    """Phase 12 Enterprise Insights and Explanation Engine dashboard."""
+    if not can_view_operations_centre():
+        abort(403)
+    from app.insights_engine import latest_period, get_insight_summary
+    latest = latest_period()
+    selected_year = int(request.args.get("year") or latest.get("year") or datetime.utcnow().year)
+    selected_month = int(request.args.get("month") or latest.get("month") or datetime.utcnow().month)
+    summary = get_insight_summary(selected_year, selected_month)
+    narratives = (InsightNarrative.query.filter_by(year=selected_year, month=selected_month)
+        .order_by(InsightNarrative.created_at.desc(), InsightNarrative.id.desc()).limit(80).all())
+    executive_items = [n for n in narratives if n.narrative_type in ("executive_summary", "company_health", "monthly_summary")]
+    franchise_items = [n for n in narratives if n.franchise_id is not None][:20]
+    province_items = [n for n in narratives if n.narrative_type == "province_summary"][:20]
+    royalty_items = [n for n in narratives if n.narrative_type in ("royalty_explanation", "royalty_warning")][:20]
+    return render_template(
+        "admin/insights_dashboard.html",
+        selected_year=selected_year,
+        selected_month=selected_month,
+        latest_period=latest,
+        summary=summary,
+        narratives=narratives,
+        executive_items=executive_items,
+        franchise_items=franchise_items,
+        province_items=province_items,
+        royalty_items=royalty_items,
+    )
+
+
+@admin_bp.route("/insights/rebuild", methods=["POST"])
+@login_required
+def insights_rebuild():
+    if not can_view_operations_centre():
+        abort(403)
+    from app.insights_engine import rebuild_insight_narratives, latest_period
+    latest = latest_period()
+    selected_year = int(request.form.get("year") or latest.get("year") or datetime.utcnow().year)
+    selected_month = int(request.form.get("month") or latest.get("month") or datetime.utcnow().month)
+    result = rebuild_insight_narratives(selected_year, selected_month, commit=True)
+    try:
+        from app.events import emit_event
+        emit_event(
+            "insights.rebuilt",
+            source="insights_engine",
+            title="Insight narratives rebuilt",
+            message=f"Insight narratives rebuilt for {selected_year}-{selected_month:02d}.",
+            year=selected_year,
+            month=selected_month,
+            payload=result,
+        )
+    except Exception:
+        db.session.rollback()
+    log_action("Insights", "Rebuilt insight narratives", f"Period {selected_year}-{selected_month:02d}; narratives {result.get('narratives', 0)}")
+    flash(f"Insight narratives rebuilt for {selected_year}-{selected_month:02d}.", "success")
+    return redirect(url_for("admin.insights_dashboard", year=selected_year, month=selected_month))
 
 
 @admin_bp.route("/operations")

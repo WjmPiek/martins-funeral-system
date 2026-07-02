@@ -1122,6 +1122,40 @@ class BusinessInsight(db.Model):
 
 
 
+class InsightNarrative(db.Model):
+    """Plain-language explanation generated from trusted operational data.
+
+    Phase 12 is explanatory only: it does not change imports, royalties,
+    targets, dashboards or business calculations.  It stores what the system
+    explained, for which period, and the data source category used.
+    """
+    __tablename__ = "insight_narratives"
+    id = db.Column(db.Integer, primary_key=True)
+    narrative_type = db.Column(db.String(80), nullable=False, index=True)
+    title = db.Column(db.String(220), nullable=False, default="")
+    summary = db.Column(db.Text, nullable=False, default="")
+    detail = db.Column(db.Text, nullable=False, default="")
+    severity = db.Column(db.String(30), nullable=False, default="info", index=True)
+    year = db.Column(db.Integer, nullable=True, index=True)
+    month = db.Column(db.Integer, nullable=True, index=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
+    province = db.Column(db.String(120), nullable=True, index=True)
+    source = db.Column(db.String(120), nullable=False, default="insights_engine")
+    source_json = db.Column(db.Text, nullable=False, default="{}")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    franchise = db.relationship("Franchise", backref=db.backref("insight_narratives", lazy=True, cascade="all, delete-orphan"))
+
+    @property
+    def source_data(self):
+        try:
+            return json.loads(self.source_json or "{}")
+        except Exception:
+            return {}
+
+
+
 class SystemEvent(db.Model):
     """Durable enterprise event bus row.
 

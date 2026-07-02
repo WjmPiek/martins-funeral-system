@@ -258,6 +258,17 @@ def create_app(config_class=Config):
         result = rebuild_business_intelligence(period["year"], period["month"], commit=True)
         print(f"Business intelligence rebuilt for {result['year']}-{result['month']:02d}: {result['snapshots']} snapshots, {result['insights']} insights")
 
+
+    @app.cli.command("rebuild-insights")
+    @click.option("--month", type=int, required=False, help="Reporting month number, 1-12. Defaults to latest period.")
+    @click.option("--year", type=int, required=False, help="Reporting year. Defaults to latest period.")
+    def rebuild_insights_command(month, year):
+        """Rebuild Phase 12 plain-language insight narratives."""
+        from app.insights_engine import rebuild_insight_narratives, latest_period
+        period = latest_period() if not month or not year else {"month": month, "year": year}
+        result = rebuild_insight_narratives(period["year"], period["month"], commit=True)
+        print(f"Insight narratives rebuilt for {result['year']}-{result['month']:02d}: {result['narratives']} narratives")
+
     @app.cli.command("check-franchise-expiry")
     def check_franchise_expiry():
         from app.franchise.notifications import send_agreement_expiry_reminders
