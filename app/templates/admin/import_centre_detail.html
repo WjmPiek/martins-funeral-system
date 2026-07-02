@@ -48,12 +48,17 @@
   <h2>Review items</h2>
   <div class="table-responsive compact-table">
     <table>
-      <thead><tr><th>Franchise / Area</th><th>Issue</th><th>Rows</th></tr></thead>
+      <thead><tr><th>Franchise / Area</th><th>Issue</th><th>Royalty method</th><th>Scale</th><th>Rows</th></tr></thead>
       <tbody>
       {% for item in report.warnings or [] %}
         <tr>
           <td>{{ item.franchise }}</td>
-          <td>{{ item.warnings|join(', ') }}</td>
+          <td>
+            {% if item.blocking_errors %}<strong>Blocking:</strong> {{ item.blocking_errors|join(', ') }}{% endif %}
+            {% if item.warnings %}{% if item.blocking_errors %}<br>{% endif %}<span>{{ item.warnings|join(', ') }}</span>{% endif %}
+          </td>
+          <td>{{ item.royalty_method or '-' }}{% if item.method_source %}<br><small>{{ item.method_source }}</small>{% endif %}</td>
+          <td>{{ item.scale_count if item.scale_count is defined else '-' }}{% if item.scale_source %}<br><small>{{ item.scale_source }}{% if item.scale_source_franchise %}: {{ item.scale_source_franchise }}{% endif %}</small>{% endif %}</td>
           <td>
             {% if item.rows %}
               {% for row in item.rows[:10] %}
@@ -63,12 +68,41 @@
           </td>
         </tr>
       {% else %}
-        <tr><td colspan="3">No review items. This import reconciled successfully.</td></tr>
+        <tr><td colspan="5">No review items. This import reconciled successfully.</td></tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
 </section>
+
+
+{% if report.royalty_engine_reviews %}
+<section class="page-card">
+  <h2>Royalty Engine 2.0 reviews</h2>
+  <div class="table-responsive compact-table">
+    <table>
+      <thead><tr><th>Franchise</th><th>Agreement</th><th>Method</th><th>Scale source</th><th>Base</th><th>%</th><th>Royalty</th><th>Review</th></tr></thead>
+      <tbody>
+      {% for item in report.royalty_engine_reviews %}
+        <tr>
+          <td>{{ item.franchise_name }}</td>
+          <td>{{ item.agreement_start_date or '-' }}{% if item.agreement_end_date %} to {{ item.agreement_end_date }}{% endif %}</td>
+          <td>{{ item.method_label }}<br><small>{{ item.method_source }}</small></td>
+          <td>{{ item.scale_source_franchise_name or '-' }}</td>
+          <td>{{ item.royalty_base }}</td>
+          <td>{{ item.royalty_percentage }}%</td>
+          <td>{{ item.royalty_amount }}</td>
+          <td>
+            {% if item.blocking_errors %}<strong>Blocking:</strong> {{ item.blocking_errors|join(', ') }}{% endif %}
+            {% if item.warnings %}{% if item.blocking_errors %}<br>{% endif %}{{ item.warnings|join(', ') }}{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
 
 <section class="page-card">
   <h2>What this proves</h2>

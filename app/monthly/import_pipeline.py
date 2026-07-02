@@ -9,6 +9,7 @@ from flask import current_app
 from app.extensions import db
 from app.import_progress import update_import_job
 from app.models import Franchise, MonthlyFigure, RoyaltyScale
+from app.royalty_engine import validate_franchise_for_royalties
 
 
 def _as_list(values):
@@ -33,15 +34,16 @@ def _has_royalty_scale(franchise: Franchise) -> bool:
         return False
 
 
-def _franchise_warning(franchise: Franchise) -> list[str]:
-    warnings = []
-    if not franchise.agreement_start_date:
-        warnings.append('missing agreement start date')
-    if not _has_royalty_scale(franchise):
-        warnings.append('missing royalty scale')
-    if not franchise.assigned_users:
+def _franchise_warning(franchise: Franchise, month=None, year=None) -> dict:
+    validation = validate_franchise_for_royalties(franchise, month=month, year=year)
+    warnings = list(validation.get('warnings') or [])
+    blocking = list(validation.get('blocking_errors') or [])
+    if franchise and not franchise.assigned_users:
         warnings.append('no linked franchise user login')
-    return warnings
+    validation['warnings'] = warnings
+    validation['blocking_errors'] = blocking
+    validation['blocking'] = bool(blocking)
+    return validation
 
 
 def run_month_end_import_pipeline(
@@ -96,17 +98,26 @@ def run_month_end_import_pipeline(
     # and Finance must still see the imported figures immediately, while the
     # franchise-user visibility can be fixed from User Management.
     blocking_validation_count = 0
+    validation_month = periods[0][0] if periods else None
+    validation_year = periods[0][1] if periods else None
     for franchise in franchises:
-        warnings = _franchise_warning(franchise)
-        if warnings:
-            blocking = [item for item in warnings if item in {'missing agreement start date', 'missing royalty scale'}]
+        validation = _franchise_warning(franchise, month=validation_month, year=validation_year)
+        warnings = list(validation.get('warnings') or [])
+        blocking = list(validation.get('blocking_errors') or [])
+        if warnings or blocking:
             if blocking:
                 blocking_validation_count += 1
             report['warnings'].append({
                 'franchise_id': franchise.id,
                 'franchise': franchise.business_name,
                 'warnings': warnings,
+                'blocking_errors': blocking,
                 'blocking': bool(blocking),
+                'royalty_method': validation.get('method_label'),
+                'method_source': validation.get('method_source'),
+                'scale_count': validation.get('scale_count'),
+                'scale_source': validation.get('scale_source'),
+                'scale_source_franchise': validation.get('scale_source_franchise'),
             })
 
     if report['errors'] or blocking_validation_count:
@@ -140,11 +151,17 @@ def run_month_end_import_pipeline(
 
     _stage(progress_job, 78, 'Stage 3/6: recalculating royalties from agreement date and scale...')
     from app.monthly.routes import recalculate_monthly_figure
+    report['royalty_engine_reviews'] = []
     for monthly_figure in rows:
-        recalculate_monthly_figure(monthly_figure)
+        result = recalculate_monthly_figure(monthly_figure)
         report['recalculated_rows'] += 1
         if Decimal(monthly_figure.royalty_amount or 0) > 0 or Decimal(monthly_figure.royalty_percentage or 0) > 0:
             report['royalties_calculated'] += 1
+        if result and (result.warnings or result.blocking_errors):
+            report['royalty_engine_reviews'].append(result.to_dict())
+            if result.blocking_errors:
+                report['status'] = 'needs_review'
+                report['stage'] = 'royalty_needs_review'
     db.session.commit()
 
     _stage(progress_job, 86, 'Stage 4/6: checking royalty exceptions...')

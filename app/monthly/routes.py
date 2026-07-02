@@ -302,60 +302,21 @@ def normalize_gross_method(value):
 
 
 def get_franchise_gross_method(franchise):
-    """Return the royalty gross method from the agreement date.
-
-    The agreement date is the source of truth because imported franchise rows
-    often keep the model default ``royalty_gross_method='old'`` even when the
-    contract is a new-method agreement.  This caused month-end imports to show
-    figures but calculate the royalty payover with the wrong formula.
-
-    Formula rule:
-    * Agreement start year 2018 or later = New Gross Method = SALES + ADMIN FEE.
-    * Agreement start before 2018 = Old Gross Method = SALES + INSURANCE RECEIPTS.
-    * Missing agreement date = fall back to any explicit stored method, then old.
-    """
-    start_date = getattr(franchise, "agreement_start_date", None)
-    if start_date:
-        return "new" if getattr(start_date, "year", 0) >= 2018 else "old"
-
-    stored_method = normalize_gross_method(getattr(franchise, "royalty_gross_method", ""))
-    if stored_method in {"new", "old"}:
-        return stored_method
-    return "old"
-
-
-def gross_method_label(method):
-    return "Gross = New Gross Method" if method == "new" else "Gross = Old"
-
+    from app.royalty_engine import select_royalty_method
+    return select_royalty_method(franchise)[0]
 
 def calculate_sales_for_royalty(monthly_figure):
-    """Return the SALES component used for royalty calculations.
-
-    SALES must include Society Receipts for both Gross = New and Gross = Old:
-    Funeral Receipts + Society Receipts + Cash Sales + Tombstone Receipts + OBO Services Receipts.
-    This uses the source fields directly so older records are corrected even if their saved sales field excluded society receipts.
-    """
-    return (
-        Decimal(monthly_figure.funeral_receipts or 0)
-        + Decimal(monthly_figure.society_receipts or 0)
-        + Decimal(monthly_figure.cash_sales or 0)
-        + Decimal(monthly_figure.tombstone_receipts or 0)
-        + Decimal(monthly_figure.obo_service_receipts or 0)
-    )
-
+    from app.royalty_engine import calculate_sales
+    return calculate_sales(monthly_figure)
 
 def calculate_royalty_base(monthly_figure, franchise):
-    method = get_franchise_gross_method(franchise)
-    sales = calculate_sales_for_royalty(monthly_figure)
-    if method == "new":
-        royalty_base = sales + Decimal(monthly_figure.admin_fee or 0)
-    else:
-        # Old Gross: SALES + INSURANCE RECEIPTS. Blank/zero insurance receipts still gives SALES.
-        royalty_base = sales + Decimal(monthly_figure.insurance_receipts or 0)
-    if royalty_base < 0:
-        royalty_base = Decimal("0")
-    return royalty_base, method
-
+    from app.royalty_engine import select_royalty_method, calculate_base
+    method = select_royalty_method(
+        franchise,
+        period_month=getattr(monthly_figure, "month", None),
+        period_year=getattr(monthly_figure, "year", None),
+    )[0]
+    return calculate_base(monthly_figure, franchise, method=method), method
 
 def normalize_franchise_name_for_royalties(value):
     text = (value or "").strip().lower()
@@ -450,144 +411,21 @@ def _normalise_royalty_scale_rows(scales):
 
 
 def get_royalty_scales_for_franchise(franchise):
-    """Return the bracket scale that belongs to the selected franchise.
-
-    Priority is now:
-    1. This franchise user's structured RoyaltyScale rows.
-    2. This franchise user's imported raw scale text.
-    3. A matching franchise record's structured/raw scale rows.
-    4. This franchise user's imported single percentage as a last resort.
-
-    The previous fallback could use imported_royalty_percentage before checking
-    matching structured brackets, which caused some franchise users to calculate
-    one flat percentage instead of the correct bracket percentage.
-    """
-    if not franchise:
-        return []
-
-    own_scales = RoyaltyScale.query.filter_by(franchise_id=franchise.id).order_by(
-        RoyaltyScale.row_number,
-        RoyaltyScale.amount_from,
-        RoyaltyScale.id,
-    ).all()
-    own_valid_scales = _normalise_royalty_scale_rows(own_scales)
-    if own_valid_scales:
-        return own_valid_scales
-
-    parsed_raw = _normalise_royalty_scale_rows(
-        _parse_royalty_scale_text(getattr(franchise, "imported_royalty_scale_text", ""))
-    )
-    if parsed_raw:
-        return parsed_raw
-
-    wanted = normalize_franchise_name_for_royalties(getattr(franchise, "business_name", ""))
-    if wanted:
-        candidates = []
-        for candidate in Franchise.query.all():
-            if candidate.id == franchise.id:
-                continue
-            key = normalize_franchise_name_for_royalties(candidate.business_name)
-            if not key:
-                continue
-            ratio = SequenceMatcher(None, wanted, key).ratio()
-            if key == wanted or wanted in key or key in wanted or ratio >= 0.84:
-                candidates.append((ratio, candidate))
-
-        for _ratio, candidate in sorted(candidates, key=lambda item: item[0], reverse=True):
-            candidate_scales = RoyaltyScale.query.filter_by(franchise_id=candidate.id).order_by(
-                RoyaltyScale.row_number,
-                RoyaltyScale.amount_from,
-                RoyaltyScale.id,
-            ).all()
-            valid_candidate_scales = _normalise_royalty_scale_rows(candidate_scales)
-            if valid_candidate_scales:
-                return valid_candidate_scales
-
-            parsed_candidate_raw = _normalise_royalty_scale_rows(
-                _parse_royalty_scale_text(getattr(candidate, "imported_royalty_scale_text", ""))
-            )
-            if parsed_candidate_raw:
-                return parsed_candidate_raw
-
-    imported_percentage = Decimal(getattr(franchise, "imported_royalty_percentage", 0) or 0)
-    if imported_percentage > 0:
-        return [SimpleNamespace(
-            row_number=1,
-            amount_from=Decimal("0"),
-            amount_to=Decimal("999999999999"),
-            percentage=imported_percentage,
-        )]
-
-    return []
+    from app.royalty_engine import get_royalty_scales
+    scales, _source_franchise, _source_label = get_royalty_scales(franchise)
+    return scales
 
 def calculate_royalty(franchise, royalty_base):
-    if royalty_base < 0:
-        royalty_base = Decimal("0")
-
-    scales = get_royalty_scales_for_franchise(franchise)
-    percentage = Decimal("0")
-
-    for scale in scales:
-        amount_from = Decimal(getattr(scale, "amount_from", 0) or 0)
-        amount_to = Decimal(getattr(scale, "amount_to", 0) or 0)
-        if amount_to <= 0:
-            amount_to = Decimal("999999999999")
-
-        if royalty_base >= amount_from and royalty_base <= amount_to:
-            percentage = Decimal(getattr(scale, "percentage", 0) or 0)
-            break
-
-    # If the base is above the highest configured bracket, use the final bracket
-    # instead of returning 0%. This protects imported scales where the last
-    # "or more" row was saved without a high Amount To.
-    if percentage == 0 and scales:
-        highest = max(scales, key=lambda s: Decimal(getattr(s, "amount_to", 0) or 0))
-        if royalty_base >= Decimal(getattr(highest, "amount_from", 0) or 0):
-            percentage = Decimal(getattr(highest, "percentage", 0) or 0)
-
-    calculated_royalty = (royalty_base * percentage) / Decimal("100")
-    minimum = Decimal(getattr(franchise, "minimum_royalty_amount", 0) or 0)
-    minimum_applied = minimum > 0 and calculated_royalty < minimum
-    royalty_amount = minimum if minimum_applied else calculated_royalty
-    return royalty_base, percentage, royalty_amount, minimum_applied
+    from app.royalty_engine import calculate_royalty_amount, decimal_value
+    base = decimal_value(royalty_base)
+    percentage, royalty_amount, _minimum, minimum_applied, _source_franchise, _source_label, _warnings, _errors = calculate_royalty_amount(franchise, base)
+    return base, percentage, royalty_amount, minimum_applied
 
 def recalculate_monthly_figure(monthly_figure):
-    franchise = monthly_figure.franchise or Franchise.query.get(monthly_figure.franchise_id) or get_or_create_franchise()
-
-    # Claim Receipts removed from the Monthly Figures workflow.
-    monthly_figure.claim_receipts = Decimal("0")
-
-    # SALES for royalty = Funeral Receipts + Society Receipts + Cash Sales + Tombstone Receipts + OBO Services Receipts
-    monthly_figure.sales = calculate_sales_for_royalty(monthly_figure)
-
-    # ADMIN FEE = Insurance Receipts - Insurance Payover
-    monthly_figure.admin_fee = Decimal(monthly_figure.insurance_receipts or 0) - Decimal(monthly_figure.insurance_payover or 0)
-    if monthly_figure.admin_fee < 0:
-        monthly_figure.admin_fee = Decimal("0")
-
-    # CASH stays fixed across the system: CASH = SALES + INSURANCE RECEIPTS.
-    # GROSS/ROYALTY BASE is automatic from the newest agreement start date:
-    # 2018 or newer = New Gross Method = SALES + ADMIN FEE.
-    # Before 2018/missing = Old Gross Method = SALES + INSURANCE RECEIPTS.
-    sales = Decimal(monthly_figure.sales or 0)
-    monthly_figure.cash = sales + Decimal(monthly_figure.insurance_receipts or 0)
-    royalty_base, gross_method = calculate_royalty_base(monthly_figure, franchise)
-    monthly_figure.gross_turnover = royalty_base
-    monthly_figure.gross_method = gross_method
-    franchise.royalty_gross_method = gross_method
-
-    # Backward compatibility fields.
-    monthly_figure.cash_received = monthly_figure.cash
-    monthly_figure.insurance_received = monthly_figure.insurance_receipts
-    monthly_figure.payover = monthly_figure.insurance_payover
-    monthly_figure.other_income = monthly_figure.admin_fee
-
-    gross, percentage, royalty_amount, minimum_applied = calculate_royalty(franchise, royalty_base)
-    monthly_figure.gross_revenue = gross
-    monthly_figure.royalty_percentage = percentage
-    monthly_figure.royalty_amount = royalty_amount
-    monthly_figure.minimum_royalty_applied = minimum_applied
-
+    from app.royalty_engine import calculate_monthly_figure
+    result = calculate_monthly_figure(monthly_figure)
+    monthly_figure.royalty_review = result
+    return result
 
 def recalculate_figures_for_display(figures, commit=True):
     """Recalculate visible monthly/royalty rows from the current Franchise Details settings.
