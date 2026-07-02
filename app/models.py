@@ -270,12 +270,61 @@ class ImportJob(db.Model):
     current_step = db.Column(db.Integer, nullable=False, default=0)
     progress_percent = db.Column(db.Integer, nullable=False, default=0)
     extra_json = db.Column(db.Text, default="")
+
+    # Persistent queue fields added in Phase 7.  The import job row is now both
+    # a progress record and a durable queue item that can survive Render restarts.
+    queue_name = db.Column(db.String(80), nullable=False, default="default", index=True)
+    priority = db.Column(db.Integer, nullable=False, default=100, index=True)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    max_attempts = db.Column(db.Integer, nullable=False, default=1)
+    available_at = db.Column(db.DateTime, nullable=True, index=True)
+    locked_at = db.Column(db.DateTime, nullable=True, index=True)
+    locked_by = db.Column(db.String(120), nullable=True, index=True)
+    heartbeat_at = db.Column(db.DateTime, nullable=True, index=True)
+    payload_json = db.Column(db.Text, default="")
+    result_json = db.Column(db.Text, default="")
+    error_json = db.Column(db.Text, default="")
+
     started_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     finished_at = db.Column(db.DateTime)
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
     created_by = db.relationship("User", backref=db.backref("import_jobs", lazy=True))
 
+    @property
+    def is_active(self):
+        return self.status in {"queued", "running", "processing", "validating", "publishing"}
 
+    @property
+    def payload(self):
+        try:
+            return json.loads(self.payload_json or "{}")
+        except Exception:
+            return {}
+
+    @property
+    def result(self):
+        try:
+            return json.loads(self.result_json or self.extra_json or "{}")
+        except Exception:
+            return {}
+
+
+class ImportJobLog(db.Model):
+    __tablename__ = "import_job_logs"
+    id = db.Column(db.Integer, primary_key=True)
+    import_job_id = db.Column(db.Integer, db.ForeignKey("import_jobs.id"), nullable=False, index=True)
+    level = db.Column(db.String(20), nullable=False, default="info", index=True)
+    message = db.Column(db.String(1000), nullable=False, default="")
+    data_json = db.Column(db.Text, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    import_job = db.relationship("ImportJob", backref=db.backref("job_logs", lazy=True, cascade="all, delete-orphan"))
+
+    @property
+    def data(self):
+        try:
+            return json.loads(self.data_json or "{}")
+        except Exception:
+            return {}
 
 
 class LiveEvent(db.Model):

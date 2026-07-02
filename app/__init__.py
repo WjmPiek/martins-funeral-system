@@ -119,6 +119,41 @@ def create_app(config_class=Config):
         }
 
 
+
+    @app.cli.command("enqueue-noop-job")
+    def enqueue_noop_job():
+        """Create a small test job for the persistent queue."""
+        from app.jobs import enqueue_job
+        job = enqueue_job("system_noop", filename="system", payload={"source": "cli"})
+        print(f"Queued job {job.id}")
+
+    @app.cli.command("run-next-job")
+    def run_next_job_command():
+        """Process one queued persistent job."""
+        from app.jobs import run_next_job
+        job = run_next_job(worker_id="render-cli")
+        if not job:
+            print("No queued jobs found.")
+        else:
+            print(f"Processed job {job.id}: {job.status} - {job.message}")
+
+    @app.cli.command("run-job-worker")
+    def run_job_worker_command():
+        """Process queued persistent jobs until the queue is empty.
+
+        This is safe to run from Render Shell or as a future Render Worker.  All
+        job state is stored in PostgreSQL, so progress survives restarts.
+        """
+        from app.jobs import run_next_job
+        processed = 0
+        while True:
+            job = run_next_job(worker_id="render-worker")
+            if not job:
+                break
+            processed += 1
+            print(f"Processed job {job.id}: {job.status} - {job.message}")
+        print(f"Worker finished. Jobs processed: {processed}")
+
     @app.cli.command("rebuild-performance-cache")
     def rebuild_performance_cache():
         """Pre-calculate performance_results for every imported monthly period."""

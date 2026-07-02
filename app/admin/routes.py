@@ -9,7 +9,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
-from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, user_franchises
+from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
@@ -2044,7 +2044,13 @@ def operations_centre():
     import_status = {row["status"] or "unknown": row["count"] for row in import_status_rows}
     needs_review_imports = ImportJob.query.filter(ImportJob.status.in_(["needs_review", "failed", "warning"])).order_by(ImportJob.started_at.desc()).limit(12).all()
     running_imports = ImportJob.query.filter(ImportJob.status.in_(["queued", "running", "processing", "validating", "publishing"])).order_by(ImportJob.started_at.desc()).limit(12).all()
+    stuck_jobs = ImportJob.query.filter(
+        ImportJob.status.in_(["running", "processing", "validating", "publishing"]),
+        ImportJob.heartbeat_at.isnot(None),
+        ImportJob.heartbeat_at < (datetime.utcnow() - timedelta(minutes=15)),
+    ).order_by(ImportJob.heartbeat_at.asc()).limit(12).all()
     latest_imports = ImportJob.query.order_by(ImportJob.started_at.desc()).limit(12).all()
+    latest_job_logs = ImportJobLog.query.order_by(ImportJobLog.created_at.desc()).limit(20).all()
 
     latest_period = _latest_import_period()
     monthly_period_rows = db.session.execute(text("""
@@ -2092,6 +2098,7 @@ def operations_centre():
         {"label": "Import jobs", "value": _ops_count("import_jobs"), "tone": "ok"},
         {"label": "Needs review", "value": sum(import_status.get(key, 0) for key in ("needs_review", "failed", "warning")), "tone": "danger" if sum(import_status.get(key, 0) for key in ("needs_review", "failed", "warning")) else "ok"},
         {"label": "Running imports", "value": len(running_imports), "tone": "warning" if running_imports else "ok"},
+        {"label": "Stale jobs", "value": len(stuck_jobs), "tone": "danger" if stuck_jobs else "ok"},
         {"label": "Valid cache rows", "value": cache.get("valid", 0), "tone": "ok" if cache.get("valid", 0) else "warning"},
         {"label": "Unread notifications", "value": unread_notifications, "tone": "warning" if unread_notifications else "ok"},
     ]
@@ -2124,6 +2131,8 @@ def operations_centre():
         running_imports=running_imports,
         needs_review_imports=needs_review_imports,
         latest_imports=latest_imports,
+        stuck_jobs=stuck_jobs,
+        latest_job_logs=latest_job_logs,
         monthly_period_rows=monthly_period_rows,
         cache=cache,
         latest_cache_rows=latest_cache_rows,
@@ -2161,6 +2170,63 @@ def operations_rebuild_cache():
     result = warm_performance_cache_for_period(month, year, franchise_ids=franchise_ids)
     log_action("Operations", "Rebuilt performance cache", f"Period: {year}-{month:02d}; Result: {result}")
     flash(f"Performance cache rebuilt for {year}-{month:02d}: {result.get('cache_rows', 0)} cache rows and {result.get('performance_rows', 0)} performance rows.", "success")
+    return redirect(url_for("admin.operations_centre"))
+
+
+@admin_bp.route("/operations/jobs/run-next", methods=["POST"])
+@login_required
+def operations_run_next_job():
+    if not can_view_operations_centre():
+        abort(403)
+    from app.jobs import run_next_job
+    job = run_next_job(worker_id=f"web:{current_user.id}")
+    if job:
+        log_action("Operations", "Processed queued job", f"Job {job.id}: {job.status} - {job.message}")
+        flash(f"Processed job {job.id}: {job.status} - {job.message}", "success" if job.status == "completed" else "warning")
+    else:
+        flash("No queued jobs found.", "info")
+    return redirect(url_for("admin.operations_centre"))
+
+
+@admin_bp.route("/operations/jobs/<int:job_id>/retry", methods=["POST"])
+@login_required
+def operations_retry_job(job_id):
+    if not can_view_operations_centre():
+        abort(403)
+    from app.jobs import retry_job
+    job = ImportJob.query.get_or_404(job_id)
+    retry_job(job)
+    log_action("Operations", "Retried job", f"Job {job.id}: {job.kind}")
+    flash(f"Job {job.id} queued for retry.", "success")
+    return redirect(url_for("admin.operations_centre"))
+
+
+@admin_bp.route("/operations/jobs/<int:job_id>/cancel", methods=["POST"])
+@login_required
+def operations_cancel_job(job_id):
+    if not can_view_operations_centre():
+        abort(403)
+    from app.jobs import cancel_job
+    job = ImportJob.query.get_or_404(job_id)
+    cancel_job(job, reason=f"Cancelled by {current_user.email}")
+    log_action("Operations", "Cancelled job", f"Job {job.id}: {job.kind}")
+    flash(f"Job {job.id} cancelled.", "warning")
+    return redirect(url_for("admin.operations_centre"))
+
+
+@admin_bp.route("/operations/jobs/<int:job_id>/release", methods=["POST"])
+@login_required
+def operations_release_job(job_id):
+    if not can_view_operations_centre():
+        abort(403)
+    job = ImportJob.query.get_or_404(job_id)
+    job.status = "queued"
+    job.locked_at = None
+    job.locked_by = None
+    job.message = "Released back to queue by Admin."
+    db.session.commit()
+    log_action("Operations", "Released stale job", f"Job {job.id}: {job.kind}")
+    flash(f"Job {job.id} released back to the queue.", "success")
     return redirect(url_for("admin.operations_centre"))
 
 

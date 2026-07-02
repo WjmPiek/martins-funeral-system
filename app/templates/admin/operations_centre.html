@@ -29,6 +29,9 @@
             <p class="page-subtitle">High-level checks that indicate whether the live system is ready for daily operation.</p>
         </div>
         <div class="action-row">
+            <form method="post" action="{{ url_for('admin.operations_run_next_job') }}" class="inline-form">
+                <button class="btn-primary" type="submit">Run Next Job</button>
+            </form>
             <form method="post" action="{{ url_for('admin.operations_rebuild_cache') }}" class="inline-form">
                 <input type="hidden" name="year" value="{{ latest_period.year }}">
                 <input type="hidden" name="month" value="{{ latest_period.month }}">
@@ -71,18 +74,30 @@
         </div>
         <div class="table-responsive compact-table">
             <table>
-                <thead><tr><th>Kind</th><th>File</th><th>Status</th><th>Progress</th><th>Started</th></tr></thead>
+                <thead><tr><th>ID</th><th>Kind</th><th>File</th><th>Status</th><th>Progress</th><th>Attempts</th><th>Lock</th><th>Started</th><th>Action</th></tr></thead>
                 <tbody>
                 {% for job in latest_imports %}
                     <tr>
+                        <td>{{ job.id }}</td>
                         <td>{{ job.kind }}</td>
                         <td>{{ job.filename }}</td>
                         <td><span class="status-pill {{ job.status }}">{{ job.status }}</span></td>
                         <td>{{ job.progress_percent }}%</td>
+                        <td>{{ job.attempts or 0 }}/{{ job.max_attempts or 1 }}</td>
+                        <td>{{ job.locked_by or '' }}</td>
                         <td>{{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '' }}</td>
+                        <td class="action-cell">
+                            {% if job.status in ['failed','needs_review','cancelled'] %}
+                                <form method="post" action="{{ url_for('admin.operations_retry_job', job_id=job.id) }}" class="inline-form"><button class="btn-small" type="submit">Retry</button></form>
+                            {% elif job.status in ['queued','running','processing','validating','publishing'] %}
+                                <form method="post" action="{{ url_for('admin.operations_cancel_job', job_id=job.id) }}" class="inline-form"><button class="btn-small danger" type="submit">Cancel</button></form>
+                            {% else %}
+                                <a class="btn-small" href="{{ url_for('admin.import_centre_detail', job_id=job.id) }}">Open</a>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% else %}
-                    <tr><td colspan="5">No imports found.</td></tr>
+                    <tr><td colspan="9">No imports found.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
@@ -106,6 +121,54 @@
                     </tr>
                 {% else %}
                     <tr><td colspan="5">No imports need review.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Stale / locked jobs</h2>
+        <p class="page-subtitle">Jobs with no heartbeat for more than 15 minutes. Release them if Render restarted during processing.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>ID</th><th>Kind</th><th>Status</th><th>Worker</th><th>Heartbeat</th><th>Action</th></tr></thead>
+                <tbody>
+                {% for job in stuck_jobs %}
+                    <tr>
+                        <td>{{ job.id }}</td>
+                        <td>{{ job.kind }}</td>
+                        <td><span class="status-pill warning">{{ job.status }}</span></td>
+                        <td>{{ job.locked_by or '' }}</td>
+                        <td>{{ job.heartbeat_at.strftime('%Y-%m-%d %H:%M') if job.heartbeat_at else '' }}</td>
+                        <td><form method="post" action="{{ url_for('admin.operations_release_job', job_id=job.id) }}" class="inline-form"><button class="btn-small" type="submit">Release</button></form></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6">No stale jobs found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Job execution log</h2>
+        <p class="page-subtitle">Permanent job log stored in PostgreSQL.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Time</th><th>Job</th><th>Level</th><th>Message</th></tr></thead>
+                <tbody>
+                {% for entry in latest_job_logs %}
+                    <tr>
+                        <td>{{ entry.created_at.strftime('%Y-%m-%d %H:%M') if entry.created_at else '' }}</td>
+                        <td>{{ entry.import_job_id }}</td>
+                        <td><span class="status-pill {{ 'danger' if entry.level == 'error' else 'warning' if entry.level == 'warning' else 'ok' }}">{{ entry.level }}</span></td>
+                        <td>{{ entry.message }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4">No job logs found.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
