@@ -51,10 +51,23 @@ class RoyaltyResult:
 
 
 def decimal_value(value, default="0") -> Decimal:
+    """Return a safe Decimal for optional numeric inputs.
+
+    Production imports sometimes contain blank cells/None values.  The earlier
+    implementation attempted Decimal(None) when both value and default were
+    None, which stopped the entire royalty rebuild.  Missing or invalid values
+    now safely fall back to 0 unless a different default is supplied.
+    """
+    fallback = "0" if default is None else default
+    if value is None:
+        value = fallback
     try:
-        return Decimal(value if value is not None else default)
+        return Decimal(str(value))
     except (InvalidOperation, ValueError, TypeError):
-        return Decimal(default)
+        try:
+            return Decimal(str(fallback))
+        except (InvalidOperation, ValueError, TypeError):
+            return Decimal("0")
 
 
 def normalize_gross_method(value) -> str:

@@ -217,17 +217,22 @@ def create_app(config_class=Config):
         print(f"Event subscriptions created: {count}")
 
     @app.cli.command("rebuild-performance-cache")
-    def rebuild_performance_cache():
-        """Pre-calculate performance_results for every imported monthly period."""
+    @click.option("--month", type=int, required=False, help="Reporting month number, 1-12. Omit to rebuild all periods.")
+    @click.option("--year", type=int, required=False, help="Reporting year. Omit to rebuild all periods.")
+    def rebuild_performance_cache(month, year):
+        """Pre-calculate performance_results. Optionally limit to one reporting period."""
         from app.models import MonthlyFigure
         from app.performance.service import rebuild_performance_results
-        periods = db.session.query(MonthlyFigure.month, MonthlyFigure.year).distinct().order_by(MonthlyFigure.year, MonthlyFigure.month).all()
+        query = db.session.query(MonthlyFigure.month, MonthlyFigure.year).distinct()
+        if month and year:
+            query = query.filter(MonthlyFigure.month == int(month), MonthlyFigure.year == int(year))
+        periods = query.order_by(MonthlyFigure.year, MonthlyFigure.month).all()
         total = 0
-        for month, year in periods:
-            franchise_ids = [row[0] for row in db.session.query(MonthlyFigure.franchise_id).filter_by(month=month, year=year).distinct().all()]
-            saved = rebuild_performance_results(month, year, franchise_ids, "annual_gross_scale")
+        for period_month, period_year in periods:
+            franchise_ids = [row[0] for row in db.session.query(MonthlyFigure.franchise_id).filter_by(month=period_month, year=period_year).distinct().all()]
+            saved = rebuild_performance_results(period_month, period_year, franchise_ids, "annual_gross_scale")
             total += saved
-            print(f"{year}-{month:02d}: {saved} rows")
+            print(f"{period_year}-{period_month:02d}: {saved} rows")
         print(f"Performance cache rebuilt. Total rows saved: {total}")
 
 

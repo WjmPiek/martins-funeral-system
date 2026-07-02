@@ -118,9 +118,10 @@ def snapshot_monthly_figure(monthly_figure: MonthlyFigure, *, commit: bool = Fal
     franchise = monthly_figure.franchise or Franchise.query.get(monthly_figure.franchise_id)
     profile = agreement_profile_for(franchise, month=monthly_figure.month, year=monthly_figure.year, commit=False) if franchise else None
     growth_profile = profile.growth_profile if profile and profile.growth_profile else ensure_default_growth_profile(commit=False)
-    growth_percent = decimal_value(getattr(profile, "custom_growth_percent", None), None) if profile else Decimal("0")
-    if growth_percent is None or growth_percent == Decimal("0"):
-        growth_percent = decimal_value(getattr(growth_profile, "default_growth_percent", DEFAULT_GDP_GROWTH_PERCENT))
+    custom_growth = getattr(profile, "custom_growth_percent", None) if profile else None
+    growth_percent = decimal_value(custom_growth, "0")
+    if growth_percent == Decimal("0"):
+        growth_percent = decimal_value(getattr(growth_profile, "default_growth_percent", DEFAULT_GDP_GROWTH_PERCENT), DEFAULT_GDP_GROWTH_PERCENT)
     avg, target = target_for_month(monthly_figure.franchise_id, monthly_figure.year, growth_percent)
 
     diagnostics = {
@@ -188,13 +189,32 @@ def recalculate_royalties_for_period(month: int, year: int, franchise_ids: Optio
     total = 0
     needs_review = 0
     calculated = 0
+    errors = 0
+    error_details = []
     for row in rows:
-        snapshot = snapshot_monthly_figure(row, commit=False)
         total += 1
-        if snapshot.status == "needs_review":
+        try:
+            snapshot = snapshot_monthly_figure(row, commit=False)
+            if snapshot.status == "needs_review":
+                needs_review += 1
+            else:
+                calculated += 1
+        except Exception as exc:
+            errors += 1
             needs_review += 1
-        else:
-            calculated += 1
+            franchise_name = getattr(getattr(row, "franchise", None), "business_name", "") or f"Franchise #{getattr(row, 'franchise_id', '')}"
+            error_details.append({
+                "monthly_figure_id": getattr(row, "id", None),
+                "franchise_id": getattr(row, "franchise_id", None),
+                "franchise_name": franchise_name,
+                "error": str(exc),
+            })
+            row.status = "Needs Review"
+            marker = f"Royalty rebuild error: {exc}"
+            notes = row.notes or ""
+            if marker not in notes:
+                row.notes = (notes + "\n" + marker).strip()
+            continue
     if commit:
         try:
             from app.events import emit_event
@@ -202,8 +222,8 @@ def recalculate_royalties_for_period(month: int, year: int, franchise_ids: Optio
                 "royalty.recalculated",
                 source="royalty_management",
                 title=f"Royalties recalculated for {year}-{int(month):02d}",
-                message=f"{calculated} calculated, {needs_review} need review.",
-                payload={"month": int(month), "year": int(year), "total": total, "calculated": calculated, "needs_review": needs_review},
+                message=f"{calculated} calculated, {needs_review} need review, {errors} errors.",
+                payload={"month": int(month), "year": int(year), "total": total, "calculated": calculated, "needs_review": needs_review, "errors": errors, "error_details": error_details[:50]},
                 year=int(year),
                 month=int(month),
                 aggregate_type="royalties",
@@ -211,7 +231,7 @@ def recalculate_royalties_for_period(month: int, year: int, franchise_ids: Optio
         except Exception:
             pass
         db.session.commit()
-    return {"month": int(month), "year": int(year), "total": total, "calculated": calculated, "needs_review": needs_review}
+    return {"month": int(month), "year": int(year), "total": total, "calculated": calculated, "needs_review": needs_review, "errors": errors, "error_details": error_details}
 
 
 def royalty_management_summary() -> dict:
