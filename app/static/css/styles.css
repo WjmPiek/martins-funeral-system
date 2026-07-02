@@ -1926,3 +1926,24 @@ body.app-body {
 .status-pill.failed, .status-pill.error { background:#ffe0e0; color:#9d1c1c; }
 .status-pill.running, .status-pill.processing { background:#fff0c2; color:#945900; }
 @media (max-width: 760px) { .page-header-row { flex-direction:column; } .diagnostic-grid { grid-template-columns:1fr; } .compact-table th, .compact-table td { white-space:normal; } }
+
+/* Live enterprise notification panel */
+.live-notification-panel{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin:0 0 16px 0;
+    padding:12px 14px;
+    border:1px solid rgba(91,63,153,.18);
+    border-left:4px solid #5b3f99;
+    border-radius:14px;
+    background:#fff;
+    box-shadow:0 8px 24px rgba(31,26,51,.08);
+}
+.live-notification-panel[hidden]{display:none!important;}
+.live-dot{width:10px;height:10px;border-radius:50%;background:#18a058;box-shadow:0 0 0 6px rgba(24,160,88,.12);flex:0 0 auto;}
+.live-text{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.live-text strong{font-size:.95rem;color:#221b3a;}
+.live-text span{font-size:.86rem;color:#5b6472;}
+.live-close{margin-left:auto;border:0;background:transparent;font-size:1.4rem;line-height:1;color:#6b7280;cursor:pointer;padding:2px 6px;}
+.live-close:hover{color:#221b3a;}

@@ -35,8 +35,22 @@ def current_reporting_period():
     return now.month, now.year
 
 
+def latest_imported_reporting_period():
+    latest = db.session.query(MonthlyFigure.year, MonthlyFigure.month).order_by(
+        MonthlyFigure.year.desc(),
+        MonthlyFigure.month.desc(),
+    ).first()
+    if latest:
+        return int(latest.month), int(latest.year)
+    return current_reporting_period()
+
+
 def selected_reporting_period():
-    default_month, default_year = current_reporting_period()
+    # Default to the latest imported reporting period, not the calendar month.
+    # This prevents Finance/Admin imports for a prior month (for example May 2026)
+    # from being saved correctly but then appearing to be missing because the page
+    # opens on the current calendar month.
+    default_month, default_year = latest_imported_reporting_period()
     try:
         month = int(request.args.get("month", default_month))
     except (TypeError, ValueError):
@@ -642,20 +656,43 @@ def extract_pdf_text(file_storage):
         raise
 
 
-def parse_pdf_month_year(text):
-    now = datetime.now()
-    year_match = re.search(r"\b(20\d{2})\b", text)
-    year = int(year_match.group(1)) if year_match else now.year
+def parse_pdf_month_year(text, filename="", override_month=None, override_year=None):
+    """Return the intended reporting month/year for a PDF import.
 
-    month = now.month
+    Finance imports are often done after month end, so using the current date is
+    unsafe.  The explicit form month/year is the source of truth.  If omitted,
+    the parser prefers the filename and then report-like month/year patterns in
+    the PDF text before falling back to the latest imported period/current date.
+    """
+    try:
+        if override_month and override_year:
+            month = int(override_month)
+            year = int(override_year)
+            if 1 <= month <= 12 and 2000 <= year <= 2100:
+                return month, year
+    except (TypeError, ValueError):
+        pass
+
+    combined = f"{filename or ''}\n{text or ''}"
     month_names = {name.lower(): value for value, name in MONTHS}
-    lower = text.lower()
-    for name, value in month_names.items():
-        if name in lower:
-            month = value
-            break
 
-    return month, year
+    # Prefer patterns where month and year are close together.
+    for name, value in month_names.items():
+        pattern = rf"\b{name}\b[^0-9]{{0,30}}\b(20\d{{2}})\b|\b(20\d{{2}})\b[^A-Za-z0-9]{{0,30}}\b{name}\b"
+        match = re.search(pattern, combined, flags=re.IGNORECASE)
+        if match:
+            year_text = match.group(1) or match.group(2)
+            return value, int(year_text)
+
+    # Match numeric period forms such as 2026-05, 2026/05 or 05-2026.
+    match = re.search(r"\b(20\d{2})[-_/ ](0?[1-9]|1[0-2])\b", combined)
+    if match:
+        return int(match.group(2)), int(match.group(1))
+    match = re.search(r"\b(0?[1-9]|1[0-2])[-_/ ](20\d{2})\b", combined)
+    if match:
+        return int(match.group(1)), int(match.group(2))
+
+    return latest_imported_reporting_period()
 
 
 def normalise_text(text):
@@ -1155,7 +1192,7 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
                 f"Sheet: {sheet_title}; Franchise: {franchise_name}; Column: {column}"
             )
             if monthly_figure.status == "Draft":
-                monthly_figure.status = "Imported"
+                monthly_figure.status = "Published"
             recalculate_monthly_figure(monthly_figure)
 
         if period_has_data:
@@ -1163,6 +1200,11 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
             period_tuples.add((month, year))
 
     db.session.commit()
+
+    if period_tuples:
+        latest_month, latest_year = sorted(period_tuples, key=lambda item: (item[1], item[0]))[-1]
+        session["last_imported_month"] = latest_month
+        session["last_imported_year"] = latest_year
 
     # Proper month-end import pipeline:
     # 1) validate franchise matching and agreement data,
@@ -1198,7 +1240,7 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
     }
 
 
-def create_monthly_figure_from_pdf(file_storage, franchise_id=None):
+def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, year=None, progress_job=None):
     franchise = None
     if franchise_id:
         candidate = Franchise.query.get(franchise_id)
@@ -1209,16 +1251,30 @@ def create_monthly_figure_from_pdf(file_storage, franchise_id=None):
         franchise = get_selected_franchise() or get_or_create_franchise()
     text, tmp_path = extract_pdf_text(file_storage)
     imported = parse_pdf_values(text)
-    month, year = parse_pdf_month_year(text)
+    month, year = parse_pdf_month_year(
+        text,
+        filename=file_storage.filename,
+        override_month=month,
+        override_year=year,
+    )
 
-    monthly_figure = MonthlyFigure(
+    monthly_figure = MonthlyFigure.query.filter_by(
         franchise_id=franchise.id,
         month=month,
         year=year,
-        created_by_id=current_user.id,
-        # PDF import needs a manual Insurance Payover before the figures are final.
-        status="Pending Payover",
-    )
+    ).first()
+    if not monthly_figure:
+        monthly_figure = MonthlyFigure(
+            franchise_id=franchise.id,
+            month=month,
+            year=year,
+            created_by_id=current_user.id,
+            status="Published",
+        )
+        db.session.add(monthly_figure)
+    else:
+        monthly_figure.created_by_id = current_user.id
+        monthly_figure.status = "Published"
 
     monthly_figure.funeral_receipts = imported.get("funeral_receipts", Decimal("0"))
     monthly_figure.claim_receipts = Decimal("0")
@@ -1228,19 +1284,29 @@ def create_monthly_figure_from_pdf(file_storage, franchise_id=None):
     monthly_figure.obo_service_receipts = imported.get("obo_service_receipts", Decimal("0"))
     monthly_figure.insurance_receipts = imported.get("insurance_receipts", Decimal("0"))
 
-    # Insurance Payover is manual, so it always starts at zero after import.
-    monthly_figure.insurance_payover = Decimal("0")
+    # Keep an existing manually captured Insurance Payover when re-importing the
+    # same franchise/month PDF, otherwise start at zero.
+    if monthly_figure.insurance_payover is None:
+        monthly_figure.insurance_payover = Decimal("0")
 
     monthly_figure.insurance_joinings = imported.get("insurance_joinings", 0)
     monthly_figure.mf_files = imported.get("mf_files", 0)
     monthly_figure.notes = f"Imported from PDF: {file_storage.filename}"
 
-    # Calculate preview values with payover as zero, but keep the record pending
-    # until the finance user enters the actual Insurance Payover.
+    # Calculate and publish the imported period immediately so Admin, Finance
+    # Manager and Finance Assistant users can see exactly what was imported.
     recalculate_monthly_figure(monthly_figure)
-
-    db.session.add(monthly_figure)
     db.session.commit()
+
+    try:
+        from app.monthly.import_pipeline import run_month_end_import_pipeline
+        run_month_end_import_pipeline(
+            period_tuples={(month, year)},
+            franchise_ids={franchise.id},
+            progress_job=progress_job,
+        )
+    except Exception as exc:
+        current_app.logger.exception("PDF import pipeline failed: %s", exc)
 
     upload_dir = Path(current_app.instance_path) / "monthly_imports"
     upload_dir.mkdir(parents=True, exist_ok=True)
@@ -1248,7 +1314,9 @@ def create_monthly_figure_from_pdf(file_storage, franchise_id=None):
     stored_pdf = upload_dir / f"{monthly_figure.id}_{safe_name}"
     shutil.move(str(tmp_path), stored_pdf)
 
-    log_action("Monthly Figures", "Imported PDF monthly figures", f"Period: {monthly_figure.period_label}; File: {safe_name}")
+    session["last_imported_month"] = month
+    session["last_imported_year"] = year
+    log_action("Monthly Figures", "Imported PDF monthly figures", f"Period: {monthly_figure.period_label}; Franchise: {franchise.business_name}; File: {safe_name}")
     db.session.commit()
     return monthly_figure
 
@@ -1386,16 +1454,32 @@ def import_pdf():
             flash("Please select a PDF file to import.", "warning")
             return redirect(url_for("monthly.import_pdf"))
 
+        progress_job = None
         try:
-            monthly_figure = create_monthly_figure_from_pdf(file_storage, request.form.get('franchise_id', type=int))
+            from app.import_progress import start_import_job, update_import_job
+            progress_job = start_import_job("monthly_pdf", file_storage.filename, total_steps=100)
+            monthly_figure = create_monthly_figure_from_pdf(
+                file_storage,
+                request.form.get('franchise_id', type=int),
+                month=request.form.get('month', type=int),
+                year=request.form.get('year', type=int),
+                progress_job=progress_job,
+            )
+            update_import_job(progress_job, 100, "PDF import completed and published.", status="completed", commit=True)
         except Exception as exc:
+            db.session.rollback()
+            try:
+                update_import_job(progress_job, None, str(exc), status="failed", commit=True)
+            except Exception:
+                pass
             flash(str(exc), "danger")
             return redirect(url_for("monthly.import_pdf"))
 
-        flash("PDF imported. Enter the Insurance Payover now, or choose Save for Later if you do not have the payover yet.", "success")
-        return redirect(url_for("monthly.edit", figure_id=monthly_figure.id))
+        flash(f"PDF imported and published for {monthly_figure.franchise.business_name} - {monthly_figure.period_label}. All Admin/Finance users can now see the figures; the franchise user can see only their own data.", "success")
+        return redirect(url_for("monthly.index", month=monthly_figure.month, year=monthly_figure.year))
 
-    return render_template("monthly/import.html", franchises=get_accessible_franchises(), selected_franchise=get_selected_franchise())
+    default_month, default_year = latest_imported_reporting_period()
+    return render_template("monthly/import.html", franchises=get_accessible_franchises(), selected_franchise=get_selected_franchise(), month_options=MONTHS, year_options=reporting_years(), default_month=default_month, default_year=default_year)
 
 
 @monthly_bp.route("/new")

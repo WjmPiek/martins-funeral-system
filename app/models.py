@@ -275,6 +275,71 @@ class ImportJob(db.Model):
     created_by = db.relationship("User", backref=db.backref("import_jobs", lazy=True))
 
 
+
+
+class LiveEvent(db.Model):
+    __tablename__ = "live_events"
+    id = db.Column(db.Integer, primary_key=True)
+    kind = db.Column(db.String(80), nullable=False, default="system", index=True)
+    title = db.Column(db.String(160), nullable=False, default="")
+    message = db.Column(db.String(500), default="")
+    visibility = db.Column(db.String(40), nullable=False, default="admin_finance", index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    import_job_id = db.Column(db.Integer, db.ForeignKey("import_jobs.id"), nullable=True, index=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
+    month = db.Column(db.Integer, nullable=True, index=True)
+    year = db.Column(db.Integer, nullable=True, index=True)
+    payload_json = db.Column(db.Text, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    user = db.relationship("User", backref=db.backref("live_events", lazy=True))
+    franchise = db.relationship("Franchise", backref=db.backref("live_events", lazy=True))
+    import_job = db.relationship("ImportJob", backref=db.backref("live_events", lazy=True))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "kind": self.kind,
+            "title": self.title,
+            "message": self.message,
+            "visibility": self.visibility,
+            "franchise_id": self.franchise_id,
+            "franchise": self.franchise.business_name if self.franchise else "",
+            "month": self.month,
+            "year": self.year,
+            "created_at": self.created_at.isoformat() if self.created_at else "",
+        }
+
+
+class LiveNotification(db.Model):
+    __tablename__ = "live_notifications"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    title = db.Column(db.String(160), nullable=False, default="")
+    message = db.Column(db.String(500), default="")
+    category = db.Column(db.String(40), nullable=False, default="system", index=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
+    import_job_id = db.Column(db.Integer, db.ForeignKey("import_jobs.id"), nullable=True, index=True)
+    payload_json = db.Column(db.Text, default="")
+    read_at = db.Column(db.DateTime, nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    user = db.relationship("User", backref=db.backref("live_notifications", lazy=True, cascade="all, delete-orphan"))
+    franchise = db.relationship("Franchise", backref=db.backref("live_notifications", lazy=True))
+    import_job = db.relationship("ImportJob", backref=db.backref("live_notifications", lazy=True))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "message": self.message,
+            "category": self.category,
+            "franchise_id": self.franchise_id,
+            "franchise": self.franchise.business_name if self.franchise else "",
+            "import_job_id": self.import_job_id,
+            "read": self.read_at is not None,
+            "created_at": self.created_at.isoformat() if self.created_at else "",
+        }
+
+
 class FranchiseTarget(db.Model):
     __tablename__ = "franchise_targets"
     id = db.Column(db.Integer, primary_key=True)

@@ -114,6 +114,14 @@ def run_month_end_import_pipeline(
         ).all()
     report['saved_rows'] = len(rows)
 
+    _stage(progress_job, 74, 'Publishing rows to live system visibility...')
+    try:
+        from app.live import mark_import_visible
+        report['published_rows'] = mark_import_visible(rows, status='Published')
+    except Exception as exc:
+        current_app.logger.exception('Could not mark imported rows as visible: %s', exc)
+        report['warnings'].append({'franchise': 'Live visibility', 'warnings': [f'Could not mark imported rows as Published: {exc}']})
+
     _stage(progress_job, 78, 'Stage 3/6: recalculating royalties from agreement date and scale...')
     from app.monthly.routes import recalculate_monthly_figure
     for monthly_figure in rows:
@@ -154,8 +162,13 @@ def run_month_end_import_pipeline(
             from app.performance.service import rebuild_performance_results
             for month, year in periods:
                 report['performance_rows'] += int(rebuild_performance_results(month, year, list(ids), 'annual_gross_scale') or 0)
+                try:
+                    from app.live import publish_monthly_import
+                    publish_monthly_import(month, year, ids, import_job=progress_job, source='month_end_import', report=report)
+                except Exception as live_exc:
+                    current_app.logger.exception('Could not publish live import event: %s', live_exc)
             report['published'] = True
-            report['publish_message'] = 'Graphs, leaderboard and performance summaries were refreshed.'
+            report['publish_message'] = 'Graphs, leaderboard and performance summaries were refreshed. Live users were notified.'
         except Exception as exc:
             current_app.logger.exception('Performance cache rebuild failed in import pipeline: %s', exc)
             report['status'] = 'needs_review'

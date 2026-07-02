@@ -5,7 +5,7 @@
   <div class="section-header">
     <div>
       <h1>Import Monthly Figures PDF</h1>
-      <p class="muted">Upload the Royalty Calculation PDF. After import, the system opens the payover capture page where Insurance Payover can be entered or saved for later.</p>
+      <p class="muted">Upload the Royalty Calculation PDF and select the reporting month/year. The system saves the figures to that exact period, recalculates royalties, publishes the period, and then all Admin/Finance users can see the imported data while franchise users see only their own branch.</p>
     </div>
     <a class="btn secondary button-auto" href="{{ url_for('monthly.index') }}">Back</a>
   </div>
@@ -23,6 +23,20 @@
           {% endfor %}
         </select>
 
+        <label for="month">Reporting Month</label>
+        <select id="month" name="month" required>
+          {% for value, label in month_options %}
+            <option value="{{ value }}" {% if default_month == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+
+        <label for="year">Reporting Year</label>
+        <select id="year" name="year" required>
+          {% for year in year_options %}
+            <option value="{{ year }}" {% if default_year == year %}selected{% endif %}>{{ year }}</option>
+          {% endfor %}
+        </select>
+
         <label for="pdf_file">Select PDF</label>
         <input id="pdf_file" name="pdf_file" type="file" accept="application/pdf,.pdf" required>
       </div>
@@ -31,11 +45,11 @@
 
     <div class="form-section-card">
       <h2>Imported Fields</h2>
-      <p class="muted">The PDF should be the Martins Month-End Report. Claim Receipts is removed. Insurance Payover is captured manually after import before the final figures are saved.</p>
+      <p class="muted">The selected Reporting Month and Reporting Year are the source of truth. The PDF text or upload date will not override them.</p>
     </div>
 
     <div class="form-actions sticky-actions no-print">
-      <button class="button-auto" type="submit">Import PDF & Capture Payover</button>
+      <button class="button-auto" type="submit">Import PDF & Publish Figures</button>
     </div>
   </form>
 </section>

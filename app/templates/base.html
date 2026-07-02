@@ -177,6 +177,14 @@
                 </header>
 
                 <main class="content-area">
+                    <div class="live-notification-panel" data-live-panel data-live-url="{{ url_for('live.status') }}" hidden>
+                        <div class="live-dot"></div>
+                        <div class="live-text">
+                            <strong data-live-title>System updated</strong>
+                            <span data-live-message>New information is available.</span>
+                        </div>
+                        <button type="button" class="live-close" data-live-close aria-label="Close notification">×</button>
+                    </div>
                     {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
                             <div class="messages">
@@ -311,6 +319,50 @@ document.addEventListener('DOMContentLoaded', function () {
   menu.querySelectorAll('a').forEach(function (link) {
     link.addEventListener('click', function () { menu.open = false; });
   });
+})();
+</script>
+
+
+<script>
+// Live enterprise status: lightweight polling so imports and recalculations appear without a manual refresh.
+(function () {
+  var panel = document.querySelector('[data-live-panel]');
+  if (!panel) return;
+  var url = panel.getAttribute('data-live-url');
+  var title = panel.querySelector('[data-live-title]');
+  var message = panel.querySelector('[data-live-message]');
+  var close = panel.querySelector('[data-live-close]');
+  var latestId = parseInt(localStorage.getItem('mfs_live_latest_id') || '0', 10);
+  var hiddenUntil = parseInt(sessionStorage.getItem('mfs_live_hidden_until') || '0', 10);
+  function show(item) {
+    if (!item || Date.now() < hiddenUntil) return;
+    title.textContent = item.title || 'System updated';
+    message.textContent = item.message || 'New information is available.';
+    panel.hidden = false;
+  }
+  function poll() {
+    fetch(url + '?since_id=' + encodeURIComponent(latestId), {headers: {'Accept': 'application/json'}})
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.ok) return;
+        var items = (data.notifications || []).concat(data.events || []);
+        if (data.latest_id && data.latest_id > latestId) {
+          latestId = data.latest_id;
+          localStorage.setItem('mfs_live_latest_id', String(latestId));
+        }
+        if (items.length) show(items[0]);
+      })
+      .catch(function () {});
+  }
+  if (close) {
+    close.addEventListener('click', function () {
+      panel.hidden = true;
+      hiddenUntil = Date.now() + 60000;
+      sessionStorage.setItem('mfs_live_hidden_until', String(hiddenUntil));
+    });
+  }
+  poll();
+  setInterval(poll, 15000);
 })();
 </script>
 

@@ -26,8 +26,18 @@ def current_reporting_period():
     return now.month, now.year
 
 
+def latest_imported_reporting_period():
+    latest = db.session.query(MonthlyFigure.year, MonthlyFigure.month).order_by(
+        MonthlyFigure.year.desc(),
+        MonthlyFigure.month.desc(),
+    ).first()
+    if latest:
+        return int(latest.month), int(latest.year)
+    return current_reporting_period()
+
+
 def selected_reporting_period():
-    default_month, default_year = current_reporting_period()
+    default_month, default_year = latest_imported_reporting_period()
     try:
         month = int(request.args.get("month", default_month))
     except (TypeError, ValueError):

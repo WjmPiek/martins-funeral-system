@@ -51,6 +51,7 @@ def create_app(config_class=Config):
     from app.insurance_claims.routes import insurance_claims_bp
     from app.leaderboard.routes import leaderboard_bp
     from app.performance.routes import performance_bp
+    from app.live import live_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -64,6 +65,7 @@ def create_app(config_class=Config):
     app.register_blueprint(insurance_claims_bp)
     app.register_blueprint(leaderboard_bp)
     app.register_blueprint(performance_bp)
+    app.register_blueprint(live_bp)
 
 
     @app.template_filter("rand")
