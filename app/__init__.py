@@ -302,4 +302,75 @@ def create_app(config_class=Config):
         sent_count = send_agreement_expiry_reminders()
         print(f"Franchise agreement reminder emails sent: {sent_count}")
 
+
+    @app.cli.command("stabilize-platform")
+    @click.option("--month", type=int, required=False, help="Reporting month number. Omit to use latest period.")
+    @click.option("--year", type=int, required=False, help="Reporting year. Omit to use latest period.")
+    @click.option("--all-periods", is_flag=True, help="Rebuild royalties, BI, insights and performance cache for every imported period.")
+    def stabilize_platform_command(month, year, all_periods):
+        """Run the safe v100 platform repair/rebuild sequence.
+
+        This command is intended for Render Shell after deploying v100. It seeds
+        required defaults, recalculates royalties without stopping on one bad
+        franchise, rebuilds BI/insight data, rebuilds performance cache and
+        processes pending events.
+        """
+        from app.models import MonthlyFigure
+        from app.events import ensure_default_subscriptions, process_pending_events
+        from app.royalty_management import ensure_default_growth_profile, recalculate_royalties_for_period
+        from app.business_intelligence import rebuild_business_intelligence, latest_period as bi_latest_period
+        from app.insights_engine import rebuild_insight_narratives, latest_period as insights_latest_period
+        from app.workflow_engine import ensure_phase13_defaults
+        from app.performance.service import rebuild_performance_results
+
+        print("v100 platform stabilization starting...")
+        event_subs = ensure_default_subscriptions(commit=True)
+        growth_profile = ensure_default_growth_profile(commit=True)
+        workflow_defaults = ensure_phase13_defaults(commit=True)
+        print(f"Defaults ready: event_subscriptions_created={event_subs}, growth_profile={growth_profile.name}, workflow_defaults={workflow_defaults}")
+
+        if all_periods:
+            periods = db.session.query(MonthlyFigure.year, MonthlyFigure.month).distinct().order_by(MonthlyFigure.year, MonthlyFigure.month).all()
+            periods = [(int(y), int(m)) for y, m in periods]
+        else:
+            if not month or not year:
+                latest = bi_latest_period() or insights_latest_period() or {}
+                month = int(latest.get("month") or 0)
+                year = int(latest.get("year") or 0)
+            periods = [(int(year), int(month))] if month and year else []
+
+        if not periods:
+            print("No monthly figure periods found. Dashboards will show empty-state cards until data is imported.")
+        for period_year, period_month in periods:
+            print(f"Rebuilding period {period_year}-{period_month:02d}...")
+            royalty_result = recalculate_royalties_for_period(period_month, period_year, commit=True)
+            print(f"  royalties: {royalty_result}")
+            try:
+                bi_result = rebuild_business_intelligence(period_year, period_month, commit=True)
+                print(f"  business_intelligence: {bi_result}")
+            except Exception as exc:
+                db.session.rollback()
+                print(f"  business_intelligence failed: {exc}")
+            try:
+                insight_result = rebuild_insight_narratives(period_year, period_month, commit=True)
+                print(f"  insights: {insight_result}")
+            except Exception as exc:
+                db.session.rollback()
+                print(f"  insights failed: {exc}")
+            try:
+                franchise_ids = [row[0] for row in db.session.query(MonthlyFigure.franchise_id).filter_by(month=period_month, year=period_year).distinct().all()]
+                cache_rows = rebuild_performance_results(period_month, period_year, franchise_ids, "annual_gross_scale")
+                print(f"  performance_cache_rows: {cache_rows}")
+            except Exception as exc:
+                db.session.rollback()
+                print(f"  performance cache failed: {exc}")
+
+        try:
+            processed = process_pending_events(limit=200, worker_id="v100-stabilize")
+            print(f"Events processed: {processed}")
+        except Exception as exc:
+            db.session.rollback()
+            print(f"Event processing failed: {exc}")
+        print("v100 platform stabilization complete.")
+
     return app
