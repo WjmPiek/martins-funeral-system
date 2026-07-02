@@ -1234,3 +1234,195 @@ class EventProcessingLog(db.Model):
             return json.loads(self.data_json or "{}")
         except Exception:
             return {}
+
+
+class WorkflowDefinition(db.Model):
+    """Reusable workflow definition for enterprise operations.
+
+    Phase 13 stores workflow definitions in PostgreSQL so imports, royalty
+    rebuilds, diagnostics and future modules can share the same workflow,
+    notification, task and audit infrastructure.
+    """
+    __tablename__ = "workflow_definitions"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(160), nullable=False, unique=True, index=True)
+    workflow_key = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    module = db.Column(db.String(120), nullable=False, default="system", index=True)
+    description = db.Column(db.Text, nullable=False, default="")
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    step_template_json = db.Column(db.Text, nullable=False, default="[]")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    @property
+    def step_template(self):
+        try:
+            return json.loads(self.step_template_json or "[]")
+        except Exception:
+            return []
+
+
+class WorkflowInstance(db.Model):
+    """A running or completed workflow instance."""
+    __tablename__ = "workflow_instances"
+    id = db.Column(db.Integer, primary_key=True)
+    workflow_definition_id = db.Column(db.Integer, db.ForeignKey("workflow_definitions.id"), nullable=True, index=True)
+    workflow_key = db.Column(db.String(120), nullable=False, index=True)
+    module = db.Column(db.String(120), nullable=False, default="system", index=True)
+    title = db.Column(db.String(220), nullable=False, default="")
+    status = db.Column(db.String(40), nullable=False, default="pending", index=True)
+    current_step_key = db.Column(db.String(120), nullable=True, index=True)
+    progress_percent = db.Column(db.Integer, nullable=False, default=0)
+    priority = db.Column(db.String(30), nullable=False, default="normal", index=True)
+    import_job_id = db.Column(db.Integer, db.ForeignKey("import_jobs.id"), nullable=True, index=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    year = db.Column(db.Integer, nullable=True, index=True)
+    month = db.Column(db.Integer, nullable=True, index=True)
+    context_json = db.Column(db.Text, nullable=False, default="{}")
+    message = db.Column(db.String(1000), nullable=False, default="")
+    started_at = db.Column(db.DateTime, nullable=True, index=True)
+    completed_at = db.Column(db.DateTime, nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    definition = db.relationship("WorkflowDefinition", backref=db.backref("instances", lazy=True))
+    import_job = db.relationship("ImportJob", backref=db.backref("workflow_instances", lazy=True))
+    franchise = db.relationship("Franchise", backref=db.backref("workflow_instances", lazy=True))
+    created_by = db.relationship("User", foreign_keys=[created_by_user_id], backref=db.backref("created_workflows", lazy=True))
+
+    @property
+    def context(self):
+        try:
+            return json.loads(self.context_json or "{}")
+        except Exception:
+            return {}
+
+
+class WorkflowStep(db.Model):
+    """Instance-specific workflow step state."""
+    __tablename__ = "workflow_steps"
+    id = db.Column(db.Integer, primary_key=True)
+    workflow_instance_id = db.Column(db.Integer, db.ForeignKey("workflow_instances.id"), nullable=False, index=True)
+    step_key = db.Column(db.String(120), nullable=False, index=True)
+    label = db.Column(db.String(220), nullable=False, default="")
+    status = db.Column(db.String(40), nullable=False, default="pending", index=True)
+    sort_order = db.Column(db.Integer, nullable=False, default=0, index=True)
+    message = db.Column(db.String(1000), nullable=False, default="")
+    started_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    workflow_instance = db.relationship("WorkflowInstance", backref=db.backref("steps", lazy=True, cascade="all, delete-orphan", order_by="WorkflowStep.sort_order"))
+
+
+class BusinessRule(db.Model):
+    """Configurable business rule used by workflows and diagnostics."""
+    __tablename__ = "business_rules"
+    id = db.Column(db.Integer, primary_key=True)
+    rule_key = db.Column(db.String(140), nullable=False, unique=True, index=True)
+    name = db.Column(db.String(180), nullable=False)
+    module = db.Column(db.String(120), nullable=False, default="system", index=True)
+    severity = db.Column(db.String(30), nullable=False, default="warning", index=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    description = db.Column(db.Text, nullable=False, default="")
+    config_json = db.Column(db.Text, nullable=False, default="{}")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    @property
+    def config(self):
+        try:
+            return json.loads(self.config_json or "{}")
+        except Exception:
+            return {}
+
+
+class EnterpriseTask(db.Model):
+    """Admin/Finance task generated from workflows, rules, imports or diagnostics."""
+    __tablename__ = "enterprise_tasks"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(220), nullable=False)
+    description = db.Column(db.Text, nullable=False, default="")
+    module = db.Column(db.String(120), nullable=False, default="system", index=True)
+    task_type = db.Column(db.String(80), nullable=False, default="general", index=True)
+    status = db.Column(db.String(40), nullable=False, default="open", index=True)
+    priority = db.Column(db.String(30), nullable=False, default="normal", index=True)
+    assigned_role = db.Column(db.String(120), nullable=True, index=True)
+    assigned_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
+    workflow_instance_id = db.Column(db.Integer, db.ForeignKey("workflow_instances.id"), nullable=True, index=True)
+    business_rule_id = db.Column(db.Integer, db.ForeignKey("business_rules.id"), nullable=True, index=True)
+    source = db.Column(db.String(120), nullable=False, default="system", index=True)
+    due_at = db.Column(db.DateTime, nullable=True, index=True)
+    completed_at = db.Column(db.DateTime, nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    assigned_user = db.relationship("User", foreign_keys=[assigned_user_id], backref=db.backref("enterprise_tasks", lazy=True))
+    franchise = db.relationship("Franchise", backref=db.backref("enterprise_tasks", lazy=True))
+    workflow_instance = db.relationship("WorkflowInstance", backref=db.backref("tasks", lazy=True))
+    business_rule = db.relationship("BusinessRule", backref=db.backref("tasks", lazy=True))
+
+
+class EnterpriseNotification(db.Model):
+    """Role-scoped notification centre entry."""
+    __tablename__ = "enterprise_notifications"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(220), nullable=False)
+    message = db.Column(db.String(1000), nullable=False, default="")
+    module = db.Column(db.String(120), nullable=False, default="system", index=True)
+    notification_type = db.Column(db.String(80), nullable=False, default="info", index=True)
+    severity = db.Column(db.String(30), nullable=False, default="info", index=True)
+    target_role = db.Column(db.String(120), nullable=True, index=True)
+    target_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
+    workflow_instance_id = db.Column(db.Integer, db.ForeignKey("workflow_instances.id"), nullable=True, index=True)
+    system_event_id = db.Column(db.Integer, db.ForeignKey("system_events.id"), nullable=True, index=True)
+    is_read = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    read_at = db.Column(db.DateTime, nullable=True)
+
+    target_user = db.relationship("User", foreign_keys=[target_user_id], backref=db.backref("enterprise_notifications", lazy=True))
+    franchise = db.relationship("Franchise", backref=db.backref("enterprise_notifications", lazy=True))
+    workflow_instance = db.relationship("WorkflowInstance", backref=db.backref("notifications", lazy=True))
+    system_event = db.relationship("SystemEvent", backref=db.backref("enterprise_notifications", lazy=True))
+
+
+class ScheduledJobDefinition(db.Model):
+    """Admin-managed recurring maintenance or reporting job definition."""
+    __tablename__ = "scheduled_job_definitions"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(180), nullable=False, unique=True, index=True)
+    job_key = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    command = db.Column(db.String(220), nullable=False, default="")
+    schedule_text = db.Column(db.String(220), nullable=False, default="Manual")
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    last_run_at = db.Column(db.DateTime, nullable=True, index=True)
+    next_run_at = db.Column(db.DateTime, nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class EnterpriseAuditTimeline(db.Model):
+    """Unified operational timeline across workflows, jobs, events and modules."""
+    __tablename__ = "enterprise_audit_timeline"
+    id = db.Column(db.Integer, primary_key=True)
+    module = db.Column(db.String(120), nullable=False, default="system", index=True)
+    action = db.Column(db.String(160), nullable=False, index=True)
+    title = db.Column(db.String(220), nullable=False, default="")
+    detail = db.Column(db.Text, nullable=False, default="")
+    severity = db.Column(db.String(30), nullable=False, default="info", index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    workflow_instance_id = db.Column(db.Integer, db.ForeignKey("workflow_instances.id"), nullable=True, index=True)
+    import_job_id = db.Column(db.Integer, db.ForeignKey("import_jobs.id"), nullable=True, index=True)
+    system_event_id = db.Column(db.Integer, db.ForeignKey("system_events.id"), nullable=True, index=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+
+    user = db.relationship("User", backref=db.backref("enterprise_audit_timeline", lazy=True))
+    workflow_instance = db.relationship("WorkflowInstance", backref=db.backref("timeline_entries", lazy=True))
+    import_job = db.relationship("ImportJob", backref=db.backref("timeline_entries", lazy=True))
+    system_event = db.relationship("SystemEvent", backref=db.backref("timeline_entries", lazy=True))
+    franchise = db.relationship("Franchise", backref=db.backref("enterprise_audit_timeline", lazy=True))

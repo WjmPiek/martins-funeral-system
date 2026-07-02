@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-card diagnostics-page">
+    <div class="page-header-row">
+        <div>
+            <h1>Enterprise Workflows & Automation</h1>
+            <p class="page-subtitle">Phase 13 control centre for workflows, business rules, notifications, tasks, schedules and the unified audit timeline.</p>
+        </div>
+        <div class="action-row">
+            <form method="post" action="{{ url_for('admin.enterprise_workflows_seed') }}" class="inline-form">
+                <button class="btn-secondary" type="submit">Seed Defaults</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.enterprise_workflows_run_diagnostics') }}" class="inline-form">
+                <button class="btn-primary" type="submit">Run Diagnostics Workflow</button>
+            </form>
+            <a class="btn-secondary" href="{{ url_for('admin.operations_centre') }}">Operations Centre</a>
+        </div>
+    </div>
+
+    <div class="diagnostic-cards">
+        <div class="diagnostic-card ok"><span>Workflow definitions</span><strong>{{ summary.definitions }}</strong></div>
+        <div class="diagnostic-card warning"><span>Running workflows</span><strong>{{ summary.running }}</strong></div>
+        <div class="diagnostic-card danger"><span>Needs review</span><strong>{{ summary.needs_review }}</strong></div>
+        <div class="diagnostic-card warning"><span>Open tasks</span><strong>{{ summary.open_tasks }}</strong></div>
+        <div class="diagnostic-card warning"><span>Unread notifications</span><strong>{{ summary.unread_notifications }}</strong></div>
+        <div class="diagnostic-card ok"><span>Active rules</span><strong>{{ summary.active_rules }}</strong></div>
+        <div class="diagnostic-card ok"><span>Schedules</span><strong>{{ summary.schedules }}</strong></div>
+    </div>
+</section>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Workflow definitions</h2>
+        <p class="page-subtitle">Reusable enterprise workflows. New modules can plug into these same steps instead of creating separate logic.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Workflow</th><th>Module</th><th>Status</th><th>Description</th><th>Action</th></tr></thead>
+                <tbody>
+                {% for workflow in workflow_definitions %}
+                    <tr>
+                        <td>{{ workflow.name }}</td>
+                        <td>{{ workflow.module }}</td>
+                        <td><span class="status-pill {{ 'ok' if workflow.is_active else 'warning' }}">{{ 'Active' if workflow.is_active else 'Inactive' }}</span></td>
+                        <td>{{ workflow.description }}</td>
+                        <td>
+                            <form method="post" action="{{ url_for('admin.enterprise_workflows_start', workflow_key=workflow.workflow_key) }}" class="inline-form">
+                                <button class="btn-small" type="submit">Start</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5">No workflows found. Click Seed Defaults.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Workflow status</h2>
+        <p class="page-subtitle">Current workflow status distribution.</p>
+        <div class="diagnostic-cards small-cards">
+            {% for status, count in workflow_status.items() %}
+                <div class="diagnostic-card {% if status in ['failed','needs_review'] %}danger{% elif status in ['running','pending'] %}warning{% else %}ok{% endif %}">
+                    <span>{{ status|replace('_',' ')|title }}</span><strong>{{ count }}</strong>
+                </div>
+            {% else %}
+                <div class="diagnostic-card ok"><span>No workflow history</span><strong>0</strong></div>
+            {% endfor %}
+        </div>
+
+        <h3>Task status</h3>
+        <div class="diagnostic-cards small-cards">
+            {% for status, count in task_status.items() %}
+                <div class="diagnostic-card {% if status == 'open' %}warning{% elif status == 'completed' %}ok{% else %}danger{% endif %}">
+                    <span>{{ status|replace('_',' ')|title }}</span><strong>{{ count }}</strong>
+                </div>
+            {% else %}
+                <div class="diagnostic-card ok"><span>No tasks</span><strong>0</strong></div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+
+<section class="page-card">
+    <h2>Recent workflows</h2>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>ID</th><th>Title</th><th>Module</th><th>Status</th><th>Progress</th><th>Current step</th><th>Message</th><th>Started</th></tr></thead>
+            <tbody>
+            {% for item in latest_workflows %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.title }}</td>
+                    <td>{{ item.module }}</td>
+                    <td><span class="status-pill {{ item.status }}">{{ item.status }}</span></td>
+                    <td>{{ item.progress_percent }}%</td>
+                    <td>{{ item.current_step_key or '' }}</td>
+                    <td>{{ item.message }}</td>
+                    <td>{{ item.started_at.strftime('%Y-%m-%d %H:%M') if item.started_at else item.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8">No workflow instances yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Enterprise Task Centre</h2>
+        <p class="page-subtitle">Tasks generated from workflows, diagnostics and business rules.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Task</th><th>Module</th><th>Priority</th><th>Assigned</th><th>Due</th><th>Action</th></tr></thead>
+                <tbody>
+                {% for task in open_tasks %}
+                    <tr>
+                        <td><strong>{{ task.title }}</strong><br><small>{{ task.description }}</small></td>
+                        <td>{{ task.module }}</td>
+                        <td><span class="status-pill {{ 'danger' if task.priority == 'high' else 'warning' if task.priority == 'normal' else 'ok' }}">{{ task.priority }}</span></td>
+                        <td>{{ task.assigned_role or task.assigned_user.email if task.assigned_user else task.assigned_role or '' }}</td>
+                        <td>{{ task.due_at.strftime('%Y-%m-%d') if task.due_at else '' }}</td>
+                        <td><form method="post" action="{{ url_for('admin.enterprise_task_complete', task_id=task.id) }}" class="inline-form"><button class="btn-small" type="submit">Complete</button></form></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6">No open tasks.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Notification Centre</h2>
+        <p class="page-subtitle">Role-scoped operational notifications.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Time</th><th>Notification</th><th>Severity</th><th>Target</th><th>Action</th></tr></thead>
+                <tbody>
+                {% for note in recent_notifications %}
+                    <tr>
+                        <td>{{ note.created_at.strftime('%Y-%m-%d %H:%M') if note.created_at else '' }}</td>
+                        <td><strong>{{ note.title }}</strong><br><small>{{ note.message }}</small></td>
+                        <td><span class="status-pill {{ note.severity }}">{{ note.severity }}</span></td>
+                        <td>{{ note.target_role or note.target_user.email if note.target_user else note.target_role or 'General' }}</td>
+                        <td>{% if not note.is_read %}<form method="post" action="{{ url_for('admin.enterprise_notification_read', notification_id=note.id) }}" class="inline-form"><button class="btn-small" type="submit">Mark Read</button></form>{% else %}<span class="status-pill ok">Read</span>{% endif %}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5">No notifications.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Business Rules</h2>
+        <p class="page-subtitle">Configurable guardrails used by workflows and diagnostics. Turning off a rule only affects future checks.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Rule</th><th>Module</th><th>Severity</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                {% for rule in business_rules %}
+                    <tr>
+                        <td><strong>{{ rule.name }}</strong><br><small>{{ rule.description }}</small></td>
+                        <td>{{ rule.module }}</td>
+                        <td><span class="status-pill {{ rule.severity }}">{{ rule.severity }}</span></td>
+                        <td><span class="status-pill {{ 'ok' if rule.is_active else 'warning' }}">{{ 'Active' if rule.is_active else 'Inactive' }}</span></td>
+                        <td><form method="post" action="{{ url_for('admin.enterprise_rule_toggle', rule_id=rule.id) }}" class="inline-form"><button class="btn-small" type="submit">Toggle</button></form></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5">No business rules configured.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Scheduled Automation</h2>
+        <p class="page-subtitle">Admin-visible schedule definitions. These are operational definitions for Render workers/cron or manual runs.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Name</th><th>Command</th><th>Schedule</th><th>Status</th><th>Last Run</th></tr></thead>
+                <tbody>
+                {% for schedule in schedules %}
+                    <tr>
+                        <td>{{ schedule.name }}</td>
+                        <td><code>{{ schedule.command }}</code></td>
+                        <td>{{ schedule.schedule_text }}</td>
+                        <td><span class="status-pill {{ 'ok' if schedule.is_active else 'warning' }}">{{ 'Active' if schedule.is_active else 'Inactive' }}</span></td>
+                        <td>{{ schedule.last_run_at.strftime('%Y-%m-%d %H:%M') if schedule.last_run_at else '' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5">No schedules configured.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<section class="page-card">
+    <h2>Enterprise Audit Timeline</h2>
+    <p class="page-subtitle">Unified operational timeline across workflows, jobs, events, imports, diagnostics and tasks.</p>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>Time</th><th>Module</th><th>Action</th><th>Title</th><th>Detail</th></tr></thead>
+            <tbody>
+            {% for item in timeline %}
+                <tr>
+                    <td>{{ item.created_at.strftime('%Y-%m-%d %H:%M:%S') if item.created_at else '' }}</td>
+                    <td>{{ item.module }}</td>
+                    <td><span class="status-pill {{ item.severity }}">{{ item.action }}</span></td>
+                    <td>{{ item.title }}</td>
+                    <td>{{ item.detail }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5">No timeline entries yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

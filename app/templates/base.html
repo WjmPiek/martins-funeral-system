@@ -96,6 +96,7 @@
                             {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.business_intelligence') }}">Business Intelligence</a>{% endif %}
                             {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.insights_dashboard') }}">Insight Explanations</a>{% endif %}
                             {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.operations_centre') }}">Operations Centre</a>{% endif %}
+                            {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.enterprise_workflows') }}">Workflows & Automation</a>{% endif %}
                             {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.royalty_management') }}">Royalty Management</a>{% endif %}
                             {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.imports_data') }}">Imports & Data</a>{% endif %}
                             {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.import_centre') }}">Import Centre</a>{% endif %}

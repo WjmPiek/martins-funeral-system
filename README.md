@@ -296,3 +296,14 @@ The Heat Map import accepts Excel files with columns such as MF File, Deceased N
 - Added shared `brand_logo_url` and `asset_url()` helpers.
 - Login/topbar/sidebar now reuse the same cached logo URL.
 - Logo will not refetch on every normal page navigation; browser only reloads it when the file changes.
+
+## Phase 13 - Enterprise Workflow & Automation Suite
+
+Adds Admin **Workflows & Automation**, persistent workflow definitions/instances/steps, business rules, tasks, notifications, schedule definitions, and an enterprise audit timeline.
+
+Deploy and run:
+
+```bash
+flask db upgrade
+flask seed-workflow-defaults
+```

@@ -9,7 +9,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
-from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, SystemEvent, EventSubscription, EventProcessingLog, RoyaltyGrowthProfile, RoyaltyAgreementProfile, RoyaltyCalculationSnapshot, RoyaltyOverride, FranchiseHealthSnapshot, BusinessInsight, InsightNarrative, user_franchises
+from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, SystemEvent, EventSubscription, EventProcessingLog, RoyaltyGrowthProfile, RoyaltyAgreementProfile, RoyaltyCalculationSnapshot, RoyaltyOverride, FranchiseHealthSnapshot, BusinessInsight, InsightNarrative, WorkflowDefinition, WorkflowInstance, WorkflowStep, BusinessRule, EnterpriseTask, EnterpriseNotification, ScheduledJobDefinition, EnterpriseAuditTimeline, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
@@ -3178,3 +3178,138 @@ def delete_franchise_employee(user_id):
     db.session.commit()
     flash(f"Employee user {user.full_name} was deactivated.", "success")
     return redirect(url_for("admin.franchise_employees"))
+
+
+@admin_bp.route("/enterprise-workflows")
+@login_required
+def enterprise_workflows():
+    """Phase 13 Enterprise Workflow & Automation Suite."""
+    if not can_view_operations_centre():
+        abort(403)
+    from app.workflow_engine import ensure_phase13_defaults, workflow_summary
+    ensure_phase13_defaults(commit=True)
+
+    summary = workflow_summary()
+    workflow_definitions = WorkflowDefinition.query.order_by(WorkflowDefinition.module, WorkflowDefinition.name).all()
+    latest_workflows = WorkflowInstance.query.order_by(WorkflowInstance.created_at.desc()).limit(20).all()
+    open_tasks = EnterpriseTask.query.filter_by(status="open").order_by(EnterpriseTask.priority.desc(), EnterpriseTask.created_at.desc()).limit(20).all()
+    recent_notifications = EnterpriseNotification.query.order_by(EnterpriseNotification.created_at.desc()).limit(20).all()
+    business_rules = BusinessRule.query.order_by(BusinessRule.module, BusinessRule.name).all()
+    schedules = ScheduledJobDefinition.query.order_by(ScheduledJobDefinition.name).all()
+    timeline = EnterpriseAuditTimeline.query.order_by(EnterpriseAuditTimeline.created_at.desc()).limit(30).all()
+
+    workflow_status_rows = db.session.execute(text("""
+        SELECT status, COUNT(*) AS count
+        FROM workflow_instances
+        GROUP BY status
+        ORDER BY status
+    """)).mappings().all()
+    workflow_status = {row["status"]: row["count"] for row in workflow_status_rows}
+
+    task_status_rows = db.session.execute(text("""
+        SELECT status, COUNT(*) AS count
+        FROM enterprise_tasks
+        GROUP BY status
+        ORDER BY status
+    """)).mappings().all()
+    task_status = {row["status"]: row["count"] for row in task_status_rows}
+
+    return render_template(
+        "admin/enterprise_workflows.html",
+        summary=summary,
+        workflow_definitions=workflow_definitions,
+        latest_workflows=latest_workflows,
+        open_tasks=open_tasks,
+        recent_notifications=recent_notifications,
+        business_rules=business_rules,
+        schedules=schedules,
+        timeline=timeline,
+        workflow_status=workflow_status,
+        task_status=task_status,
+    )
+
+
+@admin_bp.route("/enterprise-workflows/seed", methods=["POST"])
+@login_required
+def enterprise_workflows_seed():
+    if not can_view_operations_centre():
+        abort(403)
+    from app.workflow_engine import ensure_phase13_defaults
+    created = ensure_phase13_defaults(commit=True)
+    log_action("Enterprise Workflows", "Seeded workflow defaults", str(created))
+    flash(f"Workflow defaults ready: {created}", "success")
+    return redirect(url_for("admin.enterprise_workflows"))
+
+
+@admin_bp.route("/enterprise-workflows/run-diagnostics", methods=["POST"])
+@login_required
+def enterprise_workflows_run_diagnostics():
+    if not can_view_operations_centre():
+        abort(403)
+    from app.workflow_engine import run_diagnostics_workflow
+    instance = run_diagnostics_workflow(user_id=current_user.id, commit=True)
+    log_action("Enterprise Workflows", "Ran diagnostics workflow", f"Workflow {instance.id}: {instance.status}")
+    flash(f"Diagnostics workflow {instance.id} completed with status: {instance.status}", "success" if instance.status == "completed" else "warning")
+    return redirect(url_for("admin.enterprise_workflows"))
+
+
+@admin_bp.route("/enterprise-workflows/start/<workflow_key>", methods=["POST"])
+@login_required
+def enterprise_workflows_start(workflow_key):
+    if not can_view_operations_centre():
+        abort(403)
+    from app.workflow_engine import start_workflow
+    definition = WorkflowDefinition.query.filter_by(workflow_key=workflow_key).first_or_404()
+    instance = start_workflow(
+        workflow_key,
+        title=f"Manual {definition.name}",
+        module=definition.module,
+        user_id=current_user.id,
+        context={"source": "manual", "started_by": current_user.email},
+        commit=True,
+    )
+    log_action("Enterprise Workflows", "Started workflow", f"Workflow {instance.id}: {workflow_key}")
+    flash(f"Workflow started: {instance.title}", "success")
+    return redirect(url_for("admin.enterprise_workflows"))
+
+
+@admin_bp.route("/enterprise-workflows/tasks/<int:task_id>/complete", methods=["POST"])
+@login_required
+def enterprise_task_complete(task_id):
+    if not can_view_operations_centre():
+        abort(403)
+    from app.workflow_engine import emit_timeline
+    task = EnterpriseTask.query.get_or_404(task_id)
+    task.status = "completed"
+    task.completed_at = datetime.utcnow()
+    emit_timeline(task.module, "task.completed", task.title, f"Completed by {current_user.email}", "info", user_id=current_user.id, workflow_instance_id=task.workflow_instance_id, franchise_id=task.franchise_id)
+    db.session.commit()
+    log_action("Enterprise Tasks", "Completed task", f"Task {task.id}: {task.title}")
+    flash("Task completed.", "success")
+    return redirect(url_for("admin.enterprise_workflows"))
+
+
+@admin_bp.route("/enterprise-workflows/rules/<int:rule_id>/toggle", methods=["POST"])
+@login_required
+def enterprise_rule_toggle(rule_id):
+    if not can_view_operations_centre():
+        abort(403)
+    rule = BusinessRule.query.get_or_404(rule_id)
+    rule.is_active = not rule.is_active
+    db.session.commit()
+    log_action("Business Rules", "Toggled rule", f"{rule.rule_key}: {rule.is_active}")
+    flash(f"Rule {'enabled' if rule.is_active else 'disabled'}: {rule.name}", "success")
+    return redirect(url_for("admin.enterprise_workflows"))
+
+
+@admin_bp.route("/enterprise-workflows/notifications/<int:notification_id>/read", methods=["POST"])
+@login_required
+def enterprise_notification_read(notification_id):
+    if not can_view_operations_centre():
+        abort(403)
+    note = EnterpriseNotification.query.get_or_404(notification_id)
+    note.is_read = True
+    note.read_at = datetime.utcnow()
+    db.session.commit()
+    flash("Notification marked as read.", "success")
+    return redirect(url_for("admin.enterprise_workflows"))

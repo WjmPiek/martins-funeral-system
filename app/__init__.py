@@ -269,6 +269,28 @@ def create_app(config_class=Config):
         result = rebuild_insight_narratives(period["year"], period["month"], commit=True)
         print(f"Insight narratives rebuilt for {result['year']}-{result['month']:02d}: {result['narratives']} narratives")
 
+
+    @app.cli.command("seed-workflow-defaults")
+    def seed_workflow_defaults_command():
+        """Seed Phase 13 workflow, business-rule and schedule defaults."""
+        from app.workflow_engine import ensure_phase13_defaults
+        result = ensure_phase13_defaults(commit=True)
+        print(f"Workflow defaults ready: {result}")
+
+    @app.cli.command("run-diagnostics-workflow")
+    def run_diagnostics_workflow_command():
+        """Run the Phase 13 system diagnostics workflow and create review tasks."""
+        from app.workflow_engine import run_diagnostics_workflow
+        instance = run_diagnostics_workflow(commit=True)
+        print(f"Diagnostics workflow {instance.id}: {instance.status} - {instance.message}")
+
+    @app.cli.command("workflow-summary")
+    def workflow_summary_command():
+        """Print Phase 13 workflow/task/notification counts."""
+        from app.workflow_engine import ensure_phase13_defaults, workflow_summary
+        ensure_phase13_defaults(commit=True)
+        print(workflow_summary())
+
     @app.cli.command("check-franchise-expiry")
     def check_franchise_expiry():
         from app.franchise.notifications import send_agreement_expiry_reminders
