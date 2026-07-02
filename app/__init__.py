@@ -1,4 +1,5 @@
 from flask import Flask, request, url_for
+import click
 from pathlib import Path
 from datetime import datetime, timedelta
 from config import Config
@@ -141,21 +142,51 @@ def create_app(config_class=Config):
             print(f"Processed job {job.id}: {job.status} - {job.message}")
 
     @app.cli.command("run-job-worker")
-    def run_job_worker_command():
-        """Process queued persistent jobs until the queue is empty.
+    @click.option("--forever", is_flag=True, help="Keep polling for jobs instead of exiting when the queue is empty.")
+    @click.option("--sleep", "sleep_seconds", default=5, show_default=True, type=int, help="Seconds to wait between empty polls.")
+    @click.option("--queue", "queue_name", default="default", show_default=True, help="Queue name to process.")
+    @click.option("--worker-id", default="render-worker", show_default=True, help="Worker identifier stored on locked jobs.")
+    @click.option("--release-stale", is_flag=True, help="Release stale running jobs before polling.")
+    @click.option("--stale-minutes", default=15, show_default=True, type=int, help="Heartbeat age in minutes before a job is stale.")
+    def run_job_worker_command(forever, sleep_seconds, queue_name, worker_id, release_stale, stale_minutes):
+        """Process queued persistent jobs.
 
-        This is safe to run from Render Shell or as a future Render Worker.  All
-        job state is stored in PostgreSQL, so progress survives restarts.
+        Use once from Render Shell for manual processing, or use --forever as a
+        Render Worker start command for continuous background processing.
         """
-        from app.jobs import run_next_job
+        import time
+        from app.jobs import queue_stats, release_stale_jobs, run_next_job
+
         processed = 0
+        empty_polls = 0
         while True:
-            job = run_next_job(worker_id="render-worker")
-            if not job:
+            if release_stale:
+                released = release_stale_jobs(stale_after_minutes=stale_minutes, worker_id=worker_id)
+                if released:
+                    print(f"Released stale jobs: {released}")
+            job = run_next_job(queue_name=queue_name, worker_id=worker_id)
+            if job:
+                processed += 1
+                empty_polls = 0
+                print(f"Processed job {job.id}: {job.status} - {job.message}")
+                continue
+
+            stats = queue_stats(queue_name=queue_name)
+            if not forever:
                 break
-            processed += 1
-            print(f"Processed job {job.id}: {job.status} - {job.message}")
+            empty_polls += 1
+            print(f"No queued jobs. Poll {empty_polls}. Stats: {stats}. Sleeping {sleep_seconds}s")
+            time.sleep(max(int(sleep_seconds or 5), 1))
         print(f"Worker finished. Jobs processed: {processed}")
+
+    @app.cli.command("release-stale-jobs")
+    @click.option("--stale-minutes", default=15, show_default=True, type=int)
+    @click.option("--worker-id", default="render-cli", show_default=True)
+    def release_stale_jobs_command(stale_minutes, worker_id):
+        """Release stale locked jobs back to the persistent queue."""
+        from app.jobs import release_stale_jobs
+        count = release_stale_jobs(stale_after_minutes=stale_minutes, worker_id=worker_id)
+        print(f"Released stale jobs: {count}")
 
     @app.cli.command("rebuild-performance-cache")
     def rebuild_performance_cache():

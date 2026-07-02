@@ -220,6 +220,42 @@ def run_next_job(queue_name: str = "default", worker_id: str = "worker") -> Opti
     return run_job(job, worker_id=worker_id)
 
 
+def release_stale_jobs(stale_after_minutes: int = 15, *, worker_id: str = "system") -> int:
+    """Release running jobs whose heartbeat is stale.
+
+    Render can restart a web or worker container while a job is locked.  Because
+    the queue is persistent, stale locks must be returned to the queue so an
+    Admin or worker can continue processing safely.
+    """
+    cutoff = utcnow() - timedelta(minutes=max(int(stale_after_minutes or 15), 1))
+    stale_jobs = (ImportJob.query
+                  .filter(ImportJob.status.in_(["running", "processing", "validating", "publishing"]))
+                  .filter((ImportJob.heartbeat_at.is_(None)) | (ImportJob.heartbeat_at < cutoff))
+                  .all())
+    for job in stale_jobs:
+        job.status = "queued"
+        job.message = f"Released stale lock by {worker_id}."[:255]
+        job.available_at = utcnow()
+        job.locked_at = None
+        job.locked_by = None
+        add_job_log(job, "warning", "Stale job lock released", {"worker_id": worker_id, "stale_after_minutes": stale_after_minutes}, commit=False)
+    if stale_jobs:
+        db.session.commit()
+    return len(stale_jobs)
+
+
+def queue_stats(queue_name: str = "default") -> dict:
+    """Return lightweight queue status counts for dashboards and workers."""
+    rows = (db.session.query(ImportJob.status, db.func.count(ImportJob.id))
+            .filter((ImportJob.queue_name == queue_name) | (ImportJob.queue_name.is_(None)))
+            .group_by(ImportJob.status)
+            .all())
+    stats = {status: int(count or 0) for status, count in rows}
+    stats["active"] = sum(stats.get(status, 0) for status in JOB_STATUSES_ACTIVE)
+    stats["done"] = sum(stats.get(status, 0) for status in JOB_STATUSES_DONE)
+    return stats
+
+
 def retry_job(job: ImportJob, *, reset_progress: bool = True) -> ImportJob:
     if reset_progress:
         job.current_step = 0

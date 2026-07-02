@@ -32,6 +32,9 @@
             <form method="post" action="{{ url_for('admin.operations_run_next_job') }}" class="inline-form">
                 <button class="btn-primary" type="submit">Run Next Job</button>
             </form>
+            <form method="post" action="{{ url_for('admin.operations_release_stale_jobs') }}" class="inline-form">
+                <button class="btn-secondary" type="submit">Release Stale Jobs</button>
+            </form>
             <form method="post" action="{{ url_for('admin.operations_rebuild_cache') }}" class="inline-form">
                 <input type="hidden" name="year" value="{{ latest_period.year }}">
                 <input type="hidden" name="month" value="{{ latest_period.month }}">

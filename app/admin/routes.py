@@ -2214,6 +2214,18 @@ def operations_cancel_job(job_id):
     return redirect(url_for("admin.operations_centre"))
 
 
+@admin_bp.route("/operations/jobs/release-stale", methods=["POST"])
+@login_required
+def operations_release_stale_jobs():
+    if not can_view_operations_centre():
+        abort(403)
+    from app.jobs import release_stale_jobs
+    count = release_stale_jobs(stale_after_minutes=15, worker_id=f"web:{current_user.id}")
+    log_action("Operations", "Released stale jobs", f"Released stale jobs: {count}")
+    flash(f"Released stale jobs: {count}", "success" if count else "info")
+    return redirect(url_for("admin.operations_centre"))
+
+
 @admin_bp.route("/operations/jobs/<int:job_id>/release", methods=["POST"])
 @login_required
 def operations_release_job(job_id):
