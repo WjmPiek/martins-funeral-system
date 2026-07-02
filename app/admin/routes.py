@@ -9,7 +9,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
-from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, user_franchises
+from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, SystemEvent, EventSubscription, EventProcessingLog, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
@@ -2094,6 +2094,17 @@ def operations_centre():
     latest_notifications = LiveNotification.query.order_by(LiveNotification.created_at.desc()).limit(12).all()
     latest_audit_logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(12).all()
 
+    try:
+        from app.events import event_stats, ensure_default_subscriptions
+        ensure_default_subscriptions(commit=False)
+        event_bus_stats = event_stats()
+    except Exception:
+        event_bus_stats = {}
+    latest_system_events = SystemEvent.query.order_by(SystemEvent.created_at.desc()).limit(15).all()
+    failed_system_events = SystemEvent.query.filter(SystemEvent.status.in_(["failed", "needs_review"])).order_by(SystemEvent.created_at.desc()).limit(10).all()
+    event_subscriptions = EventSubscription.query.order_by(EventSubscription.event_type, EventSubscription.name).limit(20).all()
+    latest_event_logs = EventProcessingLog.query.order_by(EventProcessingLog.created_at.desc()).limit(15).all()
+
     unread_notifications = LiveNotification.query.filter(LiveNotification.read_at.is_(None)).count()
     admin_cards = [
         {"label": "Latest period", "value": f"{latest_period['year']}-{int(latest_period['month']):02d}", "tone": "ok" if latest_period.get("rows") else "warning"},
@@ -2104,6 +2115,8 @@ def operations_centre():
         {"label": "Online workers", "value": len(online_workers), "tone": "ok" if online_workers else "warning"},
         {"label": "Valid cache rows", "value": cache.get("valid", 0), "tone": "ok" if cache.get("valid", 0) else "warning"},
         {"label": "Unread notifications", "value": unread_notifications, "tone": "warning" if unread_notifications else "ok"},
+        {"label": "Pending events", "value": event_bus_stats.get("pending", 0), "tone": "warning" if event_bus_stats.get("pending", 0) else "ok"},
+        {"label": "Failed events", "value": event_bus_stats.get("failed", 0), "tone": "danger" if event_bus_stats.get("failed", 0) else "ok"},
     ]
 
     health_checks = [
@@ -2113,6 +2126,7 @@ def operations_centre():
         {"label": "Franchise agreements", "status": "Review" if diagnostics["missing_agreements"] else "OK", "tone": "warning" if diagnostics["missing_agreements"] else "ok", "detail": f"{diagnostics['missing_agreements']} franchises have missing agreement dates."},
         {"label": "Performance cache", "status": "OK" if cache.get("valid", 0) else "Needs warmup", "tone": "ok" if cache.get("valid", 0) else "warning", "detail": f"{cache.get('valid', 0)} valid / {cache.get('invalidated', 0)} invalidated cache rows."},
         {"label": "Background worker", "status": "Online" if online_workers else "Not detected", "tone": "ok" if online_workers else "warning", "detail": f"{len(online_workers)} active worker heartbeat row(s)."},
+        {"label": "Event bus", "status": "Review" if event_bus_stats.get("failed", 0) else "OK", "tone": "danger" if event_bus_stats.get("failed", 0) else "ok", "detail": f"{event_bus_stats.get('pending', 0)} pending / {event_bus_stats.get('failed', 0)} failed / {event_bus_stats.get('processed', 0)} processed events."},
     ]
 
     table_counts = [
@@ -2123,6 +2137,8 @@ def operations_centre():
         {"table": "import_jobs", "count": _ops_count("import_jobs")},
         {"table": "worker_heartbeats", "count": _ops_count("worker_heartbeats")},
         {"table": "live_events", "count": _ops_count("live_events")},
+        {"table": "system_events", "count": _ops_count("system_events")},
+        {"table": "event_processing_logs", "count": _ops_count("event_processing_logs")},
         {"table": "performance_page_cache", "count": _ops_count("performance_page_cache")},
         {"table": "audit_logs", "count": _ops_count("audit_logs")},
     ]
@@ -2146,6 +2162,11 @@ def operations_centre():
         latest_events=latest_events,
         latest_notifications=latest_notifications,
         latest_audit_logs=latest_audit_logs,
+        event_bus_stats=event_bus_stats,
+        latest_system_events=latest_system_events,
+        failed_system_events=failed_system_events,
+        event_subscriptions=event_subscriptions,
+        latest_event_logs=latest_event_logs,
         table_counts=table_counts,
         latest_period=latest_period,
     )
@@ -2175,6 +2196,20 @@ def operations_rebuild_cache():
         year = int(latest.get("year") or datetime.utcnow().year)
     franchise_ids = [fid for (fid,) in db.session.query(Franchise.id).filter(Franchise.is_performance_active == True).all()]
     result = warm_performance_cache_for_period(month, year, franchise_ids=franchise_ids)
+    try:
+        from app.events import emit_event
+        emit_event(
+            "cache.rebuilt",
+            source="operations.cache.rebuild",
+            title=f"Performance cache rebuilt for {year}-{month:02d}",
+            message=f"{result.get('cache_rows', 0)} cache rows rebuilt.",
+            payload=result,
+            year=year,
+            month=month,
+            aggregate_type="performance_cache",
+        )
+    except Exception:
+        pass
     log_action("Operations", "Rebuilt performance cache", f"Period: {year}-{month:02d}; Result: {result}")
     flash(f"Performance cache rebuilt for {year}-{month:02d}: {result.get('cache_rows', 0)} cache rows and {result.get('performance_rows', 0)} performance rows.", "success")
     return redirect(url_for("admin.operations_centre"))
@@ -2246,6 +2281,43 @@ def operations_release_job(job_id):
     db.session.commit()
     log_action("Operations", "Released stale job", f"Job {job.id}: {job.kind}")
     flash(f"Job {job.id} released back to the queue.", "success")
+    return redirect(url_for("admin.operations_centre"))
+
+
+@admin_bp.route("/operations/events/process", methods=["POST"])
+@login_required
+def operations_process_events():
+    if not can_view_operations_centre():
+        abort(403)
+    from app.events import process_pending_events
+    count = process_pending_events(limit=50, worker_id=f"web:{current_user.id}")
+    log_action("Operations", "Processed event bus", f"Events processed: {count}")
+    flash(f"Processed event bus events: {count}", "success" if count else "info")
+    return redirect(url_for("admin.operations_centre"))
+
+
+@admin_bp.route("/operations/events/<int:event_id>/retry", methods=["POST"])
+@login_required
+def operations_retry_event(event_id):
+    if not can_view_operations_centre():
+        abort(403)
+    from app.events import retry_event
+    event = SystemEvent.query.get_or_404(event_id)
+    retry_event(event)
+    log_action("Operations", "Retried event", f"Event {event.id}: {event.event_type}")
+    flash(f"Event {event.id} queued for retry.", "success")
+    return redirect(url_for("admin.operations_centre"))
+
+
+@admin_bp.route("/operations/events/release-stale", methods=["POST"])
+@login_required
+def operations_release_stale_events():
+    if not can_view_operations_centre():
+        abort(403)
+    from app.events import release_stale_events
+    count = release_stale_events(stale_after_minutes=15, worker_id=f"web:{current_user.id}")
+    log_action("Operations", "Released stale events", f"Events released: {count}")
+    flash(f"Released stale events: {count}", "success" if count else "info")
     return redirect(url_for("admin.operations_centre"))
 
 

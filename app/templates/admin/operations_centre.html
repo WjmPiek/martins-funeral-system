@@ -43,6 +43,12 @@
             <form method="post" action="{{ url_for('admin.operations_invalidate_cache') }}" class="inline-form">
                 <button class="btn-secondary" type="submit">Invalidate Cache</button>
             </form>
+            <form method="post" action="{{ url_for('admin.operations_process_events') }}" class="inline-form">
+                <button class="btn-primary" type="submit">Process Events</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.operations_release_stale_events') }}" class="inline-form">
+                <button class="btn-secondary" type="submit">Release Stale Events</button>
+            </form>
         </div>
     </div>
     <div class="table-responsive compact-table">
@@ -267,6 +273,86 @@
                     <tr><td>Missing agreement dates</td><td>{{ diagnostics.missing_agreements }}</td><td><a href="{{ url_for('admin.database_diagnostics') }}">View</a></td></tr>
                     <tr><td>Orphan monthly figures</td><td>{{ diagnostics.orphan_monthly_figures }}</td><td><a href="{{ url_for('admin.database_diagnostics') }}">View</a></td></tr>
                     <tr><td>Zero royalty warnings</td><td>{{ diagnostics.zero_royalty_warnings }}</td><td><a href="{{ url_for('admin.database_diagnostics') }}">View</a></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<section class="page-card">
+    <div class="page-header-row">
+        <div>
+            <h2>Enterprise event bus</h2>
+            <p class="page-subtitle">Database-backed event stream that coordinates imports, royalties, cache rebuilds, dashboards, notifications and future modules.</p>
+        </div>
+        <div class="action-row">
+            <form method="post" action="{{ url_for('admin.operations_process_events') }}" class="inline-form"><button class="btn-primary" type="submit">Process Pending Events</button></form>
+        </div>
+    </div>
+    <div class="diagnostic-cards small-cards">
+        {% for status, count in event_bus_stats.items() %}
+            {% if status != 'total' %}
+                <div class="diagnostic-card {% if status == 'failed' %}danger{% elif status in ['pending','processing','queued'] %}warning{% else %}ok{% endif %}">
+                    <span>{{ status|replace('_',' ')|title }}</span><strong>{{ count }}</strong>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="diagnostic-card warning"><span>System events</span><strong>0</strong></div>
+        {% endfor %}
+    </div>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>ID</th><th>Time</th><th>Type</th><th>Source</th><th>Status</th><th>Period</th><th>Message</th><th>Action</th></tr></thead>
+            <tbody>
+            {% for event in latest_system_events %}
+                <tr>
+                    <td>{{ event.id }}</td>
+                    <td>{{ event.created_at.strftime('%Y-%m-%d %H:%M') if event.created_at else '' }}</td>
+                    <td>{{ event.event_type }}</td>
+                    <td>{{ event.source }}</td>
+                    <td><span class="status-pill {{ 'danger' if event.status == 'failed' else 'warning' if event.status in ['pending','processing','queued'] else 'ok' }}">{{ event.status }}</span></td>
+                    <td>{% if event.year and event.month %}{{ event.year }}-{{ '%02d'|format(event.month) }}{% endif %}</td>
+                    <td>{{ event.message }}</td>
+                    <td>{% if event.status == 'failed' %}<form method="post" action="{{ url_for('admin.operations_retry_event', event_id=event.id) }}" class="inline-form"><button class="btn-small" type="submit">Retry</button></form>{% endif %}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8">No system events found yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="diagnostic-grid">
+    <section class="page-card">
+        <h2>Event subscriptions</h2>
+        <p class="page-subtitle">Registered enterprise subsystems that listen for events.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Name</th><th>Event</th><th>Handler</th><th>Status</th></tr></thead>
+                <tbody>
+                {% for sub in event_subscriptions %}
+                    <tr><td>{{ sub.name }}</td><td>{{ sub.event_type }}</td><td>{{ sub.handler }}</td><td><span class="status-pill {{ 'ok' if sub.is_active else 'warning' }}">{{ 'Active' if sub.is_active else 'Inactive' }}</span></td></tr>
+                {% else %}
+                    <tr><td colspan="4">No event subscriptions found.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="page-card">
+        <h2>Event processing log</h2>
+        <p class="page-subtitle">Recent processing and replay history.</p>
+        <div class="table-responsive compact-table">
+            <table>
+                <thead><tr><th>Time</th><th>Event</th><th>Handler</th><th>Status</th><th>Message</th></tr></thead>
+                <tbody>
+                {% for entry in latest_event_logs %}
+                    <tr><td>{{ entry.created_at.strftime('%Y-%m-%d %H:%M') if entry.created_at else '' }}</td><td>{{ entry.system_event_id }}</td><td>{{ entry.handler }}</td><td><span class="status-pill {{ 'danger' if entry.status == 'error' else 'ok' if entry.status == 'success' else 'warning' }}">{{ entry.status }}</span></td><td>{{ entry.message }}</td></tr>
+                {% else %}
+                    <tr><td colspan="5">No event logs found.</td></tr>
+                {% endfor %}
                 </tbody>
             </table>
         </div>

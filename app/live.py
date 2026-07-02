@@ -108,6 +108,22 @@ def publish_monthly_import(month: int, year: int, franchise_ids: Iterable[int], 
         visibility='all',
         payload=payload,
     )
+    try:
+        from app.events import emit_event
+        emit_event(
+            'monthly_import_published',
+            source='live.publish_monthly_import',
+            title=f'Month-end data published for {year}-{int(month):02d}',
+            message=f'{len(ids)} franchise record(s) updated.',
+            payload=payload,
+            import_job_id=getattr(import_job, 'id', None),
+            year=year,
+            month=month,
+            aggregate_type='monthly_figures',
+            aggregate_id=getattr(import_job, 'id', None),
+        )
+    except Exception:
+        pass
     notify_users(
         'Month-end figures updated',
         f'{year}-{int(month):02d} figures were imported, royalties recalculated and dashboards refreshed.',
@@ -182,6 +198,22 @@ def publish_trusted_financials(month: int, year: int, franchise_ids: Iterable[in
         visibility='all',
         payload=payload,
     )
+    try:
+        from app.events import emit_event
+        emit_event(
+            'trusted_financials_published',
+            source='live.publish_trusted_financials',
+            title=f'Trusted financials published for {int(year)}-{int(month):02d}',
+            message=f'Royalties, dashboards, graphs and leaderboard refreshed for {len(ids)} franchise record(s).',
+            payload=payload,
+            import_job_id=getattr(import_job, 'id', None),
+            year=year,
+            month=month,
+            aggregate_type='trusted_financials',
+            aggregate_id=getattr(import_job, 'id', None),
+        )
+    except Exception:
+        pass
     notify_users(
         'Financial data refreshed',
         f'{int(year)}-{int(month):02d} royalties, dashboards, graphs and leaderboard are now up to date.',

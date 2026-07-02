@@ -195,6 +195,27 @@ def create_app(config_class=Config):
         count = release_stale_jobs(stale_after_minutes=stale_minutes, worker_id=worker_id)
         print(f"Released stale jobs: {count}")
 
+    @app.cli.command("process-events")
+    @click.option("--limit", default=50, show_default=True, type=int)
+    @click.option("--worker-id", default="event-cli", show_default=True)
+    @click.option("--release-stale", is_flag=True, help="Release stale processing events before processing pending events.")
+    def process_events_command(limit, worker_id, release_stale):
+        """Process pending enterprise event bus rows."""
+        from app.events import ensure_default_subscriptions, process_pending_events, release_stale_events
+        ensure_default_subscriptions(commit=True)
+        if release_stale:
+            released = release_stale_events(worker_id=worker_id)
+            print(f"Released stale events: {released}")
+        count = process_pending_events(limit=limit, worker_id=worker_id)
+        print(f"Processed events: {count}")
+
+    @app.cli.command("seed-event-subscriptions")
+    def seed_event_subscriptions_command():
+        """Seed default event-bus subscription registry rows."""
+        from app.events import ensure_default_subscriptions
+        count = ensure_default_subscriptions(commit=True)
+        print(f"Event subscriptions created: {count}")
+
     @app.cli.command("rebuild-performance-cache")
     def rebuild_performance_cache():
         """Pre-calculate performance_results for every imported monthly period."""

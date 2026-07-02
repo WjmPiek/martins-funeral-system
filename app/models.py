@@ -947,3 +947,83 @@ class UserDashboardPreference(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     user = db.relationship("User", backref=db.backref("dashboard_preference", uselist=False, lazy=True, cascade="all, delete-orphan"))
+
+
+class SystemEvent(db.Model):
+    """Durable enterprise event bus row.
+
+    Phase 8 introduces a database-backed event stream so modules can publish
+    business events without being tightly coupled to each other.  Workers can
+    process, retry and replay events even after a Render restart.
+    """
+    __tablename__ = "system_events"
+    id = db.Column(db.Integer, primary_key=True)
+    event_type = db.Column(db.String(120), nullable=False, index=True)
+    source = db.Column(db.String(120), nullable=False, default="system", index=True)
+    title = db.Column(db.String(180), nullable=False, default="")
+    message = db.Column(db.String(800), default="")
+    status = db.Column(db.String(30), nullable=False, default="pending", index=True)
+    priority = db.Column(db.Integer, nullable=False, default=100, index=True)
+    correlation_id = db.Column(db.String(120), nullable=True, index=True)
+    aggregate_type = db.Column(db.String(80), nullable=True, index=True)
+    aggregate_id = db.Column(db.Integer, nullable=True, index=True)
+    import_job_id = db.Column(db.Integer, db.ForeignKey("import_jobs.id"), nullable=True, index=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    year = db.Column(db.Integer, nullable=True, index=True)
+    month = db.Column(db.Integer, nullable=True, index=True)
+    payload_json = db.Column(db.Text, nullable=False, default="{}")
+    error_json = db.Column(db.Text, nullable=False, default="")
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    max_attempts = db.Column(db.Integer, nullable=False, default=3)
+    available_at = db.Column(db.DateTime, nullable=True, index=True)
+    locked_at = db.Column(db.DateTime, nullable=True, index=True)
+    locked_by = db.Column(db.String(120), nullable=True, index=True)
+    processed_at = db.Column(db.DateTime, nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    import_job = db.relationship("ImportJob", backref=db.backref("system_events", lazy=True))
+    franchise = db.relationship("Franchise", backref=db.backref("system_events", lazy=True))
+    user = db.relationship("User", backref=db.backref("system_events", lazy=True))
+
+    @property
+    def payload(self):
+        try:
+            return json.loads(self.payload_json or "{}")
+        except Exception:
+            return {}
+
+
+class EventSubscription(db.Model):
+    """Admin-visible registry of which enterprise subsystems consume events."""
+    __tablename__ = "event_subscriptions"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False, unique=True, index=True)
+    event_type = db.Column(db.String(120), nullable=False, index=True)
+    handler = db.Column(db.String(160), nullable=False, default="")
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    description = db.Column(db.String(500), default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class EventProcessingLog(db.Model):
+    """Permanent processing log for event bus diagnostics and replay."""
+    __tablename__ = "event_processing_logs"
+    id = db.Column(db.Integer, primary_key=True)
+    system_event_id = db.Column(db.Integer, db.ForeignKey("system_events.id"), nullable=False, index=True)
+    handler = db.Column(db.String(160), nullable=False, default="event_bus", index=True)
+    status = db.Column(db.String(30), nullable=False, default="info", index=True)
+    message = db.Column(db.String(1000), nullable=False, default="")
+    data_json = db.Column(db.Text, nullable=False, default="{}")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+
+    system_event = db.relationship("SystemEvent", backref=db.backref("processing_logs", lazy=True, cascade="all, delete-orphan"))
+
+    @property
+    def data(self):
+        try:
+            return json.loads(self.data_json or "{}")
+        except Exception:
+            return {}

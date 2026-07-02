@@ -196,6 +196,21 @@ def update_job_progress(job: ImportJob, step: Optional[int] = None, message: Opt
         if status == "completed":
             job.current_step = job.total_steps
             job.progress_percent = 100
+        try:
+            from app.events import emit_event
+            emit_event(
+                f"job.{status}",
+                source="jobs.update_job_progress",
+                title=f"Job {job.id} {status}",
+                message=job.message or "",
+                payload={"job_id": job.id, "kind": job.kind, "status": status, "progress": job.progress_percent},
+                import_job_id=job.id,
+                aggregate_type="import_job",
+                aggregate_id=job.id,
+                commit=False,
+            )
+        except Exception:
+            current_app.logger.debug("Event emission skipped for job completion", exc_info=True)
     if commit:
         db.session.commit()
     return job
@@ -220,6 +235,21 @@ def fail_job(job: ImportJob, exc: Exception | str, *, retryable: bool = True, co
         job.locked_by = None
         job.error_json = _json_dumps({"error": str(exc), "traceback": traceback.format_exc()})[:20000]
         add_job_log(job, "error", message, commit=False)
+    try:
+        from app.events import emit_event
+        emit_event(
+            "job.failed" if job.status == "failed" else "job.retry_scheduled",
+            source="jobs.fail_job",
+            title=f"Job {job.id} {job.status}",
+            message=job.message or message,
+            payload={"job_id": job.id, "kind": job.kind, "status": job.status, "attempts": attempts, "max_attempts": max_attempts},
+            import_job_id=job.id,
+            aggregate_type="import_job",
+            aggregate_id=job.id,
+            commit=False,
+        )
+    except Exception:
+        current_app.logger.debug("Event emission skipped for job failure", exc_info=True)
     if commit:
         db.session.commit()
     return job
