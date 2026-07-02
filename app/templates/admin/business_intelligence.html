@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Business Intelligence{% endblock %}
+{% block content %}
+<section class="page-shell business-intelligence">
+    <div class="page-header split-header">
+        <div>
+            <p class="eyebrow">Phase 11 • Enterprise Business Intelligence</p>
+            <h1>Business Intelligence</h1>
+            <p class="muted">Franchise health scoring, province comparison, target analysis and executive insights. This does not change royalty calculations.</p>
+        </div>
+        <form method="get" class="inline-form card compact-form">
+            <label>Month
+                <input type="number" name="month" min="1" max="12" value="{{ selected_month }}" required>
+            </label>
+            <label>Year
+                <input type="number" name="year" min="2000" max="2100" value="{{ selected_year }}" required>
+            </label>
+            <button class="btn btn-primary" type="submit">View Period</button>
+        </form>
+    </div>
+
+    <div class="stats-grid executive-kpi-grid">
+        <div class="stat-card executive-kpi-card">
+            <span>Company Health Score</span>
+            <strong>{{ '%.1f'|format(summary.avg_score or 0) }}%</strong>
+            <small>Average franchise health for {{ selected_year }}-{{ "%02d"|format(selected_month) }}</small>
+        </div>
+        <div class="stat-card executive-kpi-card">
+            <span>Healthy</span>
+            <strong>{{ summary.status.get('healthy', {}).get('count', 0)|count_value }}</strong>
+            <small>Strong or stable performance</small>
+        </div>
+        <div class="stat-card executive-kpi-card">
+            <span>Watch</span>
+            <strong>{{ summary.status.get('watch', {}).get('count', 0)|count_value }}</strong>
+            <small>Needs monitoring</small>
+        </div>
+        <div class="stat-card executive-kpi-card">
+            <span>Critical</span>
+            <strong>{{ summary.status.get('critical', {}).get('count', 0)|count_value }}</strong>
+            <small>Needs review</small>
+        </div>
+    </div>
+
+    <div class="grid two-col">
+        <section class="card">
+            <div class="section-title-row">
+                <h2>Executive Insights</h2>
+                <form method="post" action="{{ url_for('admin.business_intelligence_rebuild') }}">
+                    <input type="hidden" name="month" value="{{ selected_month }}">
+                    <input type="hidden" name="year" value="{{ selected_year }}">
+                    <button class="btn btn-light btn-sm" type="submit">Rebuild Intelligence</button>
+                </form>
+            </div>
+            <div class="alert-list">
+                {% for insight in summary.insights %}
+                    <div class="alert-row alert-{{ 'danger' if insight.severity == 'danger' else ('warning' if insight.severity == 'warning' else ('ok' if insight.severity == 'success' else 'neutral')) }}">
+                        <span>
+                            <strong>{{ insight.title }}</strong><br>
+                            <small>{{ insight.message }}</small>
+                        </span>
+                        {% if insight.franchise %}<small>{{ insight.franchise.business_name }}</small>{% endif %}
+                    </div>
+                {% else %}
+                    <p class="muted">No insights generated for this period yet. Use Rebuild Intelligence.</p>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title-row">
+                <h2>Province Intelligence</h2>
+                <span class="badge badge-light">Lowest score first</span>
+            </div>
+            <table class="data-table compact-table">
+                <thead><tr><th>Province</th><th>Score</th><th>Franchises</th><th>Gross</th><th>Growth</th><th>Critical</th></tr></thead>
+                <tbody>
+                {% for row in province_rows %}
+                    <tr>
+                        <td>{{ row.province }}</td>
+                        <td>{{ '%.1f'|format(row.avg_health_score or 0) }}%</td>
+                        <td>{{ row.franchises|count_value }}</td>
+                        <td>{{ row.gross_turnover|rand }}</td>
+                        <td>{{ '%.1f'|format(row.avg_growth_percent or 0) }}%</td>
+                        <td>{{ row.critical_count|count_value }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="muted">No province intelligence for this period.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <div class="grid two-col">
+        <section class="card">
+            <div class="section-title-row">
+                <h2>Critical / Watch Franchises</h2>
+                <span class="badge badge-warning">Lowest health score</span>
+            </div>
+            <table class="data-table compact-table">
+                <thead><tr><th>Franchise</th><th>Status</th><th>Score</th><th>Growth</th><th>Target</th><th>Reason</th></tr></thead>
+                <tbody>
+                {% for item in health_rows %}
+                    <tr>
+                        <td>{{ item.franchise.business_name }}</td>
+                        <td><span class="badge {{ 'badge-danger' if item.health_status == 'critical' else ('badge-warning' if item.health_status == 'watch' else 'badge-success') }}">{{ item.health_status }}</span></td>
+                        <td>{{ '%.1f'|format(item.health_score or 0) }}%</td>
+                        <td>{{ '%.1f'|format(item.growth_percent or 0) }}%</td>
+                        <td>{{ '%.1f'|format(item.target_achievement_percent or 0) }}%</td>
+                        <td><small>{{ item.reasons[0] if item.reasons else 'No reason recorded.' }}</small></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="6" class="muted">No health snapshots for this period.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <div class="section-title-row">
+                <h2>Target Achievement Warnings</h2>
+                <span class="badge badge-danger">Below 80%</span>
+            </div>
+            <table class="data-table compact-table">
+                <thead><tr><th>Franchise</th><th>Target</th><th>Gross</th><th>Achievement</th><th>Status</th></tr></thead>
+                <tbody>
+                {% for item in target_misses %}
+                    <tr>
+                        <td>{{ item.franchise.business_name }}</td>
+                        <td>{{ item.target_amount|rand }}</td>
+                        <td>{{ item.gross_turnover|rand }}</td>
+                        <td>{{ '%.1f'|format(item.target_achievement_percent or 0) }}%</td>
+                        <td>{{ item.health_status }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5" class="muted">No below-target warnings for this period.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <div class="grid two-col">
+        <section class="card">
+            <div class="section-title-row"><h2>Fastest Growth</h2></div>
+            <table class="data-table compact-table">
+                <thead><tr><th>Franchise</th><th>Growth</th><th>Gross</th><th>Health</th></tr></thead>
+                <tbody>
+                {% for item in top_growth %}
+                    <tr><td>{{ item.franchise.business_name }}</td><td>{{ '%.1f'|format(item.growth_percent or 0) }}%</td><td>{{ item.gross_turnover|rand }}</td><td>{{ '%.1f'|format(item.health_score or 0) }}%</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        <section class="card">
+            <div class="section-title-row"><h2>Largest Declines</h2></div>
+            <table class="data-table compact-table">
+                <thead><tr><th>Franchise</th><th>Growth</th><th>Gross</th><th>Health</th></tr></thead>
+                <tbody>
+                {% for item in biggest_decline %}
+                    <tr><td>{{ item.franchise.business_name }}</td><td>{{ '%.1f'|format(item.growth_percent or 0) }}%</td><td>{{ item.gross_turnover|rand }}</td><td>{{ '%.1f'|format(item.health_score or 0) }}%</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <section class="card">
+        <div class="section-title-row"><h2>BI Period History</h2><span class="badge badge-light">Generated snapshots</span></div>
+        <table class="data-table compact-table">
+            <thead><tr><th>Period</th><th>Snapshots</th><th>Average Score</th><th></th></tr></thead>
+            <tbody>
+            {% for row in periods %}
+                <tr>
+                    <td>{{ row.year }}-{{ "%02d"|format(row.month) }}</td>
+                    <td>{{ row.snapshots|count_value }}</td>
+                    <td>{{ '%.1f'|format(row.avg_health_score or 0) }}%</td>
+                    <td><a class="btn btn-light btn-sm" href="{{ url_for('admin.business_intelligence', year=row.year, month=row.month) }}">View</a></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4" class="muted">No generated BI history yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</section>
+{% endblock %}

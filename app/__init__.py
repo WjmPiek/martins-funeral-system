@@ -247,6 +247,17 @@ def create_app(config_class=Config):
         profile = ensure_default_growth_profile(commit=True)
         print(f"Royalty growth profile ready: {profile.name} ({profile.default_growth_percent}%)")
 
+
+    @app.cli.command("rebuild-business-intelligence")
+    @click.option("--month", type=int, required=False, help="Reporting month number, 1-12. Defaults to latest period.")
+    @click.option("--year", type=int, required=False, help="Reporting year. Defaults to latest period.")
+    def rebuild_business_intelligence_command(month, year):
+        """Rebuild Phase 11 franchise health scores and executive insights."""
+        from app.business_intelligence import rebuild_business_intelligence, latest_period
+        period = latest_period() if not month or not year else {"month": month, "year": year}
+        result = rebuild_business_intelligence(period["year"], period["month"], commit=True)
+        print(f"Business intelligence rebuilt for {result['year']}-{result['month']:02d}: {result['snapshots']} snapshots, {result['insights']} insights")
+
     @app.cli.command("check-franchise-expiry")
     def check_franchise_expiry():
         from app.franchise.notifications import send_agreement_expiry_reminders

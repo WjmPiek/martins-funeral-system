@@ -1057,6 +1057,71 @@ class RoyaltyOverride(db.Model):
     created_by = db.relationship("User", backref=db.backref("royalty_overrides", lazy=True))
 
 
+class FranchiseHealthSnapshot(db.Model):
+    """Business Intelligence health snapshot for one franchise and period.
+
+    Phase 11 is analytical only: it reads monthly figures/royalty snapshots and
+    stores health scoring without changing royalty calculations.
+    """
+    __tablename__ = "franchise_health_snapshots"
+    id = db.Column(db.Integer, primary_key=True)
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=False, index=True)
+    year = db.Column(db.Integer, nullable=False, index=True)
+    month = db.Column(db.Integer, nullable=False, index=True)
+    health_score = db.Column(db.Numeric(8, 2), nullable=False, default=0)
+    health_status = db.Column(db.String(30), nullable=False, default="watch", index=True)
+    gross_turnover = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    previous_gross_turnover = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    growth_percent = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    target_amount = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    target_achievement_percent = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    royalty_amount = db.Column(db.Numeric(14, 2), nullable=False, default=0)
+    royalty_ratio_percent = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    consecutive_growth_months = db.Column(db.Integer, nullable=False, default=0)
+    consecutive_decline_months = db.Column(db.Integer, nullable=False, default=0)
+    reasons_json = db.Column(db.Text, nullable=False, default="[]")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    franchise = db.relationship("Franchise", backref=db.backref("health_snapshots", lazy=True, cascade="all, delete-orphan"))
+
+    @property
+    def reasons(self):
+        try:
+            return json.loads(self.reasons_json or "[]")
+        except Exception:
+            return []
+
+
+class BusinessInsight(db.Model):
+    """Human-readable insight generated from operational and royalty data."""
+    __tablename__ = "business_insights"
+    id = db.Column(db.Integer, primary_key=True)
+    insight_type = db.Column(db.String(80), nullable=False, index=True)
+    severity = db.Column(db.String(30), nullable=False, default="info", index=True)
+    title = db.Column(db.String(180), nullable=False, default="")
+    message = db.Column(db.Text, nullable=False, default="")
+    franchise_id = db.Column(db.Integer, db.ForeignKey("franchises.id"), nullable=True, index=True)
+    year = db.Column(db.Integer, nullable=True, index=True)
+    month = db.Column(db.Integer, nullable=True, index=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    data_json = db.Column(db.Text, nullable=False, default="{}")
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    acknowledged_at = db.Column(db.DateTime, nullable=True, index=True)
+    acknowledged_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+
+    franchise = db.relationship("Franchise", backref=db.backref("business_insights", lazy=True, cascade="all, delete-orphan"))
+    acknowledged_by = db.relationship("User", backref=db.backref("acknowledged_business_insights", lazy=True))
+
+    @property
+    def data(self):
+        try:
+            return json.loads(self.data_json or "{}")
+        except Exception:
+            return {}
+
+
+
 class SystemEvent(db.Model):
     """Durable enterprise event bus row.
 

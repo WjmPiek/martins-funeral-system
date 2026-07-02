@@ -9,7 +9,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
-from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, SystemEvent, EventSubscription, EventProcessingLog, RoyaltyGrowthProfile, RoyaltyAgreementProfile, RoyaltyCalculationSnapshot, RoyaltyOverride, user_franchises
+from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, LiveEvent, LiveNotification, PerformancePageCache, ImportJobLog, WorkerHeartbeat, SystemEvent, EventSubscription, EventProcessingLog, RoyaltyGrowthProfile, RoyaltyAgreementProfile, RoyaltyCalculationSnapshot, RoyaltyOverride, FranchiseHealthSnapshot, BusinessInsight, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
@@ -2182,6 +2182,13 @@ def executive_dashboard():
         cache = cache_stats()
     except Exception:
         cache = {"valid": 0, "invalidated": 0}
+    bi_summary = {}
+    try:
+        from app.business_intelligence import get_intelligence_summary
+        bi_summary = get_intelligence_summary(selected_year, selected_month)
+    except Exception:
+        db.session.rollback()
+        bi_summary = {"avg_score": 0, "status": {}, "insights": []}
     event_stats_data = {}
     try:
         from app.events import event_stats
@@ -2198,11 +2205,13 @@ def executive_dashboard():
         {"label": "Failed events", "value": event_stats_data.get("failed", 0), "tone": "danger", "url": url_for("admin.operations_centre")},
         {"label": "Online workers", "value": len(online_workers), "tone": "ok" if online_workers else "warning", "url": url_for("admin.operations_centre")},
         {"label": "Valid cache rows", "value": cache.get("valid", 0), "tone": "ok" if cache.get("valid", 0) else "warning", "url": url_for("admin.operations_centre")},
+        {"label": "BI health score", "value": f"{bi_summary.get('avg_score', 0):.1f}%", "tone": "ok" if bi_summary.get("avg_score", 0) >= 70 else "warning", "url": url_for("admin.business_intelligence", year=selected_year, month=selected_month)},
     ]
 
     quick_links = [
         {"label": "Import Centre", "detail": "Review uploads and import results", "url": url_for("admin.import_centre")},
         {"label": "Royalty Management", "detail": "Recalculate and audit royalties", "url": url_for("admin.royalty_management")},
+        {"label": "Business Intelligence", "detail": "Health scoring, trends and insights", "url": url_for("admin.business_intelligence", year=selected_year, month=selected_month)},
         {"label": "Operations Centre", "detail": "Workers, events and system health", "url": url_for("admin.operations_centre")},
         {"label": "Performance Graphs", "detail": "View company and franchise graphs", "url": url_for("performance.graphs")},
         {"label": "Leaderboard", "detail": "Company-wide franchise ranking", "url": url_for("performance.index")},
@@ -2229,9 +2238,119 @@ def executive_dashboard():
         online_workers=online_workers,
         cache=cache,
         event_stats=event_stats_data,
+        bi_summary=bi_summary,
         warnings=warnings,
         quick_links=quick_links,
     )
+
+
+@admin_bp.route("/business-intelligence")
+@login_required
+def business_intelligence():
+    """Phase 11 Enterprise Business Intelligence dashboard."""
+    if not can_view_operations_centre():
+        abort(403)
+
+    from app.business_intelligence import latest_period, get_intelligence_summary
+
+    latest = latest_period()
+    selected_year = int(request.args.get("year") or latest.get("year") or datetime.utcnow().year)
+    selected_month = int(request.args.get("month") or latest.get("month") or datetime.utcnow().month)
+    summary = get_intelligence_summary(selected_year, selected_month)
+
+    health_rows = FranchiseHealthSnapshot.query.filter_by(year=selected_year, month=selected_month)\
+        .join(Franchise)\
+        .order_by(FranchiseHealthSnapshot.health_score.asc(), Franchise.business_name.asc())\
+        .limit(40).all()
+
+    top_growth = FranchiseHealthSnapshot.query.filter_by(year=selected_year, month=selected_month)\
+        .join(Franchise)\
+        .order_by(FranchiseHealthSnapshot.growth_percent.desc(), Franchise.business_name.asc())\
+        .limit(10).all()
+
+    biggest_decline = FranchiseHealthSnapshot.query.filter_by(year=selected_year, month=selected_month)\
+        .join(Franchise)\
+        .order_by(FranchiseHealthSnapshot.growth_percent.asc(), Franchise.business_name.asc())\
+        .limit(10).all()
+
+    target_misses = FranchiseHealthSnapshot.query.filter_by(year=selected_year, month=selected_month)\
+        .filter(FranchiseHealthSnapshot.target_amount > 0)\
+        .filter(FranchiseHealthSnapshot.target_achievement_percent < 80)\
+        .join(Franchise)\
+        .order_by(FranchiseHealthSnapshot.target_achievement_percent.asc(), Franchise.business_name.asc())\
+        .limit(15).all()
+
+    province_rows = _safe_rows("""
+        WITH province_map AS (
+            SELECT franchise_id, MAX(NULLIF(province, '')) AS province
+            FROM heatmap_records
+            GROUP BY franchise_id
+        )
+        SELECT COALESCE(pm.province, 'Unassigned') AS province,
+               COUNT(*) AS franchises,
+               COALESCE(AVG(fhs.health_score), 0) AS avg_health_score,
+               COALESCE(SUM(fhs.gross_turnover), 0) AS gross_turnover,
+               COALESCE(SUM(fhs.royalty_amount), 0) AS royalty_amount,
+               COALESCE(AVG(fhs.growth_percent), 0) AS avg_growth_percent,
+               SUM(CASE WHEN fhs.health_status = 'critical' THEN 1 ELSE 0 END) AS critical_count,
+               SUM(CASE WHEN fhs.health_status = 'watch' THEN 1 ELSE 0 END) AS watch_count,
+               SUM(CASE WHEN fhs.health_status = 'healthy' THEN 1 ELSE 0 END) AS healthy_count
+        FROM franchise_health_snapshots fhs
+        LEFT JOIN province_map pm ON pm.franchise_id = fhs.franchise_id
+        WHERE fhs.year = :year AND fhs.month = :month
+        GROUP BY COALESCE(pm.province, 'Unassigned')
+        ORDER BY avg_health_score ASC, gross_turnover DESC
+    """, {"year": selected_year, "month": selected_month})
+
+    periods = _safe_rows("""
+        SELECT year, month, COUNT(*) AS snapshots, COALESCE(AVG(health_score), 0) AS avg_health_score
+        FROM franchise_health_snapshots
+        GROUP BY year, month
+        ORDER BY year DESC, month DESC
+        LIMIT 12
+    """)
+
+    return render_template(
+        "admin/business_intelligence.html",
+        selected_year=selected_year,
+        selected_month=selected_month,
+        latest_period=latest,
+        summary=summary,
+        health_rows=health_rows,
+        top_growth=top_growth,
+        biggest_decline=biggest_decline,
+        target_misses=target_misses,
+        province_rows=province_rows,
+        periods=periods,
+    )
+
+
+@admin_bp.route("/business-intelligence/rebuild", methods=["POST"])
+@login_required
+def business_intelligence_rebuild():
+    if not can_view_operations_centre():
+        abort(403)
+    from app.business_intelligence import rebuild_business_intelligence, latest_period
+    latest = latest_period()
+    selected_year = int(request.form.get("year") or latest.get("year") or datetime.utcnow().year)
+    selected_month = int(request.form.get("month") or latest.get("month") or datetime.utcnow().month)
+    result = rebuild_business_intelligence(selected_year, selected_month, commit=True)
+    try:
+        from app.events import emit_event
+        emit_event(
+            "business_intelligence.rebuilt",
+            source="business_intelligence",
+            title="Business intelligence rebuilt",
+            message=f"Business intelligence rebuilt for {selected_year}-{selected_month:02d}.",
+            year=selected_year,
+            month=selected_month,
+            payload=result,
+        )
+    except Exception:
+        db.session.rollback()
+    log_action("Business Intelligence", "Rebuilt BI", f"Period {selected_year}-{selected_month:02d}; snapshots {result.get('snapshots', 0)}")
+    flash(f"Business Intelligence rebuilt for {selected_year}-{selected_month:02d}.", "success")
+    return redirect(url_for("admin.business_intelligence", year=selected_year, month=selected_month))
 
 
 @admin_bp.route("/operations")
