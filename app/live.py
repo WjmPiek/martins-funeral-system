@@ -164,6 +164,13 @@ def publish_trusted_financials(month: int, year: int, franchise_ids: Iterable[in
     """
     ids = [int(fid) for fid in (franchise_ids or []) if fid]
     payload = _refresh_payload(month, year, ids, source, report)
+    # Phase 5: build performance/graph cache before notifying users so their
+    # next page load is served from pre-calculated rows instead of live queries.
+    try:
+        from app.performance.service import warm_performance_cache_for_period
+        payload['cache'] = warm_performance_cache_for_period(month, year, ids)
+    except Exception as exc:
+        payload['cache'] = {'error': str(exc)}
     event = create_live_event(
         'trusted_financials_published',
         f'Trusted financials published for {int(year)}-{int(month):02d}',

@@ -7,6 +7,7 @@ from sqlalchemy import func
 from app.extensions import db
 from app.franchise_context import get_accessible_franchises, get_selected_franchise, is_franchise_view_mode
 from app.models import Franchise, FranchiseTarget, MonthlyFigure, PerformanceGrowthBracket, PerformanceResult, PerformanceSnapshot
+from app.performance.cache import build_cache_key, get_cached_payload, invalidate_performance_cache, set_cached_payload
 
 MONTHS = [
     (1, "January"), (2, "February"), (3, "March"), (4, "April"),
@@ -1423,7 +1424,20 @@ def aggregate_growth_trend_series(franchise_ids, metric_key, end_month, end_year
 
 def graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, periods=12, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
     franchise_ids = filter_active_franchise_ids(franchise_ids or [])
-    return {
+    cache_key = build_cache_key(
+        'graph_aggregate',
+        month=month,
+        year=year,
+        metric=metric_key,
+        franchise_ids=franchise_ids,
+        scope='aggregate',
+        extra={'periods': int(periods or 12), 'mode': mode, 'growth': str(growth_percent)},
+    )
+    cached = get_cached_payload('graph_aggregate', cache_key)
+    if cached is not None:
+        cached['cache_status'] = 'hit'
+        return cached
+    payload = {
         'metric_key': metric_key,
         'metric_label': PERFORMANCE_METRICS[metric_key]['label'],
         'actual_vs_target': aggregate_trend_series(franchise_ids, metric_key, month, year, periods, mode, growth_percent),
@@ -1431,11 +1445,30 @@ def graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, 
         'rolling_12': aggregate_rolling_12_series(franchise_ids, metric_key, month, year, periods),
         'forecast': aggregate_forecast_series(franchise_ids, metric_key, month, year, periods, mode, growth_percent),
         'growth_trend': aggregate_growth_trend_series(franchise_ids, metric_key, month, year, periods),
+        'cache_status': 'rebuilt',
     }
+    set_cached_payload(
+        'graph_aggregate', cache_key, payload, month=month, year=year, metric=metric_key,
+        scope_type='aggregate', row_count=len(franchise_ids),
+    )
+    return payload
 
 def graph_engine_payload(franchise_id, metric_key, month, year, periods=12, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+    cache_key = build_cache_key(
+        'graph_franchise',
+        month=month,
+        year=year,
+        metric=metric_key,
+        franchise_ids=[franchise_id],
+        scope='franchise',
+        extra={'periods': int(periods or 12), 'mode': mode, 'growth': str(growth_percent)},
+    )
+    cached = get_cached_payload('graph_franchise', cache_key)
+    if cached is not None:
+        cached['cache_status'] = 'hit'
+        return cached
     actual_target = trend_series(franchise_id, metric_key, month, year, periods, mode, growth_percent)
-    return {
+    payload = {
         'metric_key': metric_key,
         'metric_label': PERFORMANCE_METRICS[metric_key]['label'],
         'actual_vs_target': actual_target,
@@ -1443,7 +1476,13 @@ def graph_engine_payload(franchise_id, metric_key, month, year, periods=12, mode
         'rolling_12': rolling_12_series(franchise_id, metric_key, month, year, periods),
         'forecast': forecast_series(franchise_id, metric_key, month, year, periods, mode, growth_percent),
         'growth_trend': growth_trend_series(franchise_id, metric_key, month, year, periods),
+        'cache_status': 'rebuilt',
     }
+    set_cached_payload(
+        'graph_franchise', cache_key, payload, month=month, year=year, metric=metric_key,
+        scope_type='franchise', scope_id=int(franchise_id), row_count=1,
+    )
+    return payload
 
 # Phase 7: Leaderboard decision centre helpers
 
@@ -2043,3 +2082,28 @@ def user_access_summary(user):
         "franchises": franchises,
         "scope_label": "All franchises" if user.has_permission("franchise_management:view") or user.has_permission("franchise_management:manage") else f"{len(franchises)} assigned franchise(s)",
     }
+
+
+
+def warm_performance_cache_for_period(month, year, franchise_ids=None, mode='annual_gross_scale', growth_percent=DEFAULT_SA_GDP_GROWTH_PERCENT):
+    """Prebuild the expensive Phase 5 cache rows after import/publish.
+
+    This runs outside normal page rendering so first user after an import does not
+    pay the full graph/summary calculation cost. It is safe to call repeatedly.
+    """
+    franchise_ids = filter_active_franchise_ids(franchise_ids or active_leaderboard_franchise_ids())
+    if not franchise_ids:
+        return {'invalidated': 0, 'performance_rows': 0, 'cache_rows': 0}
+    invalidated = invalidate_performance_cache(month=month, year=year)
+    performance_rows = rebuild_performance_results(month, year, franchise_ids, mode)
+    cache_rows = 0
+    for metric_key in PERFORMANCE_METRICS.keys():
+        graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, 12, mode, growth_percent)
+        cache_rows += 1
+    # Warm each linked branch graph only for the current period. Franchise users
+    # then open their own portal from cache instead of doing graph calculations.
+    for fid in franchise_ids:
+        for metric_key in PERFORMANCE_METRICS.keys():
+            graph_engine_payload(fid, metric_key, month, year, 12, mode, growth_percent)
+            cache_rows += 1
+    return {'invalidated': invalidated, 'performance_rows': int(performance_rows or 0), 'cache_rows': cache_rows}

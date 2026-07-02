@@ -818,6 +818,42 @@ class PerformanceSnapshot(db.Model):
     )
 
 
+
+
+class PerformancePageCache(db.Model):
+    """Pre-rendered JSON payloads for expensive dashboard/graph data.
+
+    This table is the Phase 5 performance layer. It keeps heavy graph and
+    dashboard payloads out of normal page requests. Imports/recalculation
+    invalidate or rebuild rows; page loads read the latest valid JSON.
+    """
+    __tablename__ = "performance_page_cache"
+    id = db.Column(db.Integer, primary_key=True)
+    cache_type = db.Column(db.String(80), nullable=False, index=True)
+    cache_key = db.Column(db.String(255), nullable=False, index=True)
+    scope_type = db.Column(db.String(40), nullable=False, default="global", index=True)
+    scope_id = db.Column(db.Integer, nullable=True, index=True)
+    year = db.Column(db.Integer, nullable=True, index=True)
+    month = db.Column(db.Integer, nullable=True, index=True)
+    metric = db.Column(db.String(80), nullable=True, index=True)
+    payload_json = db.Column(db.Text, nullable=False, default="{}")
+    row_count = db.Column(db.Integer, nullable=False, default=0)
+    source_version = db.Column(db.String(80), nullable=False, default="phase5")
+    invalidated_at = db.Column(db.DateTime, nullable=True, index=True)
+    built_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        db.UniqueConstraint("cache_type", "cache_key", name="uq_performance_page_cache_key"),
+    )
+
+    def to_payload(self):
+        try:
+            return json.loads(self.payload_json or "{}")
+        except Exception:
+            return {}
+
+
 class UserDashboardPreference(db.Model):
     """Optional per-user dashboard preferences for a cleaner home screen."""
     __tablename__ = "user_dashboard_preferences"

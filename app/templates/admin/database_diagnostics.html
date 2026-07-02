@@ -19,6 +19,37 @@
     </div>
 </section>
 
+
+<section class="page-card">
+    <h2>Performance cache status</h2>
+    <p class="page-subtitle">Phase 5 cache rows keep dashboard, leaderboard and graph pages fast. Valid rows are used immediately; invalidated rows are rebuilt after import/publish.</p>
+    <div class="diagnostic-cards">
+        <div class="diagnostic-card ok"><span>Valid cache rows</span><strong>{{ performance_cache_stats.valid }}</strong></div>
+        <div class="diagnostic-card warning"><span>Invalidated rows</span><strong>{{ performance_cache_stats.invalidated }}</strong></div>
+        <div class="diagnostic-card"><span>Total rows</span><strong>{{ performance_cache_stats.total }}</strong></div>
+    </div>
+    <div class="table-responsive compact-table">
+        <table>
+            <thead><tr><th>Type</th><th>Period</th><th>Metric</th><th>Scope</th><th>Rows</th><th>Built</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for row in latest_cache_rows %}
+                <tr>
+                    <td>{{ row.cache_type }}</td>
+                    <td>{{ row.year or '' }}{% if row.month %}-{{ '%02d'|format(row.month) }}{% endif %}</td>
+                    <td>{{ row.metric or '' }}</td>
+                    <td>{{ row.scope_type }}{% if row.scope_id %}: {{ row.scope_id }}{% endif %}</td>
+                    <td>{{ row.row_count }}</td>
+                    <td>{{ row.built_at.strftime('%Y-%m-%d %H:%M') if row.built_at else '' }}</td>
+                    <td>{% if row.invalidated_at %}<span class="status-pill needs_review">Invalidated</span>{% else %}<span class="status-pill completed">Valid</span>{% endif %}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7">No performance cache rows found yet. The first import publish or graph request will create them.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
 <section class="page-card">
     <h2>Latest monthly imports</h2>
     <div class="table-responsive compact-table">

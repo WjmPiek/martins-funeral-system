@@ -9,10 +9,11 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
-from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, user_franchises
+from app.models import User, Role, Permission, AuditLog, Franchise, RoyaltyScale, MonthlyFigure, ImportJob, PerformancePageCache, user_franchises
 from app.franchise_context import set_selected_franchise
 from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, permission_code
 from app.audit import log_action
+from app.performance.cache import cache_stats
 from app.performance.service import auto_hide_inactive_franchises, inactive_franchise_candidates, reactivate_franchise_performance, has_recent_performance_data
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -2114,6 +2115,9 @@ def database_diagnostics():
         LIMIT 250
     """)).mappings().all()
 
+    performance_cache_stats = cache_stats()
+    latest_cache_rows = PerformancePageCache.query.order_by(PerformancePageCache.built_at.desc()).limit(20).all()
+
     summary_cards = [
         {"label": "Missing royalty scales", "value": len(missing_scales), "tone": "danger" if missing_scales else "ok"},
         {"label": "Missing agreement dates", "value": len(missing_agreements), "tone": "warning" if missing_agreements else "ok"},
@@ -2121,6 +2125,7 @@ def database_diagnostics():
         {"label": "Employees not linked", "value": len(franchise_employees_without_parent), "tone": "warning" if franchise_employees_without_parent else "ok"},
         {"label": "Orphan monthly figures", "value": len(orphan_monthly_figures), "tone": "danger" if orphan_monthly_figures else "ok"},
         {"label": "Zero royalty warnings", "value": len(royalty_zero_checks), "tone": "warning" if royalty_zero_checks else "ok"},
+        {"label": "Valid performance cache", "value": performance_cache_stats.get("valid", 0), "tone": "ok" if performance_cache_stats.get("valid", 0) else "warning"},
     ]
 
     return render_template(
@@ -2135,6 +2140,8 @@ def database_diagnostics():
         orphan_monthly_figures=orphan_monthly_figures,
         latest_month=latest_month,
         royalty_zero_checks=royalty_zero_checks,
+        performance_cache_stats=performance_cache_stats,
+        latest_cache_rows=latest_cache_rows,
     )
 
 
