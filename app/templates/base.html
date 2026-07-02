@@ -334,14 +334,27 @@ document.addEventListener('DOMContentLoaded', function () {
   var close = panel.querySelector('[data-live-close]');
   var latestId = parseInt(localStorage.getItem('mfs_live_latest_id') || '0', 10);
   var hiddenUntil = parseInt(sessionStorage.getItem('mfs_live_hidden_until') || '0', 10);
-  function show(item) {
+  var reloadKeyPrefix = 'mfs_live_reloaded_';
+  function show(item, overrideMessage) {
     if (!item || Date.now() < hiddenUntil) return;
     title.textContent = item.title || 'System updated';
-    message.textContent = item.message || 'New information is available.';
+    message.textContent = overrideMessage || item.message || 'New information is available.';
     panel.hidden = false;
   }
+  function maybeRefresh(data, item) {
+    if (!data || !data.refresh || !data.refresh.required) return;
+    var eventId = data.refresh.event_id || data.latest_id || latestId;
+    var key = reloadKeyPrefix + eventId + '_' + location.pathname;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    show(item || {title: 'System updated'}, 'Live data was refreshed. Reloading this page...');
+    setTimeout(function () {
+      if (!document.hidden) window.location.reload();
+    }, 1400);
+  }
   function poll() {
-    fetch(url + '?since_id=' + encodeURIComponent(latestId), {headers: {'Accept': 'application/json'}})
+    var liveUrl = url + '?since_id=' + encodeURIComponent(latestId) + '&path=' + encodeURIComponent(location.pathname + location.search);
+    fetch(liveUrl, {headers: {'Accept': 'application/json'}})
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data || !data.ok) return;
@@ -351,6 +364,7 @@ document.addEventListener('DOMContentLoaded', function () {
           localStorage.setItem('mfs_live_latest_id', String(latestId));
         }
         if (items.length) show(items[0]);
+        maybeRefresh(data, items[0]);
       })
       .catch(function () {});
   }
@@ -362,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
   poll();
-  setInterval(poll, 15000);
+  setInterval(poll, 10000);
 })();
 </script>
 

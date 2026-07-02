@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -296,6 +297,10 @@ class LiveEvent(db.Model):
     import_job = db.relationship("ImportJob", backref=db.backref("live_events", lazy=True))
 
     def to_dict(self):
+        try:
+            payload = json.loads(self.payload_json or "{}")
+        except Exception:
+            payload = {}
         return {
             "id": self.id,
             "kind": self.kind,
@@ -306,6 +311,7 @@ class LiveEvent(db.Model):
             "franchise": self.franchise.business_name if self.franchise else "",
             "month": self.month,
             "year": self.year,
+            "payload": payload,
             "created_at": self.created_at.isoformat() if self.created_at else "",
         }
 
@@ -327,6 +333,10 @@ class LiveNotification(db.Model):
     import_job = db.relationship("ImportJob", backref=db.backref("live_notifications", lazy=True))
 
     def to_dict(self):
+        try:
+            payload = json.loads(self.payload_json or "{}")
+        except Exception:
+            payload = {}
         return {
             "id": self.id,
             "title": self.title,
@@ -335,6 +345,7 @@ class LiveNotification(db.Model):
             "franchise_id": self.franchise_id,
             "franchise": self.franchise.business_name if self.franchise else "",
             "import_job_id": self.import_job_id,
+            "payload": payload,
             "read": self.read_at is not None,
             "created_at": self.created_at.isoformat() if self.created_at else "",
         }
