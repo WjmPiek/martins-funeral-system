@@ -4,26 +4,27 @@
   <div class="section-header">
     <div>
       <h1>Import Centre</h1>
-      <p class="muted">Every month-end import is validated, recalculated and reconciled here before it is published to graphs, leaderboards and royalties.</p>
+      <p class="muted">Two controlled imports feed the whole platform: Franchise Master and Month-End Figures. Royalties, dashboards, BI, insights and live publishing are refreshed automatically after successful imports.</p>
     </div>
     <div class="button-row">
       <a class="btn secondary button-auto" href="{{ url_for('admin.imports_data') }}">Back to Imports & Data</a>
-      <a class="btn button-auto" href="{{ url_for('monthly.import_excel') }}">New Month-End Import</a>
+      <a class="btn secondary button-auto" href="{{ url_for('admin.data_integrity') }}">Franchise Master</a>
+      <a class="btn button-auto" href="{{ url_for('monthly.import_pdf') }}">Import Month-End PDF</a>
     </div>
   </div>
 
   <div class="card-grid import-card-grid">
     <article class="dashboard-card">
-      <h2>Controlled pipeline</h2>
-      <p>Validate file, match franchises, check agreements/scales, recalculate royalties, reconcile totals and only publish when clean.</p>
+      <h2>Franchise Code first</h2>
+      <p>Franchise Master controls the permanent franchise code. Month-end figures are linked to the selected franchise/code and unknown branches are sent to Needs Review instead of creating duplicates.</p>
     </article>
     <article class="dashboard-card">
-      <h2>Needs Review</h2>
-      <p>Imports with missing agreements, missing scales, zero royalty warnings or publish errors are clearly marked before users rely on the data.</p>
+      <h2>Automatic refresh</h2>
+      <p>After a trusted month-end import, royalties, performance cache, Business Intelligence, Insights and live publishing are refreshed automatically.</p>
     </article>
     <article class="dashboard-card">
       <h2>Audit trail</h2>
-      <p>Finance can see who uploaded the file, what happened at each stage, and whether the import was published.</p>
+      <p>Finance can see who uploaded the file, each processing stage, warnings, errors and whether the result is visible to users.</p>
     </article>
   </div>
 </section>

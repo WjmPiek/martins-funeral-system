@@ -7,58 +7,39 @@
   <div class="section-header">
     <div>
       <h1>Imports & Data</h1>
-      <p>Import tools are shown according to user role.</p>
+      <p class="muted">The system now uses two controlled imports only: Franchise Master and Month-End Figures. All other rebuilds run automatically after a trusted import.</p>
     </div>
   </div>
 
   <div class="card-grid import-card-grid">
+    {% if is_import_admin %}
+    <article class="dashboard-card import-primary-card">
+      <h2>1. Franchise Master</h2>
+      <p>Import the master Excel workbook with franchise code, business details, province, region, agreement dates and royalty scale brackets.</p>
+      <a class="btn button-auto" href="{{ url_for('admin.data_integrity') }}">Open Franchise Master</a>
+    </article>
+    {% endif %}
+
     {% if is_import_admin or is_import_finance %}
+    <article class="dashboard-card import-primary-card">
+      <h2>2. Month-End Figures</h2>
+      <p>Import the monthly figures PDF. The system validates the reporting period, links the figures to the selected franchise code, recalculates royalties, refreshes BI and publishes live data.</p>
+      <a class="btn button-auto" href="{{ url_for('monthly.import_pdf') }}">Import Month-End PDF</a>
+    </article>
+
     <article class="dashboard-card">
       <h2>Import Centre</h2>
-      <p>Review every month-end import, validation stage, reconciliation result and publish status.</p>
-      <a class="btn button-auto" href="{{ url_for('admin.import_centre') }}">Open Import Centre</a>
+      <p>Review job progress, validation results, publishing status and import history.</p>
+      <a class="btn secondary button-auto" href="{{ url_for('admin.import_centre') }}">Open Import Centre</a>
     </article>
     {% endif %}
 
     {% if is_import_admin %}
     <article class="dashboard-card">
-      <h2>Monthly Figures Excel</h2>
-      <p>Import branch monthly figures from the Syfers workbook and allocate figures to franchises.</p>
-      <a class="btn button-auto" href="{{ url_for('monthly.import_excel') }}">Import Monthly Excel</a>
-    </article>
-    {% endif %}
-
-    {% if is_import_admin or is_import_finance %}
-    <article class="dashboard-card">
-      <h2>Monthly Figures PDF</h2>
-      <p>Import monthly figures from PDF statements where needed.</p>
-      <a class="btn secondary button-auto" href="{{ url_for('monthly.import_pdf') }}">Import Monthly PDF</a>
-    </article>
-    {% endif %}
-
-    {% if is_import_admin %}
-    <article class="dashboard-card">
-      <h2>Contract Summary</h2>
-      <p>Import agreement dates, CK/PTY details, franchisee names and royalty scale brackets.</p>
-      <a class="btn button-auto" href="{{ url_for('admin.import_contract_summary') }}">Import Contract Summary</a>
-    </article>
-
-    <article class="dashboard-card">
-      <h2>Contact List</h2>
-      <p>Import branch contact details and manually allocate unmatched rows.</p>
-      <a class="btn button-auto" href="{{ url_for('admin.import_contact_list') }}">Import Contact List</a>
-    </article>
-
-    <article class="dashboard-card">
-      <h2>Franchise Users</h2>
-      <p>Import franchise users from the franchise-name workbook.</p>
-      <a class="btn button-auto" href="{{ url_for('admin.import_franchise_users') }}">Import Franchise Users</a>
-    </article>
-
-    <article class="dashboard-card">
-      <h2>Grouped Franchises</h2>
-      <p>Import linked franchise groups. The first franchise in each row becomes the main franchise for grouped royalty calculation.</p>
-      <a class="btn button-auto" href="{{ url_for('admin.import_grouped_franchises') }}">Import Grouped Franchises</a>
+      <h2>System Tools</h2>
+      <p>Print the Needs Review report, download the populated Franchise Master Excel and re-import the corrected master file.</p>
+      <a class="btn secondary button-auto" href="{{ url_for('admin.export_franchise_master_update_template') }}">Download Franchise Master</a>
+      <a class="btn secondary button-auto" href="{{ url_for('admin.data_integrity') }}#needs-review-report">Print Needs Review</a>
     </article>
     {% endif %}
 

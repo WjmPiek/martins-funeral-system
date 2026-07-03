@@ -4,8 +4,8 @@
 <section class="page-section">
   <div class="section-header">
     <div>
-      <h1>Import Monthly Figures PDF</h1>
-      <p class="muted">Upload the Royalty Calculation PDF and select the reporting month/year. The system saves the figures to that exact period, recalculates royalties, publishes the period, and then all Admin/Finance users can see the imported data while franchise users see only their own branch.</p>
+      <h1>Import Month-End Figures PDF</h1>
+      <p class="muted">Upload the monthly figures PDF, select the reporting month/year and allocate it to the correct Franchise Code. The system saves the figures, recalculates royalties, refreshes dashboards/BI/insights and publishes live data automatically.</p>
     </div>
     <a class="btn secondary button-auto" href="{{ url_for('monthly.index') }}">Back</a>
   </div>
@@ -18,7 +18,7 @@
         <select id="franchise_id" name="franchise_id" required>
           {% for franchise in franchises %}
             <option value="{{ franchise.id }}" {% if selected_franchise and selected_franchise.id == franchise.id %}selected{% endif %}>
-              {{ franchise.business_name or 'Unnamed Franchise' }}
+              {{ (franchise.franchise_code ~ ' - ') if franchise.franchise_code else '' }}{{ franchise.business_name or 'Unnamed Franchise' }}
             </option>
           {% endfor %}
         </select>
@@ -42,12 +42,12 @@
         <label for="pdf_file">Select PDF</label>
         <input id="pdf_file" name="pdf_file" type="file" accept="application/pdf,.pdf" required>
       </div>
-      <p class="muted">If PDF import fails, install the PDF reader package with: pip install pypdf</p>
+      <p class="muted">Franchise Code is the permanent identifier. If the branch is missing or the code is wrong, fix it first in Admin → Data Integrity → Franchise Master.</p>
     </div>
 
     <div class="form-section-card">
-      <h2>Imported Fields</h2>
-      <p class="muted">The selected Reporting Month and Reporting Year are required and are the only source of truth. The PDF text, file name, upload date and current date will not override them.</p>
+      <h2>Automatic workflow</h2>
+      <p class="muted">The selected Reporting Month and Reporting Year are required and are the only source of truth. After upload, the worker validates the import, recalculates royalties, rebuilds performance cache, updates BI/Insights and publishes live results.</p>
     </div>
 
     <div class="form-actions sticky-actions no-print">

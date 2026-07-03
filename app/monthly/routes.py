@@ -828,6 +828,39 @@ def excel_decimal(value):
         return Decimal("0")
 
 
+def franchise_code_candidates_from_import_label(raw_name):
+    """Return possible franchise-code values from an imported heading/label.
+
+    v105 makes Franchise Code the primary matching key.  The month-end file may
+    contain labels such as ``MF001 - Alberton``, ``MF001 Alberton`` or only
+    ``MF001``.  We still fall back to exact business-name matching for legacy
+    PDFs/Excel files, but we no longer create new franchise records from a
+    month-end import.  New franchise records must come from Franchise Master.
+    """
+    label = str(raw_name or "").strip().upper()
+    if not label:
+        return []
+    candidates = []
+    # code before a dash/space/colon
+    first = re.split(r"[\s:\-_/]+", label, maxsplit=1)[0]
+    if first:
+        candidates.append(first)
+    # any compact alpha-numeric code-like token in the first part of the label
+    for token in re.findall(r"[A-Z]{1,6}\d{1,6}|[A-Z0-9]{3,20}", label[:40]):
+        candidates.append(token)
+    compact = re.sub(r"[^A-Z0-9]+", "", label)[:20]
+    if compact:
+        candidates.append(compact)
+    seen = set()
+    output = []
+    for candidate in candidates:
+        key = normalize_franchise_key(candidate)
+        if key and key not in seen:
+            seen.add(key)
+            output.append(candidate)
+    return output
+
+
 def find_or_create_franchise_from_excel(raw_name):
     cleaned_name = clean_excel_franchise_name(raw_name)
     key = normalize_franchise_key(cleaned_name)
@@ -835,17 +868,24 @@ def find_or_create_franchise_from_excel(raw_name):
         return None, False
 
     franchises = Franchise.query.all()
+
+    # 1) Permanent Franchise Code is the primary match.
+    for code_candidate in franchise_code_candidates_from_import_label(cleaned_name):
+        code_key = normalize_franchise_key(code_candidate)
+        for franchise in franchises:
+            if franchise.franchise_code and normalize_franchise_key(franchise.franchise_code) == code_key:
+                return franchise, False
+
+    # 2) Exact normalized franchise name is retained as a legacy fallback.
     for franchise in franchises:
         if normalize_franchise_key(franchise.business_name) == key:
             return franchise, False
 
-    franchise = Franchise(
-        business_name=cleaned_name,
-        franchise_code=re.sub(r"[^A-Z0-9]+", "", cleaned_name.upper())[:20],
+    current_app.logger.warning(
+        "Month-end import skipped unknown franchise label %r. Add/update it in Franchise Master with a Franchise Code first.",
+        raw_name,
     )
-    db.session.add(franchise)
-    db.session.flush()
-    return franchise, True
+    return None, False
 
 
 def excel_slugify_email_part(value):
