@@ -1947,3 +1947,50 @@ body.app-body {
 .live-text span{font-size:.86rem;color:#5b6472;}
 .live-close{margin-left:auto;border:0;background:transparent;font-size:1.4rem;line-height:1;color:#6b7280;cursor:pointer;padding:2px 6px;}
 .live-close:hover{color:#221b3a;}
+
+/* V100 region/UI stabilization: keep dashboard text inside blocks */
+.stat-grid,
+.metric-grid,
+.executive-kpi-grid,
+.diagnostic-cards,
+.quick-link-grid { align-items: stretch; }
+.stat-card,
+.executive-kpi-card,
+.diagnostic-card,
+.quick-link-card,
+.card,
+.alert-row,
+.live-notification-panel { min-width:0; max-width:100%; overflow-wrap:anywhere; word-break:normal; box-sizing:border-box; }
+.stat-card { display:flex; flex-direction:column; justify-content:space-between; gap:.35rem; min-height:104px; line-height:1.25; }
+.stat-card span,
+.stat-card small,
+.executive-kpi-card small,
+.quick-link-card small,
+.card p,
+.card li,
+.alert-row span,
+.alert-row small { max-width:100%; overflow-wrap:anywhere; word-break:normal; line-height:1.35; }
+.stat-card strong,
+.executive-kpi-card strong,
+.diagnostic-card strong,
+.alert-row strong { max-width:100%; overflow-wrap:anywhere; word-break:normal; line-height:1.12; font-size:clamp(1.15rem,2.4vw,2rem); }
+.executive-dashboard .alert-row { gap:12px; flex-wrap:wrap; }
+.executive-dashboard .alert-row > * { min-width:0; }
+.table-responsive,
+.compact-table { width:100%; max-width:100%; overflow-x:auto; }
+.compact-table th,
+.compact-table td,
+.table-responsive th,
+.table-responsive td,
+table th,
+table td { max-width:260px; overflow-wrap:anywhere; word-break:normal; vertical-align:top; }
+.badge,
+.status-pill { white-space:normal; overflow-wrap:anywhere; line-height:1.2; }
+.inline-form.card,
+.compact-form { flex-wrap:wrap; align-items:end; }
+.inline-form.card label,
+.compact-form label { min-width:160px; max-width:100%; }
+@media (max-width:900px) {
+  .stat-card,.executive-kpi-card,.diagnostic-card,.quick-link-card,.card { padding-left:14px; padding-right:14px; }
+  table th, table td { max-width:180px; white-space:normal!important; }
+}

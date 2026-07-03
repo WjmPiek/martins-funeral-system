@@ -172,6 +172,7 @@ class Franchise(db.Model):
     royalty_gross_method = db.Column(db.String(20), nullable=False, default="old")
     imported_royalty_scale_text = db.Column(db.Text, default="")
     imported_royalty_percentage = db.Column(db.Numeric(5, 2), default=0)
+    province = db.Column(db.String(120), default="", index=True)
     regional_manager_email = db.Column(db.String(255), default="")
     finance_manager_email = db.Column(db.String(255), default="")
     notification_60_sent_at = db.Column(db.DateTime)

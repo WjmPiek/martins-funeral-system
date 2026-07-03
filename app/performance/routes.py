@@ -8,6 +8,7 @@ from app.audit import log_action
 from app.extensions import db
 from app.franchise_context import get_accessible_franchises, get_selected_franchise, is_privileged_user
 from app.models import Franchise, FranchiseTarget, HeatmapRecord, MonthlyFigure, PerformanceGrowthBracket, User
+from app.regions import canonical_province, infer_province_from_franchise_name, PROVINCES
 from app.performance.service import (
     DEFAULT_GROWTH_PERCENT,
     DEFAULT_SA_GDP_GROWTH_PERCENT,
@@ -268,21 +269,18 @@ def _graphs_scope(args):
     province_options = []
 
     if is_privileged_user() and ids:
-        province_options = [row[0] for row in (
-            db.session.query(HeatmapRecord.province)
-            .filter(HeatmapRecord.franchise_id.in_(ids), HeatmapRecord.province != "")
-            .distinct()
-            .order_by(HeatmapRecord.province.asc())
-            .all()
-        )]
+        franchise_rows = Franchise.query.filter(Franchise.id.in_(ids)).with_entities(Franchise.id, Franchise.business_name, Franchise.province).all()
+        province_by_id = {}
+        for fid, business_name, stored_province in franchise_rows:
+            province = canonical_province(stored_province) or infer_province_from_franchise_name(business_name)
+            province_by_id[int(fid)] = province
+        province_options = sorted(
+            {province for province in province_by_id.values() if province and province != "Unassigned"},
+            key=lambda province: PROVINCES.index(province) if province in PROVINCES else 999,
+        )
+        selected_province = canonical_province(selected_province)
         if selected_province:
-            province_ids = [row[0] for row in (
-                db.session.query(HeatmapRecord.franchise_id)
-                .filter(HeatmapRecord.franchise_id.in_(ids), HeatmapRecord.province == selected_province)
-                .distinct()
-                .all()
-            )]
-            ids = [fid for fid in ids if fid in province_ids]
+            ids = [fid for fid in ids if province_by_id.get(int(fid)) == selected_province]
 
     metric_key = args.get("metric", "cash")
     if metric_key not in PERFORMANCE_METRICS:

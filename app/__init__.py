@@ -296,6 +296,24 @@ def create_app(config_class=Config):
         ensure_phase13_defaults(commit=True)
         print(workflow_summary())
 
+
+    @app.cli.command("assign-franchise-regions")
+    def assign_franchise_regions_command():
+        """Assign province/region to franchises from franchise business names."""
+        from app.models import Franchise
+        from app.regions import infer_province_from_franchise_name
+        updated = 0
+        unassigned = 0
+        for franchise in Franchise.query.order_by(Franchise.business_name).all():
+            province = infer_province_from_franchise_name(franchise.business_name)
+            if province == "Unassigned":
+                unassigned += 1
+            if (franchise.province or "") != province:
+                franchise.province = province
+                updated += 1
+        db.session.commit()
+        print(f"Franchise regions assigned: {updated} updated, {unassigned} unassigned")
+
     @app.cli.command("check-franchise-expiry")
     def check_franchise_expiry():
         from app.franchise.notifications import send_agreement_expiry_reminders

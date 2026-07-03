@@ -90,7 +90,7 @@ def _province_rows(year: int, month: int) -> List[Dict[str, Any]]:
             FROM heatmap_records
             GROUP BY franchise_id
         )
-        SELECT COALESCE(pm.province, 'Unassigned') AS province,
+        SELECT COALESCE(NULLIF(f.province, ''), pm.province, 'Unassigned') AS province,
                COUNT(*) AS franchises,
                COALESCE(AVG(fhs.health_score), 0) AS avg_health_score,
                COALESCE(SUM(fhs.gross_turnover), 0) AS gross_turnover,
@@ -98,9 +98,10 @@ def _province_rows(year: int, month: int) -> List[Dict[str, Any]]:
                COALESCE(AVG(fhs.growth_percent), 0) AS avg_growth_percent,
                SUM(CASE WHEN fhs.health_status = 'critical' THEN 1 ELSE 0 END) AS critical_count
         FROM franchise_health_snapshots fhs
+        JOIN franchises f ON f.id = fhs.franchise_id
         LEFT JOIN province_map pm ON pm.franchise_id = fhs.franchise_id
         WHERE fhs.year = :year AND fhs.month = :month
-        GROUP BY COALESCE(pm.province, 'Unassigned')
+        GROUP BY COALESCE(NULLIF(f.province, ''), pm.province, 'Unassigned')
         ORDER BY avg_health_score DESC, gross_turnover DESC
         LIMIT 12
     """), {"year": year, "month": month}).mappings().all()
