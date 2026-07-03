@@ -1994,3 +1994,22 @@ table td { max-width:260px; overflow-wrap:anywhere; word-break:normal; vertical-
   .stat-card,.executive-kpi-card,.diagnostic-card,.quick-link-card,.card { padding-left:14px; padding-right:14px; }
   table th, table td { max-width:180px; white-space:normal!important; }
 }
+
+/* v103 dashboard/card readability guardrails */
+.card, .kpi-card, .executive-kpi-card, .insight-card, .quick-link-card, .metric-card {
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+.card h1, .card h2, .card h3, .card p, .card span, .card strong,
+.kpi-card h1, .kpi-card h2, .kpi-card h3, .kpi-card p, .kpi-card span, .kpi-card strong,
+.executive-kpi-card h1, .executive-kpi-card h2, .executive-kpi-card h3, .executive-kpi-card p, .executive-kpi-card span, .executive-kpi-card strong {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.15;
+}
+.kpi-grid, .executive-kpi-grid, .dashboard-grid, .insight-grid {
+    align-items: stretch;
+}
+.table-responsive { overflow-x: auto; }

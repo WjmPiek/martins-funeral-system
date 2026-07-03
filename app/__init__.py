@@ -299,20 +299,22 @@ def create_app(config_class=Config):
 
     @app.cli.command("assign-franchise-regions")
     def assign_franchise_regions_command():
-        """Assign province/region to franchises from franchise business names."""
-        from app.models import Franchise
-        from app.regions import infer_province_from_franchise_name
-        updated = 0
-        unassigned = 0
-        for franchise in Franchise.query.order_by(Franchise.business_name).all():
-            province = infer_province_from_franchise_name(franchise.business_name)
-            if province == "Unassigned":
-                unassigned += 1
-            if (franchise.province or "") != province:
-                franchise.province = province
-                updated += 1
-        db.session.commit()
-        print(f"Franchise regions assigned: {updated} updated, {unassigned} unassigned")
+        """Assign province/region to franchises from name, code and office address."""
+        from app.franchise_master_data import assign_regions_from_existing_data
+        result = assign_regions_from_existing_data(commit=True)
+        print(f"Franchise regions assigned: {result['updated']} updated, {result['unassigned']} unassigned")
+
+    @app.cli.command("franchise-master-report")
+    def franchise_master_report_command():
+        """Print franchise master data-integrity counts for Render shell."""
+        from app.franchise_master_data import data_integrity_rows
+        rows = data_integrity_rows()
+        ready = sum(1 for row in rows if row['status'] == 'Ready')
+        review = len(rows) - ready
+        print({"total": len(rows), "ready": ready, "needs_review": review})
+        for row in rows[:25]:
+            if row['status'] != 'Ready':
+                print(f"{row['business_name']}: {', '.join(row['issues'])}")
 
     @app.cli.command("check-franchise-expiry")
     def check_franchise_expiry():

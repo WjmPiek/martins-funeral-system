@@ -5,7 +5,7 @@ import re
 import secrets
 import string
 from difflib import SequenceMatcher
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, send_file
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
@@ -3315,3 +3315,70 @@ def enterprise_notification_read(notification_id):
     db.session.commit()
     flash("Notification marked as read.", "success")
     return redirect(url_for("admin.enterprise_workflows"))
+
+
+@admin_bp.route("/data-integrity")
+@login_required
+def data_integrity():
+    """Printable data integrity report for franchise master and royalty readiness."""
+    from app.franchise_master_data import data_integrity_rows, get_latest_period
+
+    if not (current_user.has_role("Admin") or current_user.has_role("Finance Manager") or current_user.has_role("Finance Assistant")):
+        abort(403)
+    rows = data_integrity_rows()
+    latest_year, latest_month = get_latest_period()
+    summary = {
+        "total": len(rows),
+        "ready": sum(1 for r in rows if r["status"] == "Ready"),
+        "needs_review": sum(1 for r in rows if r["status"] != "Ready"),
+        "unassigned_regions": sum(1 for r in rows if not r.get("province") or r.get("province") == "Unassigned"),
+        "missing_scales": sum(1 for r in rows if r.get("scale_count", 0) == 0),
+    }
+    return render_template(
+        "admin/data_integrity.html",
+        rows=rows,
+        summary=summary,
+        latest_year=latest_year,
+        latest_month=latest_month,
+    )
+
+
+@admin_bp.route("/data-integrity/franchise-master/export")
+@login_required
+def export_franchise_master_update_template():
+    """Download a populated Franchise Master workbook for correction and re-import."""
+    from io import BytesIO
+    from app.franchise_master_data import build_franchise_master_workbook
+
+    if not (current_user.has_role("Admin") or current_user.has_role("Finance Manager") or current_user.has_role("Finance Assistant")):
+        abort(403)
+    data = build_franchise_master_workbook()
+    return send_file(
+        BytesIO(data),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"Franchise_Master_Update_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+    )
+
+
+@admin_bp.route("/data-integrity/franchise-master/import", methods=["POST"])
+@login_required
+def import_franchise_master_update_template():
+    """Import the corrected Franchise Master workbook and update linked franchise records."""
+    from app.franchise_master_data import import_franchise_master_workbook
+
+    if not (current_user.has_role("Admin") or current_user.has_role("Finance Manager") or current_user.has_role("Finance Assistant")):
+        abort(403)
+    uploaded = request.files.get("excel_file")
+    if not uploaded or not uploaded.filename:
+        flash("Please choose the completed Franchise Master Excel file.", "warning")
+        return redirect(url_for("admin.data_integrity"))
+    try:
+        result = import_franchise_master_workbook(uploaded)
+        flash(f"Franchise Master import complete: {result['updated']} franchises updated, {result['scale_rows']} royalty scale rows updated, {len(result['unmatched'])} unmatched rows.", "success")
+        if result["unmatched"]:
+            flash("Some rows could not be matched. Download the report and check Franchise ID, Franchise Code or Business Name.", "warning")
+    except Exception as exc:
+        db.session.rollback()
+        flash(f"Franchise Master import failed: {exc}", "danger")
+    return redirect(url_for("admin.data_integrity"))

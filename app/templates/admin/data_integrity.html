@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Data Integrity & Franchise Master{% endblock %}
+{% block app_content %}
+<section class="page-shell data-integrity-page">
+    <div class="page-header split-header no-print">
+        <div>
+            <p class="eyebrow">v103 • Data Integrity</p>
+            <h1>Data Integrity & Franchise Master</h1>
+            <p class="muted">Use this page to print a fix report, download the Franchise Master workbook, update it in Excel, and import it back into the system.</p>
+        </div>
+        <div class="action-row">
+            <button class="btn btn-secondary" onclick="window.print()">Print Fix Report</button>
+            <a class="btn btn-primary" href="{{ url_for('admin.export_franchise_master_update_template') }}">Download Franchise Master Excel</a>
+        </div>
+    </div>
+
+    <div class="grid kpi-grid">
+        <div class="card kpi-card"><span>Total Franchises</span><strong>{{ summary.total }}</strong></div>
+        <div class="card kpi-card"><span>Ready</span><strong>{{ summary.ready }}</strong></div>
+        <div class="card kpi-card warning"><span>Needs Review</span><strong>{{ summary.needs_review }}</strong></div>
+        <div class="card kpi-card warning"><span>No Province</span><strong>{{ summary.unassigned_regions }}</strong></div>
+        <div class="card kpi-card danger"><span>No Royalty Scale</span><strong>{{ summary.missing_scales }}</strong></div>
+    </div>
+
+    <div class="card no-print import-card">
+        <h2>Import Updated Franchise Master Excel</h2>
+        <p class="muted">Update the downloaded workbook and import it here. The system matches by Franchise ID first, then Franchise Code, then Business Name.</p>
+        <form method="post" action="{{ url_for('admin.import_franchise_master_update_template') }}" enctype="multipart/form-data" class="inline-form">
+            <input type="file" name="excel_file" accept=".xlsx" required>
+            <button class="btn btn-primary" type="submit">Import Franchise Master</button>
+        </form>
+    </div>
+
+    <div class="print-title print-only">
+        <h1>Franchise Data Integrity Fix Report</h1>
+        <p>Latest reporting period: {{ latest_year }}-{{ '%02d'|format(latest_month) }}</p>
+    </div>
+
+    <div class="card">
+        <div class="section-heading">
+            <h2>Franchises to Fix</h2>
+            <p class="muted">Print this report and update the matching rows in the Franchise Master Excel file.</p>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table compact integrity-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Business Name</th>
+                        <th>Province</th>
+                        <th>Region</th>
+                        <th>Agreement</th>
+                        <th>Scale Rows</th>
+                        <th>Status</th>
+                        <th>What to Fix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr class="{{ 'needs-review' if row.status != 'Ready' else 'ready' }}">
+                        <td>{{ row.id }}</td>
+                        <td>{{ row.business_name }}</td>
+                        <td>{{ row.province or 'Unassigned' }}</td>
+                        <td>{{ row.region or '-' }}</td>
+                        <td>{{ row.agreement_start_date or '-' }}</td>
+                        <td>{{ row.scale_count }}</td>
+                        <td><span class="status-pill {{ 'ok' if row.status == 'Ready' else 'warning' }}">{{ row.status }}</span></td>
+                        <td>{% if row.issues %}<ul>{% for issue in row.issues %}<li>{{ issue }}</li>{% endfor %}</ul>{% else %}No issues{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+<style>
+.data-integrity-page .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px}.kpi-card{min-height:96px;display:flex;flex-direction:column;justify-content:center;gap:8px;overflow:hidden}.kpi-card span{font-size:.84rem;color:#6b6577;line-height:1.2}.kpi-card strong{font-size:1.9rem;line-height:1;white-space:normal;overflow-wrap:anywhere}.kpi-card.warning{border-left:5px solid #f9a825}.kpi-card.danger{border-left:5px solid #c62828}.action-row{display:flex;gap:10px;flex-wrap:wrap}.import-card{margin-bottom:18px}.integrity-table th,.integrity-table td{vertical-align:top;white-space:normal;overflow-wrap:anywhere}.integrity-table ul{margin:0;padding-left:18px}.status-pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:.8rem;font-weight:700}.status-pill.ok{background:#dcfce7;color:#166534}.status-pill.warning{background:#fef3c7;color:#92400e}.print-only{display:none}@media print{.no-print,.sidebar-nav,.app-menu,.top-bar{display:none!important}.print-only{display:block}.app-shell,.app-content{display:block!important;width:100%!important;margin:0!important;padding:0!important}.card{box-shadow:none!important;border:1px solid #ddd!important}.data-table{font-size:10px}.integrity-table th,.integrity-table td{padding:5px!important}}
+</style>
+{% endblock %}
