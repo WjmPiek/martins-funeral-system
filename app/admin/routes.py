@@ -3361,6 +3361,25 @@ def export_franchise_master_update_template():
     )
 
 
+
+
+@admin_bp.route("/data-integrity/needs-review/export")
+@login_required
+def export_needs_review_report():
+    """Download a printable Excel report of franchise records that still need repair."""
+    from io import BytesIO
+    from app.franchise_master_data import build_needs_review_workbook
+
+    if not (current_user.has_role("Admin") or current_user.has_role("Finance Manager") or current_user.has_role("Finance Assistant")):
+        abort(403)
+    data = build_needs_review_workbook()
+    return send_file(
+        BytesIO(data),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"Franchise_Needs_Review_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+    )
+
 @admin_bp.route("/data-integrity/franchise-master/import", methods=["POST"])
 @login_required
 def import_franchise_master_update_template():
@@ -3375,7 +3394,7 @@ def import_franchise_master_update_template():
         return redirect(url_for("admin.data_integrity"))
     try:
         result = import_franchise_master_workbook(uploaded)
-        flash(f"Franchise Master import complete: {result['updated']} franchises updated, {result['scale_rows']} royalty scale rows updated, {len(result['unmatched'])} unmatched rows.", "success")
+        flash(f"Franchise Master import complete: {result['updated']} franchises updated, {result.get('changed_fields', 0)} fields changed, {result['scale_rows']} royalty scale rows updated, {len(result['unmatched'])} unmatched rows.", "success")
         if result["unmatched"]:
             flash("Some rows could not be matched. Download the report and check Franchise ID, Franchise Code or Business Name.", "warning")
     except Exception as exc:
