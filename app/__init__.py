@@ -300,9 +300,18 @@ def create_app(config_class=Config):
     @app.cli.command("assign-franchise-regions")
     def assign_franchise_regions_command():
         """Assign province/region to franchises from name, code and office address."""
-        from app.franchise_master_data import assign_regions_from_existing_data
+        from app.franchise_master_data import assign_regions_from_existing_data, ensure_franchise_codes
+        code_result = ensure_franchise_codes(commit=True)
         result = assign_regions_from_existing_data(commit=True)
+        print(f"Franchise codes ready: {code_result['assigned']} assigned, {code_result['total_codes']} total")
         print(f"Franchise regions assigned: {result['updated']} updated, {result['unassigned']} unassigned")
+
+    @app.cli.command("seed-franchise-codes")
+    def seed_franchise_codes_command():
+        """Ensure every franchise has a permanent MF### franchise code."""
+        from app.franchise_master_data import ensure_franchise_codes
+        result = ensure_franchise_codes(commit=True)
+        print(f"Franchise codes ready: {result['assigned']} assigned, {result['changed']} changed, {result['total_codes']} total")
 
     @app.cli.command("franchise-master-report")
     def franchise_master_report_command():

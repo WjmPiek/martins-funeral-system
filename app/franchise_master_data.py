@@ -131,6 +131,12 @@ def franchise_lookup() -> Tuple[Dict[int, Franchise], Dict[str, Franchise], Dict
 
 def find_franchise(row: Dict[str, Any], lookups=None) -> Optional[Franchise]:
     by_id, by_code, by_name = lookups or franchise_lookup()
+
+    # Franchise Code is the primary business key from v105 onward.
+    code = normalize_key(row.get("Franchise Code"))
+    if code and code in by_code:
+        return by_code[code]
+
     raw_id = row.get("Franchise ID")
     try:
         fid = int(raw_id) if raw_id not in (None, "") else None
@@ -138,9 +144,7 @@ def find_franchise(row: Dict[str, Any], lookups=None) -> Optional[Franchise]:
         fid = None
     if fid and fid in by_id:
         return by_id[fid]
-    code = normalize_key(row.get("Franchise Code"))
-    if code and code in by_code:
-        return by_code[code]
+
     name = normalize_key(row.get("Business Name"))
     return by_name.get(name)
 
@@ -160,6 +164,8 @@ def readiness_issues(franchise: Franchise, latest_review=None) -> List[str]:
     issues = []
     if not franchise.business_name:
         issues.append("Business name missing")
+    if not (getattr(franchise, "franchise_code", "") or "").strip():
+        issues.append("Franchise code missing")
     if not (getattr(franchise, "province", "") or "").strip() or getattr(franchise, "province", "") == "Unassigned":
         issues.append("Province not assigned")
     if not (getattr(franchise, "region", "") or "").strip():
@@ -179,6 +185,58 @@ def readiness_issues(franchise: Franchise, latest_review=None) -> List[str]:
             issues.append(reason)
     return issues
 
+
+
+def ensure_franchise_codes(commit: bool = True) -> Dict[str, int]:
+    """Assign stable MF### franchise codes to records that do not yet have one.
+
+    The code is the permanent matching key used by Franchise Master and Month-End imports.
+    Existing codes are preserved. New codes are allocated in business-name order and never
+    re-used inside the same run.
+    """
+    existing = set()
+    for f in Franchise.query.all():
+        code = str(getattr(f, "franchise_code", "") or "").strip().upper()
+        if code:
+            existing.add(code)
+
+    next_number = 1
+    assigned = 0
+    changed = 0
+    for f in Franchise.query.order_by(Franchise.business_name, Franchise.id).all():
+        code = str(getattr(f, "franchise_code", "") or "").strip().upper()
+        if code:
+            if getattr(f, "franchise_code", "") != code:
+                f.franchise_code = code
+                changed += 1
+            continue
+        while True:
+            candidate = f"MF{next_number:03d}"
+            next_number += 1
+            if candidate not in existing:
+                break
+        f.franchise_code = candidate
+        existing.add(candidate)
+        assigned += 1
+        changed += 1
+    if commit and changed:
+        db.session.commit()
+    elif changed:
+        db.session.flush()
+    return {"assigned": assigned, "changed": changed, "total_codes": len(existing)}
+
+
+def has_required_schema() -> Tuple[bool, List[str]]:
+    """Lightweight database/schema guard used by the Data Integrity page."""
+    required = ["franchise_code", "province", "region", "district", "municipality"]
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        columns = {c["name"] for c in inspector.get_columns("franchises")}
+        missing = [name for name in required if name not in columns]
+        return not missing, missing
+    except Exception as exc:
+        return False, [f"schema check failed: {exc}"]
 
 def data_integrity_rows() -> List[Dict[str, Any]]:
     rows = []
@@ -213,7 +271,9 @@ def fix_hint(issues: List[str]) -> str:
     hints = []
     for issue in issues:
         lower = issue.lower()
-        if "province" in lower:
+        if "franchise code" in lower or "code" in lower:
+            hints.append("Keep or assign the permanent Franchise Code in the Franchise Master workbook.")
+        elif "province" in lower:
             hints.append("Select the correct Province in the Franchise Master workbook.")
         elif "region" in lower:
             hints.append("Complete Region in the Franchise Master workbook.")
@@ -388,11 +448,11 @@ def _write_instructions(ws):
     lines = [
         ["Franchise Master Update Instructions"],
         ["This workbook is the easiest way to fix franchise master data in bulk."],
-        ["Do not delete the Franchise ID column. The importer uses it as the strongest match."],
+        ["Do not change the Franchise Code. The importer uses Franchise Code as the permanent primary match key."],
         ["Update Province, Region, Office Address, Contact Numbers, Agreement Dates and Royalty Scales."],
         ["Use yyyy-mm-dd for dates. Use numbers only for royalty amounts and percentages."],
         ["You may edit scale brackets either on the Franchise Master sheet or the Royalty Scales sheet."],
-        ["The importer matches by Franchise ID first, then Franchise Code, then Business Name."],
+        ["The importer matches by Franchise Code first, then Franchise ID, then Business Name."],
         ["After import, run stabilize-platform or use the Admin rebuild buttons so dashboards and royalties refresh."],
     ]
     for row in lines:
@@ -473,7 +533,7 @@ def import_franchise_master_workbook(file_storage) -> Dict[str, Any]:
         raise ValueError("Workbook must contain a 'Franchise Master' sheet.")
     ws = wb["Franchise Master"]
     headers = _headers_for(ws)
-    required = ["Franchise ID", "Business Name", "Franchise Code", "Province", "Agreement Start Date"]
+    required = ["Business Name", "Franchise Code", "Province", "Agreement Start Date"]
     missing = [h for h in required if h not in headers]
     if missing:
         raise ValueError("Missing required columns: " + ", ".join(missing))

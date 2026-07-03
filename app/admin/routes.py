@@ -5,7 +5,7 @@ import re
 import secrets
 import string
 from difflib import SequenceMatcher
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, send_file, current_app
 from flask_login import login_required, current_user
 from app.extensions import db
 from sqlalchemy import text
@@ -3318,21 +3318,40 @@ def enterprise_notification_read(notification_id):
 
 
 @admin_bp.route("/data-integrity")
+@admin_bp.route("/franchise-master")
 @login_required
 def data_integrity():
-    """Printable data integrity report for franchise master and royalty readiness."""
-    from app.franchise_master_data import data_integrity_rows, get_latest_period
+    """Printable data integrity report for franchise master and royalty readiness.
+
+    This page must never be blank. If a schema or data problem is found it renders
+    a clear repair panel instead of failing with a server error.
+    """
+    from app.franchise_master_data import data_integrity_rows, get_latest_period, has_required_schema
 
     if not (current_user.has_role("Admin") or current_user.has_role("Finance Manager") or current_user.has_role("Finance Assistant")):
         abort(403)
-    rows = data_integrity_rows()
-    latest_year, latest_month = get_latest_period()
+    page_error = None
+    schema_ok, missing_schema = has_required_schema()
+    rows = []
+    latest_year = latest_month = None
+    if not schema_ok:
+        page_error = "Missing database columns: " + ", ".join(missing_schema)
+    else:
+        try:
+            rows = data_integrity_rows()
+            latest_year, latest_month = get_latest_period()
+        except Exception as exc:
+            current_app.logger.exception("Data Integrity page failed")
+            page_error = str(exc)
+    if latest_year is None or latest_month is None:
+        latest_year, latest_month = get_latest_period()
     summary = {
         "total": len(rows),
         "ready": sum(1 for r in rows if r["status"] == "Ready"),
         "needs_review": sum(1 for r in rows if r["status"] != "Ready"),
         "unassigned_regions": sum(1 for r in rows if not r.get("province") or r.get("province") == "Unassigned"),
         "missing_scales": sum(1 for r in rows if r.get("scale_count", 0) == 0),
+        "missing_codes": sum(1 for r in rows if not r.get("franchise_code")),
     }
     return render_template(
         "admin/data_integrity.html",
@@ -3340,10 +3359,13 @@ def data_integrity():
         summary=summary,
         latest_year=latest_year,
         latest_month=latest_month,
+        page_error=page_error,
+        schema_ok=schema_ok,
     )
 
 
 @admin_bp.route("/data-integrity/franchise-master/export")
+@admin_bp.route("/franchise-master/export")
 @login_required
 def export_franchise_master_update_template():
     """Download a populated Franchise Master workbook for correction and re-import."""
@@ -3364,6 +3386,7 @@ def export_franchise_master_update_template():
 
 
 @admin_bp.route("/data-integrity/needs-review/export")
+@admin_bp.route("/franchise-master/needs-review/export")
 @login_required
 def export_needs_review_report():
     """Download a printable Excel report of franchise records that still need repair."""
@@ -3381,6 +3404,7 @@ def export_needs_review_report():
     )
 
 @admin_bp.route("/data-integrity/franchise-master/import", methods=["POST"])
+@admin_bp.route("/franchise-master/import", methods=["POST"])
 @login_required
 def import_franchise_master_update_template():
     """Import the corrected Franchise Master workbook and update linked franchise records."""
