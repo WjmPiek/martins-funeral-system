@@ -179,14 +179,17 @@ def readiness_issues(franchise: Franchise, latest_review=None) -> List[str]:
     scale_count = RoyaltyScale.query.filter_by(franchise_id=franchise.id).count()
     if scale_count == 0:
         issues.append("Royalty scale missing")
-    if latest_review and latest_review.status == "needs_review":
+    review_status = (getattr(latest_review, "status", "") or getattr(latest_review, "calculation_status", "") or "").lower()
+    if latest_review and review_status in {"needs_review", "review", "failed", "error"}:
         reason = (
             getattr(latest_review, "reason", None)
             or getattr(latest_review, "diagnostic_message", None)
             or getattr(latest_review, "status_message", None)
+            or getattr(latest_review, "message", None)
             or getattr(latest_review, "calculation_status", None)
             or "Royalty calculation needs review"
         )
+        reason = str(reason).strip() or "Royalty calculation needs review"
         if reason not in issues:
             issues.append(reason)
     return issues
