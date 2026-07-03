@@ -475,8 +475,8 @@ def _style_all_sheets(wb):
     thin = Side(style="thin", color="D9E2D5")
     for ws in wb.worksheets:
         ws.freeze_panes = "A2"
-        if ws.max_row >= 1:
-            ws[1][0].font = title_font if ws.title in ("Summary", "Instructions", "Needs Review Report") else ws[1][0].font
+        if ws.max_row >= 1 and ws.title in ("Summary", "Instructions", "Needs Review Report"):
+            ws[1][0].font = title_font
         header_row = 1
         if ws.title in ("Summary", "Needs Review Report"):
             header_row = 4 if ws.title == "Needs Review Report" else 4
