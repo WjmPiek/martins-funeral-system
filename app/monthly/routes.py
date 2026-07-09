@@ -876,13 +876,20 @@ def find_or_create_franchise_from_excel(raw_name):
             if franchise.franchise_code and normalize_franchise_key(franchise.franchise_code) == code_key:
                 return franchise, False
 
-    # 2) Exact normalized franchise name is retained as a legacy fallback.
+    # 2) Master Import IDs and standardized towns are source-of-truth fallbacks.
+    for franchise in franchises:
+        if getattr(franchise, "master_import_id", None) and normalize_franchise_key(franchise.master_import_id) == key:
+            return franchise, False
+        if getattr(franchise, "standardized_town", None) and normalize_franchise_key(franchise.standardized_town) == key:
+            return franchise, False
+
+    # 3) Exact normalized franchise name is retained as a legacy fallback.
     for franchise in franchises:
         if normalize_franchise_key(franchise.business_name) == key:
             return franchise, False
 
     current_app.logger.warning(
-        "Month-end import skipped unknown franchise label %r. Add/update it in Franchise Master with a Franchise Code first.",
+        "Month-end import skipped unknown franchise label %r. Add/update it in the Master Import workbook first.",
         raw_name,
     )
     return None, False

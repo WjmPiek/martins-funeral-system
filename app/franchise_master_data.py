@@ -137,6 +137,15 @@ def find_franchise(row: Dict[str, Any], lookups=None) -> Optional[Franchise]:
     if code and code in by_code:
         return by_code[code]
 
+    master_import_id = normalize_key(row.get("Master Import ID"))
+    standardized_town = normalize_key(row.get("Standardized Town"))
+    if master_import_id or standardized_town:
+        for franchise in Franchise.query.all():
+            if master_import_id and normalize_key(getattr(franchise, "master_import_id", "")) == master_import_id:
+                return franchise
+            if standardized_town and normalize_key(getattr(franchise, "standardized_town", "")) == standardized_town:
+                return franchise
+
     raw_id = row.get("Franchise ID")
     try:
         fid = int(raw_id) if raw_id not in (None, "") else None
@@ -536,19 +545,158 @@ def _headers_for(ws) -> Dict[str, int]:
     return {str(c.value or "").strip(): idx + 1 for idx, c in enumerate(ws[1])}
 
 
+
+
+# Columns accepted by the production master import file.  The system now accepts
+# both the exported "Franchise Master" workbook and the polished single-tab
+# "Master Import" workbook used as the operational source of truth.
+MASTER_IMPORT_SHEET_NAMES = ("Master Import", "Franchise Master", "Master")
+HEADER_ALIASES = {
+    "Import ID": "Master Import ID",
+    "Unique ID": "Master Import ID",
+    "Master Import ID": "Master Import ID",
+    "Town": "Standardized Town",
+    "Standardized Town": "Standardized Town",
+    "Business Name": "Business Name",
+    "Franchise Name": "Business Name",
+    "Franchise": "Business Name",
+    "Franchise User": "Business Name",
+    "Franchise Code": "Franchise Code",
+    "Province": "Province",
+    "Province Code": "Province Code",
+    "District": "District",
+    "District Municipality": "District",
+    "District Code": "District Code",
+    "Municipality": "Municipality",
+    "Local/Metropolitan Municipality": "Municipality",
+    "Local Municipality": "Municipality",
+    "Municipality Code": "Municipality Code",
+    "Municipal Code": "Municipality Code",
+    "Region": "Region",
+    "Office Address": "Office Address",
+    "Office Number": "Office Number",
+    "After Hours Number": "After Hours Number",
+    "Franchisee Name": "Franchisee Name",
+    "Franchisee Surname": "Franchisee Surname",
+    "Franchisee Cell": "Franchisee Cell",
+    "Franchisee Email": "Franchisee Email",
+    "Public Email": "Public Email",
+    "Login User Email": "Login User Email",
+    "Agreement Start Date": "Agreement Start Date",
+    "Agreement End Date": "Agreement End Date",
+    "Royalty Method": "Royalty Method",
+    "Minimum Royalty Amount": "Minimum Royalty Amount",
+    "Minimum Royalty": "Minimum Royalty Amount",
+    "Active For Performance": "Active For Performance",
+    "Review Notes": "Review Notes",
+}
+for idx in range(1, ROYALTY_SCALE_COUNT + 1):
+    HEADER_ALIASES[f"Scale {idx} From"] = f"Scale {idx} From"
+    HEADER_ALIASES[f"Scale {idx} To"] = f"Scale {idx} To"
+    HEADER_ALIASES[f"Scale {idx} %"] = f"Scale {idx} %"
+    HEADER_ALIASES[f"Scale {idx} Percentage"] = f"Scale {idx} %"
+
+
+def _clean_header_name(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "").replace("\n", " ").strip())
+
+
+def _canonical_headers_for(ws) -> Dict[str, int]:
+    headers: Dict[str, int] = {}
+    for idx, cell in enumerate(ws[1], start=1):
+        raw = _clean_header_name(cell.value)
+        canonical = HEADER_ALIASES.get(raw, raw)
+        if canonical and canonical not in headers:
+            headers[canonical] = idx
+    return headers
+
+
+def _select_master_worksheet(wb):
+    for sheet_name in MASTER_IMPORT_SHEET_NAMES:
+        if sheet_name in wb.sheetnames:
+            return wb[sheet_name], sheet_name
+    # Last fallback: use the active sheet when it has recognizable source-of-truth columns.
+    ws = wb.active
+    headers = _canonical_headers_for(ws)
+    if {"Business Name", "Franchise Code"} & set(headers):
+        return ws, ws.title
+    raise ValueError("Workbook must contain a 'Master Import', 'Franchise Master' or 'Master' sheet.")
+
+
+def _column_exists_on_franchise(field_name: str) -> bool:
+    return hasattr(Franchise, field_name)
+
+
+def _set_if_model_has(franchise: Franchise, field_name: str, value: Any) -> int:
+    if not _column_exists_on_franchise(field_name):
+        return 0
+    if getattr(franchise, field_name) != value:
+        setattr(franchise, field_name, value)
+        return 1
+    return 0
+
+
+def _master_row_name(row: Dict[str, Any]) -> str:
+    return str(row.get("Business Name") or row.get("Standardized Town") or "").strip()
+
+
+def _ensure_franchise_user_link(franchise: Franchise, row: Dict[str, Any]) -> Tuple[int, int]:
+    """Create/link the franchise user from the Master Import row.
+
+    Returns (users_created, users_linked).  Login User Email is preferred; if it
+    is blank the importer uses Franchisee Email/Public Email, and if those are
+    blank it creates the standard @martinsdirect.com login.  This makes the
+    master import file the controlling allocation table before monthly/PDF imports.
+    """
+    login_email = str(row.get("Login User Email") or row.get("Franchisee Email") or row.get("Public Email") or "").strip().lower()
+    if not login_email:
+        slug = re.sub(r"[^a-z0-9]+", ".", _master_row_name(row).lower()).strip(".") or f"franchise{franchise.id}"
+        login_email = f"{slug}@martinsdirect.com"
+    user = User.query.filter(db.func.lower(User.email) == login_email.lower()).first()
+    created = 0
+    if not user:
+        name = str(row.get("Franchisee Name") or _master_row_name(row) or "Franchise").strip()
+        surname = str(row.get("Franchisee Surname") or "User").strip() or "User"
+        user = User(name=name, surname=surname, email=login_email, is_active=True, is_active_account=True)
+        try:
+            user.set_password("ChangeMe!2026")
+        except Exception:
+            pass
+        db.session.add(user)
+        db.session.flush()
+        created = 1
+    role = None
+    try:
+        from app.models import Role
+        role = Role.query.filter_by(name="Franchise User").first()
+        if not role:
+            role = Role(name="Franchise User", description="Imported franchise user role", is_system_role=True)
+            db.session.add(role)
+            db.session.flush()
+        if role not in user.roles:
+            user.roles.append(role)
+    except Exception:
+        pass
+    linked = 0
+    if franchise not in user.assigned_franchises:
+        user.assigned_franchises.append(franchise)
+        linked = 1
+    return created, linked
+
 def import_franchise_master_workbook(file_storage) -> Dict[str, Any]:
     wb = load_workbook(file_storage, data_only=True)
-    if "Franchise Master" not in wb.sheetnames:
-        raise ValueError("Workbook must contain a 'Franchise Master' sheet.")
-    ws = wb["Franchise Master"]
-    headers = _headers_for(ws)
-    required = ["Business Name", "Franchise Code", "Province", "Agreement Start Date"]
+    ws, sheet_name = _select_master_worksheet(wb)
+    headers = _canonical_headers_for(ws)
+    required = ["Business Name", "Franchise Code"]
     missing = [h for h in required if h not in headers]
     if missing:
         raise ValueError("Missing required columns: " + ", ".join(missing))
 
     lookups = franchise_lookup()
     updated = 0
+    created = 0
+    users_created = 0
+    users_linked = 0
     unmatched = []
     changed_fields = 0
     scale_updates = 0
@@ -559,13 +707,29 @@ def import_franchise_master_workbook(file_storage) -> Dict[str, Any]:
 
     for r in range(2, ws.max_row + 1):
         row = {h: cell(r, h) for h in headers}
-        if not any(row.get(h) for h in ("Franchise ID", "Business Name", "Franchise Code")):
+        if not any(row.get(h) for h in ("Franchise ID", "Business Name", "Franchise Code", "Standardized Town")):
+            continue
+        if str(row.get("Review Notes") or "").strip().lower() == "needs review":
+            unmatched.append({"sheet": sheet_name, "row": r, "business_name": _master_row_name(row), "franchise_code": row.get("Franchise Code"), "reason": "Review Notes says Needs review"})
             continue
         franchise = find_franchise(row, lookups)
         if not franchise:
-            unmatched.append({"sheet": "Franchise Master", "row": r, "business_name": row.get("Business Name"), "franchise_code": row.get("Franchise Code")})
-            continue
+            # The Master Import file is now the source of truth.  Unknown rows are
+            # created once they have a business name; the generated primary key is
+            # then available for all later monthly/PDF imports.
+            name = _master_row_name(row)
+            if not name:
+                unmatched.append({"sheet": sheet_name, "row": r, "business_name": row.get("Business Name"), "franchise_code": row.get("Franchise Code"), "reason": "No business name"})
+                continue
+            franchise = Franchise(business_name=name)
+            db.session.add(franchise)
+            db.session.flush()
+            created += 1
+            lookups = franchise_lookup()
         changed_fields += _update_franchise_from_row(franchise, row)
+        u_created, u_linked = _ensure_franchise_user_link(franchise, row)
+        users_created += u_created
+        users_linked += u_linked
         updated += 1
         parsed_scales = _scales_from_master_row(row)
         if parsed_scales:
@@ -575,8 +739,16 @@ def import_franchise_master_workbook(file_storage) -> Dict[str, Any]:
         scale_updates += _import_scale_sheet(wb["Royalty Scales"], lookups, unmatched)
 
     db.session.commit()
-    return {"updated": updated, "changed_fields": changed_fields, "unmatched": unmatched, "scale_rows": scale_updates}
-
+    return {
+        "updated": updated,
+        "created": created,
+        "changed_fields": changed_fields,
+        "users_created": users_created,
+        "users_linked": users_linked,
+        "unmatched": unmatched,
+        "scale_rows": scale_updates,
+        "source_sheet": sheet_name,
+    }
 
 def _update_franchise_from_row(franchise: Franchise, row: Dict[str, Any]) -> int:
     changes = 0
@@ -586,8 +758,8 @@ def _update_franchise_from_row(franchise: Franchise, row: Dict[str, Any]) -> int
         "franchise_code": str(row.get("Franchise Code") or franchise.franchise_code or "").strip(),
         "province": province,
         "region": str(row.get("Region") or province or "").strip(),
-        "district": str(row.get("District") or "").strip(),
-        "municipality": str(row.get("Municipality") or "").strip(),
+        "district": str(row.get("District") or row.get("District Municipality") or "").strip(),
+        "municipality": str(row.get("Municipality") or row.get("Local/Metropolitan Municipality") or "").strip(),
         "office_address": str(row.get("Office Address") or "").strip(),
         "office_number": str(row.get("Office Number") or "").strip(),
         "after_hours_number": str(row.get("After Hours Number") or "").strip(),
@@ -607,6 +779,11 @@ def _update_franchise_from_row(franchise: Franchise, row: Dict[str, Any]) -> int
         if getattr(franchise, field) != value:
             setattr(franchise, field, value)
             changes += 1
+    changes += _set_if_model_has(franchise, "master_import_id", str(row.get("Master Import ID") or "").strip())
+    changes += _set_if_model_has(franchise, "standardized_town", str(row.get("Standardized Town") or _master_row_name(row) or "").strip())
+    changes += _set_if_model_has(franchise, "province_code", str(row.get("Province Code") or "").strip().upper())
+    changes += _set_if_model_has(franchise, "district_code", str(row.get("District Code") or "").strip().upper())
+    changes += _set_if_model_has(franchise, "municipality_code", str(row.get("Municipality Code") or "").strip().upper())
     return changes
 
 
