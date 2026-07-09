@@ -258,13 +258,13 @@ def has_required_schema() -> Tuple[bool, List[str]]:
 
 def data_integrity_rows() -> List[Dict[str, Any]]:
     rows = []
-    latest_year, latest_month = get_latest_period()
-    latest_review = {
-        r.franchise_id: r for r in RoyaltyCalculationSnapshot.query.filter_by(year=latest_year, month=latest_month).all()
-    }
+    # Data Integrity is a master-data readiness screen. It must not mark a
+    # franchise as Needs Review because of an old/stale royalty snapshot from
+    # before the Master Import workbook was uploaded. Royalty import/calculation
+    # issues are still handled in the royalty import and diagnostics pages.
     for f in Franchise.query.order_by(Franchise.business_name).all():
         scale_count = RoyaltyScale.query.filter_by(franchise_id=f.id).count()
-        issues = readiness_issues(f, latest_review.get(f.id))
+        issues = readiness_issues(f, None)
         rows.append({
             "id": f.id,
             "business_name": f.business_name,
@@ -562,6 +562,12 @@ HEADER_ALIASES = {
     "Franchise": "Business Name",
     "Franchise User": "Business Name",
     "Franchise Code": "Franchise Code",
+    "Import ID": "Master Import ID",
+    "Master Import ID": "Master Import ID",
+    "Unique Import ID": "Master Import ID",
+    "Unique ID": "Master Import ID",
+    "Standardized Town": "Standardized Town",
+    "Standardized Town Name": "Standardized Town",
     "Province": "Province",
     "Province Code": "Province Code",
     "District": "District",
@@ -637,7 +643,11 @@ def _set_if_model_has(franchise: Franchise, field_name: str, value: Any) -> int:
 
 
 def _master_row_name(row: Dict[str, Any]) -> str:
-    return str(row.get("Business Name") or row.get("Standardized Town") or "").strip()
+    return str(row.get("Business Name") or row.get("Standardized Town") or row.get("Franchise Code") or "").strip()
+
+
+def _master_row_town(row: Dict[str, Any]) -> str:
+    return str(row.get("Standardized Town") or row.get("Business Name") or row.get("Franchise Code") or "").strip()
 
 
 def _ensure_franchise_user_link(franchise: Franchise, row: Dict[str, Any]) -> Tuple[int, int]:
@@ -727,6 +737,9 @@ def import_franchise_master_workbook(file_storage) -> Dict[str, Any]:
             created += 1
             lookups = franchise_lookup()
         changed_fields += _update_franchise_from_row(franchise, row)
+        # Refresh lookups after update because Franchise Code / Master Import ID
+        # may have changed. Later duplicate rows must match the updated record.
+        lookups = franchise_lookup()
         u_created, u_linked = _ensure_franchise_user_link(franchise, row)
         users_created += u_created
         users_linked += u_linked
@@ -758,8 +771,8 @@ def _update_franchise_from_row(franchise: Franchise, row: Dict[str, Any]) -> int
         "franchise_code": str(row.get("Franchise Code") or franchise.franchise_code or "").strip(),
         "province": province,
         "region": str(row.get("Region") or province or "").strip(),
-        "district": str(row.get("District") or row.get("District Municipality") or "").strip(),
-        "municipality": str(row.get("Municipality") or row.get("Local/Metropolitan Municipality") or "").strip(),
+        "district": str(row.get("District") or "").strip(),
+        "municipality": str(row.get("Municipality") or "").strip(),
         "office_address": str(row.get("Office Address") or "").strip(),
         "office_number": str(row.get("Office Number") or "").strip(),
         "after_hours_number": str(row.get("After Hours Number") or "").strip(),
@@ -780,7 +793,7 @@ def _update_franchise_from_row(franchise: Franchise, row: Dict[str, Any]) -> int
             setattr(franchise, field, value)
             changes += 1
     changes += _set_if_model_has(franchise, "master_import_id", str(row.get("Master Import ID") or "").strip())
-    changes += _set_if_model_has(franchise, "standardized_town", str(row.get("Standardized Town") or _master_row_name(row) or "").strip())
+    changes += _set_if_model_has(franchise, "standardized_town", _master_row_town(row))
     changes += _set_if_model_has(franchise, "province_code", str(row.get("Province Code") or "").strip().upper())
     changes += _set_if_model_has(franchise, "district_code", str(row.get("District Code") or "").strip().upper())
     changes += _set_if_model_has(franchise, "municipality_code", str(row.get("Municipality Code") or "").strip().upper())
