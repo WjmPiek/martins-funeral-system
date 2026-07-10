@@ -11,7 +11,7 @@
 <body class="app-body" data-current-path="{{ request.path }}" data-current-section="{{ request.args.get('section', '') }}">
     {% if current_user.is_authenticated %}
         <div class="app-shell">
-            <details class="app-menu">
+            <details class="app-menu" open>
                 <summary class="menu-toggle" aria-label="Open menu">
                     <span></span><span></span><span></span><span></span>
                 </summary>
