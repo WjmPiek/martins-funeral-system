@@ -76,95 +76,102 @@
                             </div>
                         </details>
                     {% else %}
-                        {# Low-priority/admin and setup areas at the top. #}
-                        {% if current_user.has_permission('users:view') or current_user.has_permission('user_roles:view') or current_user.has_permission('performance:manage_inactive') or is_admin_user or is_finance_user %}
-                            <div class="nav-group-title">Admin</div>
-                            <details class="nav-section" open>
-                                <summary>Users <span class="nav-count-badge">6</span></summary>
-                                <div class="nav-subtabs">
-                                    {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.users') }}">Users</a>{% endif %}
-                                    {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.franchise_users') }}">Franchise Users</a>{% endif %}
-                                    {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.franchise_employees') }}">Employees</a>{% endif %}
-                                    {% if current_user.has_permission('user_roles:view') %}<a href="{{ url_for('admin.roles') }}">User Roles</a>{% endif %}
-                                </div>
-                            </details>
+                        <div class="nav-primary-link">
+                            {% if current_user.has_permission('dashboard:view') and not is_franchise_user %}
+                                <a href="{{ url_for('dashboard.index') }}"><span class="nav-icon">⌂</span><span><strong>Business Overview</strong><small>Company performance at a glance</small></span></a>
+                            {% endif %}
+                        </div>
 
-                            {% if current_user.has_permission('franchise_management:view') and (is_admin_user or is_finance_user) %}
-                            <div class="nav-modern-group">
-                                <div class="nav-modern-heading">Franchise Management</div>
-                                <a href="{{ url_for('admin.insights_dashboard', tab='executive') }}">Executive Summary</a>
-                                <a href="{{ url_for('admin.insights_dashboard', tab='franchise') }}">Franchise Explanations</a>
-                                <a href="{{ url_for('admin.insights_dashboard', tab='royalty') }}">Royalty Explanations</a>
-                                <a href="{{ url_for('admin.insights_dashboard', tab='province') }}">Province Summaries</a>
+                        {% if current_user.has_permission('performance:view') %}
+                        <details class="nav-section nav-domain" open>
+                            <summary><span class="nav-icon">◒</span><span><strong>Graphs & Analytics</strong><small>Visual trends and comparisons</small></span></summary>
+                            <div class="nav-subtabs">
+                                <a href="{{ url_for('performance.graphs') }}">Performance Graphs <small>Actual vs target, prior year and forecast</small></a>
+                                <a href="{{ url_for('performance.executive') }}">Executive Analytics <small>High-level trends for decision making</small></a>
+                                <a href="{{ url_for('performance.leaderboards') }}">Franchise Rankings <small>Top and bottom performers</small></a>
+                                <a href="{{ url_for('performance.insights') }}">Performance Insights <small>Important changes and exceptions</small></a>
+                                <a href="{{ url_for('performance.decision_centre_view') }}">Decision Centre <small>Actions based on business signals</small></a>
+                                <a href="{{ url_for('performance.targets') }}">Targets <small>Monthly and annual target tracking</small></a>
+                                <a href="{{ url_for('performance.annual_budget') }}">Annual Budget <small>Budget planning and comparison</small></a>
+                                <a href="{{ url_for('performance.history') }}">Performance History <small>Review previous reporting periods</small></a>
                             </div>
-                            <div class="nav-modern-group">
-                                <div class="nav-modern-heading">Executive Dashboard</div>
+                        </details>
+                        {% endif %}
+
+                        {% if current_user.has_permission('royalties:view') or (current_user.has_permission('franchise_management:view') and (is_admin_user or is_finance_user)) %}
+                        <details class="nav-section nav-domain" open>
+                            <summary><span class="nav-icon">R</span><span><strong>Royalties</strong><small>Calculations, trends and data quality</small></span></summary>
+                            <div class="nav-subtabs">
+                                {% if current_user.has_permission('royalties:view') %}<a href="{{ url_for('royalties.index') }}">Royalty Overview <small>Current royalty figures by franchise</small></a>{% endif %}
+                                {% if current_user.has_permission('franchise_management:view') and (is_admin_user or is_finance_user) %}
+                                <a href="{{ url_for('admin.insights_dashboard', tab='royalty') }}">Royalty Explanations <small>Human-readable formula explanations</small></a>
+                                <a href="{{ url_for('admin.royalty_management', section='reporting-periods') }}">Reporting Periods <small>Royalty totals by month</small></a>
+                                <a href="{{ url_for('admin.royalty_management', section='snapshots') }}">Royalty Snapshots <small>Locked calculation records</small></a>
+                                <a href="{{ url_for('admin.royalty_management', section='royalty-data-checks') }}">Royalty Data Checks <small>Missing scales, agreements and zero royalty</small></a>
+                                <a href="{{ url_for('admin.executive_dashboard', section='royalties-per-month') }}">Royalties per Month <small>Monthly trend and movement</small></a>
+                                {% endif %}
+                            </div>
+                        </details>
+                        {% endif %}
+
+                        {% if current_user.has_permission('franchise_management:view') and (is_admin_user or is_finance_user) %}
+                        <details class="nav-section nav-domain" open>
+                            <summary><span class="nav-icon">◎</span><span><strong>Franchise Intelligence</strong><small>Health, growth and risk</small></span></summary>
+                            <div class="nav-subtabs">
+                                <a href="{{ url_for('admin.insights_dashboard', tab='executive') }}">Executive Summary <small>Plain-language business summary</small></a>
+                                <a href="{{ url_for('admin.insights_dashboard', tab='franchise') }}">Franchise Explanations <small>What changed and why</small></a>
+                                <a href="{{ url_for('admin.insights_dashboard', tab='province') }}">Province Summaries <small>Provincial performance and comparison</small></a>
+                                <a href="{{ url_for('admin.business_intelligence', section='company-health-score') }}">Company Health Score <small>Overall franchise network health</small></a>
+                                <a href="{{ url_for('admin.business_intelligence', section='franchise-critical') }}">Critical Franchises <small>Franchises needing immediate attention</small></a>
+                                <a href="{{ url_for('admin.business_intelligence', section='province-growth') }}">Province Growth <small>Growth by province</small></a>
+                                <a href="{{ url_for('admin.business_intelligence', section='critical-watch') }}">Critical / Watch List <small>Risk-ranked franchise list</small></a>
+                                <a href="{{ url_for('admin.business_intelligence', section='target-warnings') }}">Target Warnings <small>Franchises below required targets</small></a>
+                                <a href="{{ url_for('admin.business_intelligence', section='growth-declines') }}">Growth & Declines <small>Fastest growth and largest declines</small></a>
+                            </div>
+                        </details>
+
+                        <details class="nav-section nav-domain">
+                            <summary><span class="nav-icon">▦</span><span><strong>Executive Dashboard</strong><small>Focused management scenarios</small></span></summary>
+                            <div class="nav-subtabs">
                                 <a href="{{ url_for('admin.executive_dashboard', section='executive-summary') }}">Executive Summary</a>
                                 <a href="{{ url_for('admin.executive_dashboard', section='executive-alerts') }}">Executive Alerts</a>
                                 <a href="{{ url_for('admin.executive_dashboard', section='quick-actions') }}">Quick Actions</a>
-                                <a href="{{ url_for('admin.executive_dashboard', section='franchise-rankings') }}">Top &amp; Bottom 10 Franchises</a>
+                                <a href="{{ url_for('admin.executive_dashboard', section='franchise-rankings') }}">Top & Bottom 10 Franchises</a>
                                 <a href="{{ url_for('admin.executive_dashboard', section='province-performance') }}">Province Performance</a>
-                                <a href="{{ url_for('admin.executive_dashboard', section='royalties-per-month') }}">Royalties per Month</a>
                             </div>
-                            <div class="nav-modern-group">
-                                <div class="nav-modern-heading">Business Intelligence</div>
-                                <a href="{{ url_for('admin.business_intelligence', section='company-health-score') }}">Company Health Score</a>
-                                <a href="{{ url_for('admin.business_intelligence', section='franchise-critical') }}">Franchise Critical</a>
-                                <a href="{{ url_for('admin.business_intelligence', section='province-growth') }}">Province Growth</a>
-                                <a href="{{ url_for('admin.business_intelligence', section='critical-watch') }}">Critical / Watch Franchises</a>
-                                <a href="{{ url_for('admin.business_intelligence', section='target-warnings') }}">Target Achievement Warnings</a>
-                                <a href="{{ url_for('admin.business_intelligence', section='growth-declines') }}">Fastest Growth &amp; Largest Declines</a>
+                        </details>
+                        {% endif %}
+
+                        {% if current_user.has_permission('monthly_figures:view') or current_user.has_permission('franchise_details:view') %}
+                        <details class="nav-section nav-domain">
+                            <summary><span class="nav-icon">≡</span><span><strong>Franchise Operations</strong><small>Details, figures and people</small></span></summary>
+                            <div class="nav-subtabs">
+                                {% if current_user.has_permission('franchise_details:view') %}<a href="{{ url_for('franchise.details') }}">Franchise Details</a>{% endif %}
+                                {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}<a href="{{ url_for('franchise.employees') }}">Employees</a>{% endif %}
+                                {% if current_user.has_permission('monthly_figures:view') %}<a href="{{ url_for('monthly.index') }}">Monthly Figures</a>{% endif %}
+                                {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.index') }}">Leaderboard</a>{% endif %}
                             </div>
-                            <div class="nav-modern-group">
-                                <div class="nav-modern-heading">Royalty Management</div>
-                                <a href="{{ url_for('admin.royalty_management', section='reporting-periods') }}">Reporting Periods</a>
-                                <a href="{{ url_for('admin.royalty_management', section='snapshots') }}">Snapshots</a>
-                                <a href="{{ url_for('admin.royalty_management', section='royalty-data-checks') }}">Royalty Data Checks</a>
+                        </details>
+                        {% endif %}
+
+                        {% if current_user.has_permission('users:view') or current_user.has_permission('user_roles:view') or is_admin_user or is_finance_user %}
+                        <details class="nav-section nav-domain">
+                            <summary><span class="nav-icon">⚙</span><span><strong>Administration</strong><small>Users, imports and system control</small></span></summary>
+                            <div class="nav-subtabs">
+                                {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.users') }}">Users</a><a href="{{ url_for('admin.franchise_users') }}">Franchise Users</a><a href="{{ url_for('admin.franchise_employees') }}">Employees</a>{% endif %}
+                                {% if current_user.has_permission('user_roles:view') %}<a href="{{ url_for('admin.roles') }}">Roles & Permissions</a>{% endif %}
+                                {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.import_centre') }}">Import Centre</a><a href="{{ url_for('admin.imports_data') }}">Imports & Data</a><a href="{{ url_for('admin.data_integrity') }}">Data Integrity</a><a href="{{ url_for('admin.database_diagnostics') }}">Database Diagnostics</a>{% endif %}
+                                {% if current_user.has_permission('audit_logs:view') %}<a href="{{ url_for('admin.audit_logs') }}">Audit Logs</a>{% endif %}
                             </div>
-                            {% endif %}
-                            {% if current_user.has_permission('audit_logs:view') %}<a href="{{ url_for('admin.audit_logs') }}">Audit Logs</a>{% endif %}
-                            {% if current_user.has_permission('system_administration:view') %}<a href="#">System Administration</a>{% endif %}
-                            {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.imports_data') }}">Imports & Data</a>{% endif %}
-                            {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.data_integrity') }}">Data Integrity</a>{% endif %}
-                            {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.import_centre') }}">Import Centre</a>{% endif %}
-                            {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.database_diagnostics') }}">Database Diagnostics</a>{% endif %}
+                        </details>
                         {% endif %}
 
-                        {# Operational/support modules in the middle. #}
-                        {% if current_user.has_permission('manuals:view') %}<a href="{{ url_for('manuals.index') }}">Manuals</a>{% endif %}
-                        {% if current_user.has_permission('heat_map:view') %}<a href="{{ url_for('heatmap.index') }}">Heat Map</a>{% endif %}
-                        {% if current_user.has_permission('insurance_claims:view') and not is_franchise_user %}<a href="{{ url_for('insurance_claims.index') }}">Insurance Claims</a>{% endif %}
-                        {% if current_user.has_permission('joinings:view') and not is_franchise_user %}<a href="#">Joinings</a>{% endif %}
-                        {% if current_user.has_permission('funeral_services:view') and not is_franchise_user %}<a href="#">Funeral Services</a>{% endif %}
-                        {% if current_user.has_permission('attendance:view') %}<a href="{{ url_for('attendance.index') }}">Attendance</a>{% endif %}
-
-                        {# Important daily franchise and performance work lower in the sidebar. #}
-                        {% if current_user.has_permission('franchise_details:view') or current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}
-                            <details class="nav-section" open>
-                                <summary>Franchise Details <span class="nav-count-badge">2</span></summary>
-                                <div class="nav-subtabs">
-                                    {% if current_user.has_permission('franchise_details:view') %}<a href="{{ url_for('franchise.details') }}">Franchise Details</a>{% endif %}
-                                    {% if current_user.has_permission('franchise_employees:view') or current_user.has_permission('franchise_employees:manage') %}<a href="{{ url_for('franchise.employees') }}">Employees</a>{% endif %}
-                                </div>
-                            </details>
-                        {% endif %}
-
-                        {% if current_user.has_permission('performance:view') or current_user.has_permission('monthly_figures:view') or current_user.has_permission('royalties:view') or current_user.has_permission('finance:view') %}
-                            <details class="nav-section" open>
-                                <summary>Monthly Figures <span class="nav-count-badge">5</span></summary>
-                                <div class="nav-subtabs">
-                                    {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.graphs') }}">Performance Graphs</a>{% endif %}
-                                    {% if current_user.has_permission('performance:view') %}<a href="{{ url_for('performance.index') }}">Leaderboard</a>{% endif %}
-                                    {% if current_user.has_permission('monthly_figures:view') %}<a href="{{ url_for('monthly.index') }}">Monthly Figures</a>{% endif %}
-                                    {% if current_user.has_permission('royalties:view') %}<a href="{{ url_for('royalties.index') }}">Royalties</a>{% endif %}
-                                    {% if current_user.has_permission('finance:view') %}<a href="#">Finance</a>{% endif %}
-                                </div>
-                            </details>
-                        {% endif %}
-
-                        {% if current_user.has_permission('dashboard:view') and not is_franchise_user %}
-                            <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
-                        {% endif %}
+                        <div class="nav-utility-links">
+                            {% if current_user.has_permission('manuals:view') %}<a href="{{ url_for('manuals.index') }}">Manuals</a>{% endif %}
+                            {% if current_user.has_permission('heat_map:view') %}<a href="{{ url_for('heatmap.index') }}">Heat Map</a>{% endif %}
+                            {% if current_user.has_permission('insurance_claims:view') and not is_franchise_user %}<a href="{{ url_for('insurance_claims.index') }}">Insurance Claims</a>{% endif %}
+                            {% if current_user.has_permission('attendance:view') %}<a href="{{ url_for('attendance.index') }}">Attendance</a>{% endif %}
+                        </div>
                     {% endif %}
                 </nav>
                 </div>
