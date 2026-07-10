@@ -1,106 +1,108 @@
 {% extends "base.html" %}
 {% block title %}Insight Explanations{% endblock %}
 {% block app_content %}
-<section class="page-shell insights-dashboard">
-    <div class="page-header split-header">
+<section class="page-shell insights-dashboard insights-modern">
+    <div class="insights-page-heading">
         <div>
-            <p class="eyebrow">Phase 12 • Enterprise Insights & Explanation Engine</p>
+            <p class="eyebrow">Franchise Management</p>
             <h1>Insight Explanations</h1>
-            <p class="muted">Plain-language explanations generated from trusted imports, royalties, business intelligence and operational data. This page does not change royalty calculations.</p>
+            <p class="muted">Clear, traceable explanations generated from monthly figures, royalty snapshots and Business Intelligence health scoring.</p>
         </div>
-        <form method="get" class="inline-form card compact-form">
-            <label>Month
-                <input type="number" name="month" min="1" max="12" value="{{ selected_month }}" required>
-            </label>
-            <label>Year
-                <input type="number" name="year" min="2000" max="2100" value="{{ selected_year }}" required>
-            </label>
+        <form method="get" class="insights-period-form" aria-label="Select reporting period">
+            <input type="hidden" name="tab" value="{{ active_tab }}">
+            <label><span>Month</span><input type="number" name="month" min="1" max="12" value="{{ selected_month }}" required></label>
+            <label><span>Year</span><input type="number" name="year" min="2000" max="2100" value="{{ selected_year }}" required></label>
             <button class="btn btn-primary" type="submit">View Period</button>
         </form>
     </div>
 
-    <div class="stats-grid executive-kpi-grid">
-        <div class="stat-card executive-kpi-card">
-            <span>Total Explanations</span>
-            <strong>{{ summary.counts.total|count_value }}</strong>
-            <small>{{ selected_year }}-{{ "%02d"|format(selected_month) }}</small>
-        </div>
-        <div class="stat-card executive-kpi-card">
-            <span>Warnings</span>
-            <strong>{{ (summary.counts.by_severity.get('warning', 0) + summary.counts.by_severity.get('danger', 0))|count_value }}</strong>
-            <small>Items that need review</small>
-        </div>
-        <div class="stat-card executive-kpi-card">
-            <span>Franchise Explanations</span>
-            <strong>{{ (summary.counts.by_type.get('franchise_performance', 0))|count_value }}</strong>
-            <small>Growth/decline explanations</small>
-        </div>
-        <div class="stat-card executive-kpi-card">
-            <span>Royalty Explanations</span>
-            <strong>{{ (summary.counts.by_type.get('royalty_explanation', 0) + summary.counts.by_type.get('royalty_warning', 0))|count_value }}</strong>
-            <small>Traceable formula explanations</small>
-        </div>
+    <nav class="insights-tabs" aria-label="Insight explanation sections">
+        <a class="{{ 'active' if active_tab == 'executive' else '' }}" href="{{ url_for('admin.insights_dashboard', tab='executive', year=selected_year, month=selected_month) }}">
+            <span class="tab-icon">⌁</span>Executive Summary
+        </a>
+        <a class="{{ 'active' if active_tab == 'franchise' else '' }}" href="{{ url_for('admin.insights_dashboard', tab='franchise', year=selected_year, month=selected_month) }}">
+            <span class="tab-icon">▣</span>Franchise Explanations <b>{{ franchise_items|length }}</b>
+        </a>
+        <a class="{{ 'active' if active_tab == 'royalty' else '' }}" href="{{ url_for('admin.insights_dashboard', tab='royalty', year=selected_year, month=selected_month) }}">
+            <span class="tab-icon">⌁</span>Royalty Explanations <b>{{ royalty_items|length }}</b>
+        </a>
+        <a class="{{ 'active' if active_tab == 'province' else '' }}" href="{{ url_for('admin.insights_dashboard', tab='province', year=selected_year, month=selected_month) }}">
+            <span class="tab-icon">◫</span>Province Summaries <b>{{ province_items|length }}</b>
+        </a>
+    </nav>
+
+    <div class="insights-kpi-grid">
+        <article class="insights-kpi"><span class="kpi-symbol">Σ</span><div><small>Total Explanations</small><strong>{{ summary.counts.total|count_value }}</strong><em>{{ selected_year }}-{{ "%02d"|format(selected_month) }}</em></div></article>
+        <article class="insights-kpi"><span class="kpi-symbol warning">!</span><div><small>Items Requiring Review</small><strong>{{ (summary.counts.by_severity.get('warning', 0) + summary.counts.by_severity.get('danger', 0))|count_value }}</strong><em>Warnings and critical items</em></div></article>
+        <article class="insights-kpi"><span class="kpi-symbol success">↗</span><div><small>Franchise Insights</small><strong>{{ franchise_items|length|count_value }}</strong><em>Growth and decline</em></div></article>
+        <article class="insights-kpi"><span class="kpi-symbol royalty">R</span><div><small>Royalty Traces</small><strong>{{ royalty_items|length|count_value }}</strong><em>Formula explanations</em></div></article>
+        <article class="insights-kpi"><span class="kpi-symbol province">P</span><div><small>Province Summaries</small><strong>{{ province_items|length|count_value }}</strong><em>Regional overview</em></div></article>
     </div>
 
-    <section class="card" id="executive-summary">
-        <div class="section-title-row">
-            <h2>Executive Summary</h2>
+    {% if active_tab == 'executive' %}
+    <section class="insights-panel">
+        <div class="insights-panel-header">
+            <div><span class="panel-kicker">Current period</span><h2>Executive Summary</h2></div>
             <form method="post" action="{{ url_for('admin.insights_rebuild') }}">
-                <input type="hidden" name="month" value="{{ selected_month }}">
-                <input type="hidden" name="year" value="{{ selected_year }}">
-                <button class="btn btn-light btn-sm" type="submit">Rebuild Explanations</button>
+                <input type="hidden" name="month" value="{{ selected_month }}"><input type="hidden" name="year" value="{{ selected_year }}">
+                <button class="btn btn-light btn-sm" type="submit">Refresh Explanations</button>
             </form>
         </div>
         {% if summary.executive %}
-            <div class="alert-row alert-{{ 'danger' if summary.executive.severity == 'danger' else ('warning' if summary.executive.severity == 'warning' else 'neutral') }}">
-                <span>
-                    <strong>{{ summary.executive.title }}</strong><br>
-                    {{ summary.executive.summary }}<br>
-                    <small>{{ summary.executive.detail }}</small>
-                </span>
-            </div>
+        <div class="executive-summary-card severity-{{ summary.executive.severity or 'info' }}">
+            <div class="summary-status">i</div>
+            <div><h3>{{ summary.executive.title }}</h3><p>{{ summary.executive.summary }}</p><small>{{ summary.executive.detail }}</small></div>
+        </div>
         {% else %}
-            <p class="muted">No executive explanation exists yet. Use Rebuild Explanations.</p>
+        <div class="insights-empty"><strong>No executive summary is available.</strong><span>Use “Refresh Explanations” to generate the selected period.</span></div>
         {% endif %}
+
+        <div class="insights-overview-grid">
+            <div class="overview-card"><h3>What this page explains</h3><p>Turnover trends, target achievement, franchise health, province performance and royalty calculation traces.</p></div>
+            <div class="overview-card"><h3>Data sources</h3><p>Monthly figures, royalty snapshots, franchise health snapshots and Business Intelligence scoring.</p></div>
+            <div class="overview-card"><h3>Calculation protection</h3><p>Explanations are read-only and do not alter royalty values, targets or imported figures.</p></div>
+        </div>
     </section>
 
-    <div class="grid two-col">
-        <section class="card" id="franchise-explanations">
-            <div class="section-title-row"><h2>Franchise Explanations</h2><span class="badge badge-light">Growth / decline</span></div>
-            <div class="alert-list">
-                {% for item in franchise_items %}
-                    <div class="alert-row alert-{{ 'danger' if item.severity == 'danger' else ('warning' if item.severity == 'warning' else ('ok' if item.severity == 'success' else 'neutral')) }}">
-                        <span><strong>{{ item.title }}</strong><br>{{ item.summary }}<br><small>{{ item.detail }}</small></span>
-                    </div>
-                {% else %}<p class="muted">No franchise explanations for this period.</p>{% endfor %}
-            </div>
-        </section>
+    {% elif active_tab == 'franchise' %}
+    <section class="insights-panel">
+        <div class="insights-panel-header"><div><span class="panel-kicker">Performance analysis</span><h2>Franchise Explanations</h2></div><span class="result-count">{{ franchise_items|length }} results</span></div>
+        <div class="insight-list compact">
+        {% for item in franchise_items %}
+            <details class="insight-list-item severity-{{ item.severity or 'info' }}">
+                <summary><span class="severity-dot"></span><span class="item-copy"><strong>{{ item.title }}</strong><small>{{ item.summary }}</small></span><span class="expand-label">Details</span></summary>
+                <div class="insight-detail">{{ item.detail }}</div>
+            </details>
+        {% else %}<div class="insights-empty"><strong>No franchise explanations for this period.</strong><span>Refresh explanations or select a period with imported monthly figures.</span></div>{% endfor %}
+        </div>
+    </section>
 
-        <section class="card" id="royalty-explanations">
-            <div class="section-title-row"><h2>Royalty Explanations</h2><span class="badge badge-light">Formula trace</span></div>
-            <div class="alert-list">
+    {% elif active_tab == 'royalty' %}
+    <section class="insights-panel">
+        <div class="insights-panel-header"><div><span class="panel-kicker">Calculation trace</span><h2>Royalty Explanations</h2></div><span class="result-count">{{ royalty_items|length }} results</span></div>
+        <div class="insight-table-wrap">
+            <table class="insight-table">
+                <thead><tr><th>Franchise / explanation</th><th>Royalty summary</th><th>Status</th><th></th></tr></thead>
+                <tbody>
                 {% for item in royalty_items %}
-                    <div class="alert-row alert-{{ 'danger' if item.severity == 'danger' else ('warning' if item.severity == 'warning' else 'neutral') }}">
-                        <span><strong>{{ item.title }}</strong><br>{{ item.summary }}<br><small>{{ item.detail }}</small></span>
-                    </div>
-                {% else %}<p class="muted">No royalty explanations for this period.</p>{% endfor %}
-            </div>
-        </section>
-    </div>
+                <tr><td><strong>{{ item.title|replace('Royalty explanation - ', '') }}</strong></td><td>{{ item.summary }}</td><td><span class="status-pill status-{{ item.severity or 'info' }}">{{ item.severity|default('info')|title }}</span></td><td><details class="inline-detail"><summary>View trace</summary><div>{{ item.detail }}</div></details></td></tr>
+                {% else %}<tr><td colspan="4"><div class="insights-empty"><strong>No royalty explanations for this period.</strong><span>Confirm royalty snapshots exist, then refresh explanations.</span></div></td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
 
-    <div class="grid two-col">
-        <section class="card" id="province-summaries">
-            <div class="section-title-row"><h2>Province Summaries</h2><span class="badge badge-light">Province view</span></div>
-            <div class="alert-list">
-                {% for item in province_items %}
-                    <div class="alert-row alert-{{ 'danger' if item.severity == 'danger' else ('warning' if item.severity == 'warning' else 'neutral') }}">
-                        <span><strong>{{ item.title }}</strong><br>{{ item.summary }}<br><small>{{ item.detail }}</small></span>
-                    </div>
-                {% else %}<p class="muted">No province summaries for this period.</p>{% endfor %}
-            </div>
-        </section>
+    {% elif active_tab == 'province' %}
+    <section class="insights-panel">
+        <div class="insights-panel-header"><div><span class="panel-kicker">Regional intelligence</span><h2>Province Summaries</h2></div><span class="result-count">{{ province_items|length }} provinces</span></div>
+        <div class="province-card-grid">
+        {% for item in province_items %}
+            <article class="province-insight-card severity-{{ item.severity or 'info' }}"><div class="province-card-top"><span class="province-mark">P</span><span class="status-pill status-{{ item.severity or 'info' }}">{{ item.severity|default('info')|title }}</span></div><h3>{{ item.title|replace(' province summary', '') }}</h3><p>{{ item.summary }}</p><small>{{ item.detail }}</small></article>
+        {% else %}<div class="insights-empty full-width"><strong>No province summaries for this period.</strong><span>Province summaries require franchises to have valid province details and health snapshots for the selected period.</span></div>{% endfor %}
+        </div>
+    </section>
+    {% endif %}
 
-
-    </div>
+    <footer class="insights-footer"><span>Showing data for {{ selected_year }}-{{ "%02d"|format(selected_month) }}</span><span>Read-only explanation centre</span></footer>
 </section>
 {% endblock %}

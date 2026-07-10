@@ -93,7 +93,7 @@
                             <details class="nav-section" open>
                                 <summary>Franchise Management <span class="nav-count-badge">4</span></summary>
                                 <div class="nav-subtabs">
-                                    <a href="{{ url_for('admin.insights_dashboard') }}">Executive Summary</a>
+                                    <a href="{{ url_for('admin.insights_dashboard', tab='executive') }}">Executive Summary</a>
                                     <details class="nav-section nav-nested-section">
                                         <summary>Executive Dashboard</summary>
                                         <div class="nav-subtabs nav-sub-subtabs">
@@ -124,9 +124,9 @@
                                             <a href="{{ url_for('admin.database_diagnostics') }}">Royalty Data Checks</a>
                                         </div>
                                     </details>
-                                    <a href="{{ url_for('admin.insights_dashboard') }}#franchise-explanations">Franchise Explanations</a>
-                                    <a href="{{ url_for('admin.insights_dashboard') }}#royalty-explanations">Royalty Explanations</a>
-                                    <a href="{{ url_for('admin.insights_dashboard') }}#province-summaries">Province Summaries</a>
+                                    <a href="{{ url_for('admin.insights_dashboard', tab='franchise')">Franchise Explanations</a>
+                                    <a href="{{ url_for('admin.insights_dashboard', tab='royalty')">Royalty Explanations</a>
+                                    <a href="{{ url_for('admin.insights_dashboard', tab='province')">Province Summaries</a>
                                 </div>
                             </details>
                             {% endif %}

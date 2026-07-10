@@ -2365,13 +2365,22 @@ def insights_dashboard():
     latest = latest_period()
     selected_year = int(request.args.get("year") or latest.get("year") or datetime.utcnow().year)
     selected_month = int(request.args.get("month") or latest.get("month") or datetime.utcnow().month)
+    active_tab = (request.args.get("tab") or "executive").strip().lower()
+    allowed_tabs = {"executive", "franchise", "royalty", "province"}
+    if active_tab not in allowed_tabs:
+        active_tab = "executive"
+
     summary = get_insight_summary(selected_year, selected_month)
     narratives = (InsightNarrative.query.filter_by(year=selected_year, month=selected_month)
-        .order_by(InsightNarrative.created_at.desc(), InsightNarrative.id.desc()).limit(80).all())
+        .order_by(InsightNarrative.created_at.desc(), InsightNarrative.id.desc()).limit(160).all())
+
+    # Keep each sub-tab tied to one narrative type.  Previously every record with
+    # a franchise_id appeared under Franchise Explanations, which duplicated
+    # royalty and BI information under different headings.
     executive_items = [n for n in narratives if n.narrative_type in ("executive_summary", "company_health", "monthly_summary")]
-    franchise_items = [n for n in narratives if n.franchise_id is not None][:20]
-    province_items = [n for n in narratives if n.narrative_type == "province_summary"][:20]
-    royalty_items = [n for n in narratives if n.narrative_type in ("royalty_explanation", "royalty_warning")][:20]
+    franchise_items = [n for n in narratives if n.narrative_type in ("franchise_performance", "business_insight_explanation")][:40]
+    province_items = [n for n in narratives if n.narrative_type == "province_summary"][:40]
+    royalty_items = [n for n in narratives if n.narrative_type in ("royalty_explanation", "royalty_warning")][:40]
     return render_template(
         "admin/insights_dashboard.html",
         selected_year=selected_year,
@@ -2383,6 +2392,7 @@ def insights_dashboard():
         franchise_items=franchise_items,
         province_items=province_items,
         royalty_items=royalty_items,
+        active_tab=active_tab,
     )
 
 
