@@ -3364,6 +3364,99 @@ def data_integrity():
     )
 
 
+
+
+@admin_bp.route("/data-integrity/franchise/<int:franchise_id>/edit", methods=["GET", "POST"])
+@admin_bp.route("/franchise-master/<int:franchise_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_franchise_master_record(franchise_id):
+    """Edit one live franchise master record and its linked franchise user."""
+    from decimal import Decimal, InvalidOperation
+    if not (current_user.has_role("Admin") or current_user.has_role("Finance Manager") or current_user.has_role("Finance Assistant")):
+        abort(403)
+    franchise = Franchise.query.get_or_404(franchise_id)
+    linked_user = (User.query.join(user_franchises, User.id == user_franchises.c.user_id)
+                   .filter(user_franchises.c.franchise_id == franchise.id)
+                   .order_by(user_franchises.c.is_primary.desc(), User.id.asc()).first())
+    scales = RoyaltyScale.query.filter_by(franchise_id=franchise.id).order_by(RoyaltyScale.row_number.asc()).all()
+    if request.method == "POST":
+        def text_value(name): return (request.form.get(name) or "").strip()
+        franchise.business_name = text_value("business_name")
+        franchise.franchise_code = text_value("franchise_code").upper()
+        franchise.master_import_id = text_value("master_import_id")
+        franchise.standardized_town = text_value("standardized_town")
+        franchise.province = text_value("province")
+        franchise.province_code = text_value("province_code").upper()
+        franchise.region = text_value("region")
+        franchise.district = text_value("district")
+        franchise.district_code = text_value("district_code").upper()
+        franchise.municipality = text_value("municipality")
+        franchise.municipality_code = text_value("municipality_code").upper()
+        franchise.office_address = text_value("office_address")
+        franchise.office_number = text_value("office_number")
+        franchise.after_hours_number = text_value("after_hours_number")
+        franchise.franchisee_name = text_value("franchisee_name")
+        franchise.franchisee_surname = text_value("franchisee_surname")
+        franchise.franchisee_cell = text_value("franchisee_cell")
+        franchise.franchisee_email = text_value("franchisee_email").lower()
+        franchise.public_email = text_value("public_email").lower()
+        franchise.royalty_gross_method = text_value("royalty_gross_method") or "old"
+        try: franchise.minimum_royalty_amount = Decimal(text_value("minimum_royalty_amount") or "0")
+        except InvalidOperation:
+            flash("Minimum royalty must be a valid number.", "danger")
+            return render_template("admin/edit_franchise_master_record.html", franchise=franchise, linked_user=linked_user, scales=scales)
+        for attr, field in (("agreement_start_date", "agreement_start_date"), ("agreement_end_date", "agreement_end_date")):
+            raw = text_value(field)
+            setattr(franchise, attr, datetime.strptime(raw, "%Y-%m-%d").date() if raw else None)
+        login_email = text_value("login_email").lower()
+        if login_email:
+            duplicate = User.query.filter(db.func.lower(User.email) == login_email, User.id != (linked_user.id if linked_user else 0)).first()
+            if duplicate:
+                flash("That login email already belongs to another user.", "danger")
+                return render_template("admin/edit_franchise_master_record.html", franchise=franchise, linked_user=linked_user, scales=scales)
+            if linked_user:
+                linked_user.email = login_email
+                linked_user.name = text_value("login_name") or linked_user.name
+                linked_user.surname = text_value("login_surname") or linked_user.surname
+            else:
+                role = Role.query.filter_by(name="Franchise User").first()
+                if not role:
+                    role = Role(name="Franchise User", description="Franchise owner/user", is_system_role=True)
+                    db.session.add(role); db.session.flush()
+                linked_user = User(
+                    name=text_value("login_name") or franchise.franchisee_name or franchise.business_name,
+                    surname=text_value("login_surname") or franchise.franchisee_surname or "User",
+                    email=login_email, is_active=True, is_active_account=True,
+                )
+                linked_user.set_password("ChangeMe!2026")
+                linked_user.roles.append(role)
+                db.session.add(linked_user); db.session.flush()
+                linked_user.assigned_franchises.append(franchise)
+                db.session.flush()
+            db.session.execute(user_franchises.update().where(
+                user_franchises.c.franchise_id == franchise.id
+            ).values(is_primary=False))
+            db.session.execute(user_franchises.update().where(
+                (user_franchises.c.franchise_id == franchise.id) &
+                (user_franchises.c.user_id == linked_user.id)
+            ).values(is_primary=True))
+        RoyaltyScale.query.filter_by(franchise_id=franchise.id).delete(synchronize_session=False)
+        for idx in range(1, 11):
+            raw_from, raw_to, raw_pct = text_value(f"scale_{idx}_from"), text_value(f"scale_{idx}_to"), text_value(f"scale_{idx}_pct")
+            if not any((raw_from, raw_to, raw_pct)): continue
+            try:
+                db.session.add(RoyaltyScale(franchise_id=franchise.id, row_number=idx,
+                    amount_from=Decimal(raw_from or "0"), amount_to=Decimal(raw_to or "0"), percentage=Decimal(raw_pct or "0")))
+            except InvalidOperation:
+                db.session.rollback(); flash(f"Royalty scale row {idx} contains an invalid number.", "danger")
+                return render_template("admin/edit_franchise_master_record.html", franchise=franchise, linked_user=linked_user, scales=scales)
+        db.session.commit()
+        log_action("Franchise Master", "Manual franchise update", f"Franchise {franchise.id}: {franchise.business_name}")
+        flash("Franchise details saved to the database. The downloadable Master file now contains these changes.", "success")
+        return redirect(url_for("admin.data_integrity"))
+    return render_template("admin/edit_franchise_master_record.html", franchise=franchise, linked_user=linked_user, scales=scales)
+
+
 @admin_bp.route("/data-integrity/franchise-master/export")
 @admin_bp.route("/franchise-master/export")
 @login_required

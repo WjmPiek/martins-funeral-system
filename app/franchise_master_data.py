@@ -30,7 +30,7 @@ ROYALTY_SCALE_COUNT = 10
 
 MASTER_HEADERS = [
     "Franchise ID", "Readiness Status", "Issues To Fix", "Business Name", "Franchise Code",
-    "Province", "Region", "District", "Municipality", "Office Address", "Office Number",
+    "Master Import ID", "Standardized Town", "Province", "Province Code", "Region", "District", "District Code", "Municipality", "Municipality Code", "Office Address", "Office Number",
     "After Hours Number", "Franchisee Name", "Franchisee Surname", "Franchisee Cell",
     "Franchisee Email", "Public Email", "Login User Email", "Agreement Start Date",
     "Agreement End Date", "Royalty Method", "Minimum Royalty Amount", "Active For Performance",
@@ -403,10 +403,15 @@ def _write_master(ws, franchises, integrity_rows):
             "; ".join(integrity.get("issues", [])),
             f.business_name,
             f.franchise_code,
+            getattr(f, "master_import_id", "") or "",
+            getattr(f, "standardized_town", "") or "",
             getattr(f, "province", "") or "Unassigned",
+            getattr(f, "province_code", "") or "",
             getattr(f, "region", "") or "",
             getattr(f, "district", "") or "",
+            getattr(f, "district_code", "") or "",
             getattr(f, "municipality", "") or "",
+            getattr(f, "municipality_code", "") or "",
             f.office_address,
             f.office_number,
             f.after_hours_number,
@@ -513,14 +518,22 @@ def _style_all_sheets(wb):
         for row_idx in range(1, ws.max_row + 1):
             ws.row_dimensions[row_idx].height = 24 if row_idx > 1 else 28
         if ws.title == "Franchise Master":
-            for col in [19, 20]:
-                for col_cells in ws.iter_cols(min_col=col, max_col=col, min_row=2):
-                    for c in col_cells:
-                        c.number_format = "yyyy-mm-dd"
-            for col in range(22, ws.max_column + 1):
-                for col_cells in ws.iter_cols(min_col=col, max_col=col, min_row=2):
-                    for c in col_cells:
-                        c.number_format = "#,##0.00"
+            header_map = _headers_for(ws)
+            for header in ("Agreement Start Date", "Agreement End Date"):
+                col = header_map.get(header)
+                if col:
+                    for col_cells in ws.iter_cols(min_col=col, max_col=col, min_row=2):
+                        for c in col_cells:
+                            c.number_format = "yyyy-mm-dd"
+            number_headers = ["Minimum Royalty Amount"]
+            for idx in range(1, ROYALTY_SCALE_COUNT + 1):
+                number_headers.extend([f"Scale {idx} From", f"Scale {idx} To", f"Scale {idx} %"])
+            for header in number_headers:
+                col = header_map.get(header)
+                if col:
+                    for col_cells in ws.iter_cols(min_col=col, max_col=col, min_row=2):
+                        for c in col_cells:
+                            c.number_format = "#,##0.00"
         if ws.title == "Royalty Scales":
             for col in [5, 6, 7]:
                 for col_cells in ws.iter_cols(min_col=col, max_col=col, min_row=2):
@@ -536,9 +549,13 @@ def _add_validations(wb, max_rows: int):
     master.add_data_validation(province_val)
     master.add_data_validation(method_val)
     master.add_data_validation(yes_no_val)
-    province_val.add(f"F2:F{max_rows}")
-    method_val.add(f"U2:U{max_rows}")
-    yes_no_val.add(f"W2:W{max_rows}")
+    headers = _headers_for(master)
+    province_col = get_column_letter(headers["Province"])
+    method_col = get_column_letter(headers["Royalty Method"])
+    active_col = get_column_letter(headers["Active For Performance"])
+    province_val.add(f"{province_col}2:{province_col}{max_rows}")
+    method_val.add(f"{method_col}2:{method_col}{max_rows}")
+    yes_no_val.add(f"{active_col}2:{active_col}{max_rows}")
 
 
 def _headers_for(ws) -> Dict[str, int]:
