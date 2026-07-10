@@ -1,6 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Royalty Management{% endblock %}
+{% block title %}Royalty Management</div>
+{% endblock %}
 {% block app_content %}
+<div data-section-page>
 <section class="page-shell">
     <div class="page-header split-header">
         <div>
@@ -27,8 +29,8 @@
     </div>
 
     <div class="grid two-col">
-        <section class="card">
-            <h2>Growth Profiles</h2>
+        <section class="card" data-page-section="royalty-data-checks" data-title="Royalty Data Checks">
+            <h2>Royalty Data Checks</h2>
             <p class="muted">Admin-only policy used for targets. Franchise users cannot see or edit this.</p>
             {% for profile in growth_profiles %}
                 <form method="post" action="{{ url_for('admin.royalty_management_update_growth_profile', profile_id=profile.id) }}" class="stack-form">
@@ -49,7 +51,7 @@
             {% endfor %}
         </section>
 
-        <section class="card" id="reporting-periods">
+        <section class="card" id="reporting-periods" data-page-section="reporting-periods" data-title="Reporting Periods">
             <h2>Reporting Periods</h2>
             <table class="data-table compact-table">
                 <thead><tr><th>Period</th><th>Rows</th><th>Gross</th><th>Royalties</th><th></th></tr></thead>
@@ -68,7 +70,7 @@
         </section>
     </div>
 
-    <section class="card" id="snapshots">
+    <section class="card" id="snapshots" data-page-section="snapshots" data-title="Snapshots">
         <div class="section-title-row">
             <h2>Snapshots for {{ selected_year }}-{{ "%02d"|format(selected_month) }}</h2>
             <span class="badge {{ 'badge-danger' if needs_review else 'badge-success' }}">{{ needs_review|length }} need review</span>

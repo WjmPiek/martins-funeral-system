@@ -1,6 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Business Intelligence{% endblock %}
+{% block title %}Business Intelligence</div>
+{% endblock %}
 {% block app_content %}
+<div data-section-page>
 <section class="page-shell business-intelligence">
     <div class="page-header split-header">
         <div>
@@ -19,7 +21,7 @@
         </form>
     </div>
 
-    <div class="stats-grid executive-kpi-grid" id="company-health-score">
+    <div class="stats-grid executive-kpi-grid" id="company-health-score" data-page-section="company-health-score" data-title="Company Health Score">
         <div class="stat-card executive-kpi-card">
             <span>Company Health Score</span>
             <strong>{{ '%.1f'|format(summary.avg_score or 0) }}%</strong>
@@ -43,7 +45,7 @@
     </div>
 
     <div class="grid two-col">
-        <section class="card" id="franchise-critical">
+        <section class="card" id="franchise-critical" data-page-section="franchise-critical" data-title="Franchise Critical">
             <div class="section-title-row">
                 <h2>Franchise Critical</h2>
                 <form method="post" action="{{ url_for('admin.business_intelligence_rebuild') }}">
@@ -67,7 +69,7 @@
             </div>
         </section>
 
-        <section class="card" id="province-growth">
+        <section class="card" id="province-growth" data-page-section="province-growth" data-title="Province Growth">
             <div class="section-title-row">
                 <h2>Province Growth</h2>
                 <span class="badge badge-light">Lowest score first</span>
@@ -93,7 +95,7 @@
     </div>
 
     <div class="grid two-col">
-        <section class="card" id="critical-watch">
+        <section class="card" id="critical-watch" data-page-section="critical-watch" data-title="Critical / Watch Franchises">
             <div class="section-title-row">
                 <h2>Critical / Watch Franchises</h2>
                 <span class="badge badge-warning">Lowest health score</span>
@@ -117,7 +119,7 @@
             </table>
         </section>
 
-        <section class="card" id="target-warnings">
+        <section class="card" id="target-warnings" data-page-section="target-warnings" data-title="Target Achievement Warnings">
             <div class="section-title-row">
                 <h2>Target Achievement Warnings</h2>
                 <span class="badge badge-danger">Below 80%</span>
@@ -141,7 +143,7 @@
         </section>
     </div>
 
-    <div class="grid two-col" id="growth-declines">
+    <div class="grid two-col" id="growth-declines" data-page-section="growth-declines" data-title="Fastest Growth & Largest Declines">
         <section class="card">
             <div class="section-title-row"><h2>Fastest Growth</h2></div>
             <table class="data-table compact-table">

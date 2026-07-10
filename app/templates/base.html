@@ -8,7 +8,7 @@
     <link rel="preload" href="{{ brand_logo_url }}" as="image" fetchpriority="high">
     <link rel="stylesheet" href="{{ asset_url('css/styles.css') }}">
 </head>
-<body class="app-body">
+<body class="app-body" data-current-path="{{ request.path }}" data-current-section="{{ request.args.get('section', '') }}">
     {% if current_user.is_authenticated %}
         <div class="app-shell">
             <details class="app-menu">
@@ -90,45 +90,37 @@
                             </details>
 
                             {% if current_user.has_permission('franchise_management:view') and (is_admin_user or is_finance_user) %}
-                            <details class="nav-section" open>
-                                <summary>Franchise Management <span class="nav-count-badge">4</span></summary>
-                                <div class="nav-subtabs">
-                                    <a href="{{ url_for('admin.insights_dashboard', tab='executive') }}">Executive Summary</a>
-                                    <details class="nav-section nav-nested-section">
-                                        <summary>Executive Dashboard</summary>
-                                        <div class="nav-subtabs nav-sub-subtabs">
-                                            <a href="{{ url_for('admin.executive_dashboard') }}#executive-summary">Executive Summary</a>
-                                            <a href="{{ url_for('admin.executive_dashboard') }}#executive-alerts">Executive Alerts</a>
-                                            <a href="{{ url_for('admin.executive_dashboard') }}#quick-actions">Quick Actions</a>
-                                            <a href="{{ url_for('admin.executive_dashboard') }}#franchise-rankings">Top &amp; Bottom 10 Franchises</a>
-                                            <a href="{{ url_for('admin.executive_dashboard') }}#province-performance">Province Performance</a>
-                                            <a href="{{ url_for('admin.executive_dashboard') }}#royalties-per-month">Royalties per Month</a>
-                                        </div>
-                                    </details>
-                                    <details class="nav-section nav-nested-section">
-                                        <summary>Business Intelligence</summary>
-                                        <div class="nav-subtabs nav-sub-subtabs">
-                                            <a href="{{ url_for('admin.business_intelligence') }}#company-health-score">Company Health Score</a>
-                                            <a href="{{ url_for('admin.business_intelligence') }}#franchise-critical">Franchise Critical</a>
-                                            <a href="{{ url_for('admin.business_intelligence') }}#province-growth">Province Growth</a>
-                                            <a href="{{ url_for('admin.business_intelligence') }}#critical-watch">Critical / Watch Franchises</a>
-                                            <a href="{{ url_for('admin.business_intelligence') }}#target-warnings">Target Achievement Warnings</a>
-                                            <a href="{{ url_for('admin.business_intelligence') }}#growth-declines">Fastest Growth &amp; Largest Declines</a>
-                                        </div>
-                                    </details>
-                                    <details class="nav-section nav-nested-section">
-                                        <summary>Royalty Management</summary>
-                                        <div class="nav-subtabs nav-sub-subtabs">
-                                            <a href="{{ url_for('admin.royalty_management') }}#reporting-periods">Reporting Periods</a>
-                                            <a href="{{ url_for('admin.royalty_management') }}#snapshots">Snapshots</a>
-                                            <a href="{{ url_for('admin.database_diagnostics') }}">Royalty Data Checks</a>
-                                        </div>
-                                    </details>
-                                    <a href="{{ url_for('admin.insights_dashboard', tab='franchise') }}">Franchise Explanations</a>
-                                    <a href="{{ url_for('admin.insights_dashboard', tab='royalty') }}">Royalty Explanations</a>
-                                    <a href="{{ url_for('admin.insights_dashboard', tab='province') }}">Province Summaries</a>
-                                </div>
-                            </details>
+                            <div class="nav-modern-group">
+                                <div class="nav-modern-heading">Franchise Management</div>
+                                <a href="{{ url_for('admin.insights_dashboard', tab='executive') }}">Executive Summary</a>
+                                <a href="{{ url_for('admin.insights_dashboard', tab='franchise') }}">Franchise Explanations</a>
+                                <a href="{{ url_for('admin.insights_dashboard', tab='royalty') }}">Royalty Explanations</a>
+                                <a href="{{ url_for('admin.insights_dashboard', tab='province') }}">Province Summaries</a>
+                            </div>
+                            <div class="nav-modern-group">
+                                <div class="nav-modern-heading">Executive Dashboard</div>
+                                <a href="{{ url_for('admin.executive_dashboard', section='executive-summary') }}">Executive Summary</a>
+                                <a href="{{ url_for('admin.executive_dashboard', section='executive-alerts') }}">Executive Alerts</a>
+                                <a href="{{ url_for('admin.executive_dashboard', section='quick-actions') }}">Quick Actions</a>
+                                <a href="{{ url_for('admin.executive_dashboard', section='franchise-rankings') }}">Top &amp; Bottom 10 Franchises</a>
+                                <a href="{{ url_for('admin.executive_dashboard', section='province-performance') }}">Province Performance</a>
+                                <a href="{{ url_for('admin.executive_dashboard', section='royalties-per-month') }}">Royalties per Month</a>
+                            </div>
+                            <div class="nav-modern-group">
+                                <div class="nav-modern-heading">Business Intelligence</div>
+                                <a href="{{ url_for('admin.business_intelligence', section='company-health-score') }}">Company Health Score</a>
+                                <a href="{{ url_for('admin.business_intelligence', section='franchise-critical') }}">Franchise Critical</a>
+                                <a href="{{ url_for('admin.business_intelligence', section='province-growth') }}">Province Growth</a>
+                                <a href="{{ url_for('admin.business_intelligence', section='critical-watch') }}">Critical / Watch Franchises</a>
+                                <a href="{{ url_for('admin.business_intelligence', section='target-warnings') }}">Target Achievement Warnings</a>
+                                <a href="{{ url_for('admin.business_intelligence', section='growth-declines') }}">Fastest Growth &amp; Largest Declines</a>
+                            </div>
+                            <div class="nav-modern-group">
+                                <div class="nav-modern-heading">Royalty Management</div>
+                                <a href="{{ url_for('admin.royalty_management', section='reporting-periods') }}">Reporting Periods</a>
+                                <a href="{{ url_for('admin.royalty_management', section='snapshots') }}">Snapshots</a>
+                                <a href="{{ url_for('admin.royalty_management', section='royalty-data-checks') }}">Royalty Data Checks</a>
+                            </div>
                             {% endif %}
                             {% if current_user.has_permission('audit_logs:view') %}<a href="{{ url_for('admin.audit_logs') }}">Audit Logs</a>{% endif %}
                             {% if current_user.has_permission('system_administration:view') %}<a href="#">System Administration</a>{% endif %}
@@ -421,5 +413,29 @@ document.addEventListener('DOMContentLoaded', function () {
 })();
 </script>
 
+
+<script>
+// Modern section-page routing: each sidebar item opens only its requested content section.
+document.addEventListener('DOMContentLoaded', function () {
+  var section = new URLSearchParams(window.location.search).get('section');
+  if (section) {
+    var page = document.querySelector('[data-section-page]');
+    if (page) {
+      page.querySelectorAll('[data-page-section]').forEach(function (node) {
+        node.hidden = node.dataset.pageSection !== section;
+      });
+      var title = document.querySelector('[data-section-title]');
+      var active = page.querySelector('[data-page-section="' + CSS.escape(section) + '"]');
+      if (title && active && active.dataset.title) title.textContent = active.dataset.title;
+    }
+  }
+  document.querySelectorAll('.sidebar-nav a').forEach(function(a){
+    try {
+      var u=new URL(a.href, window.location.origin);
+      if(u.pathname===window.location.pathname && u.search===window.location.search) a.classList.add('is-active');
+    } catch(e) {}
+  });
+});
+</script>
 </body>
 </html>

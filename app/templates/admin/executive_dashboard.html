@@ -1,6 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Executive Dashboard{% endblock %}
+{% block title %}Executive Dashboard</div>
+{% endblock %}
 {% block app_content %}
+<div data-section-page>
 <section class="page-shell executive-dashboard">
     <div class="page-header split-header">
         <div>
@@ -19,7 +21,7 @@
         </form>
     </div>
 
-    <div class="section-title-row" id="executive-summary">
+    <div class="section-title-row" id="executive-summary" data-page-section="executive-summary" data-title="Executive Summary">
         <h2>{{ selected_year }}-{{ "%02d"|format(selected_month) }} Executive Summary</h2>
         <span class="badge badge-light">Previous period: {{ previous_period.year }}-{{ "%02d"|format(previous_period.month) if previous_period.month else 'n/a' }}</span>
     </div>
@@ -44,7 +46,7 @@
     </div>
 
     <div class="grid two-col">
-        <section class="card" id="executive-alerts">
+        <section class="card" id="executive-alerts" data-page-section="executive-alerts" data-title="Executive Alerts">
             <div class="section-title-row">
                 <h2>Executive Alerts</h2>
                 <span class="badge badge-light">Live system health</span>
@@ -59,7 +61,7 @@
             </div>
         </section>
 
-        <section class="card" id="quick-actions">
+        <section class="card" id="quick-actions" data-page-section="quick-actions" data-title="Quick Actions">
             <div class="section-title-row">
                 <h2>Quick Actions</h2>
                 <span class="badge badge-light">Admin / Finance</span>
@@ -75,7 +77,7 @@
         </section>
     </div>
 
-    <div class="grid two-col" id="franchise-rankings">
+    <div class="grid two-col" id="franchise-rankings" data-page-section="franchise-rankings" data-title="Top & Bottom 10 Franchises">
         <section class="card">
             <div class="section-title-row">
                 <h2>Top 10 Franchises</h2>
@@ -125,7 +127,7 @@
         </section>
     </div>
 
-    <section class="card" id="province-performance">
+    <section class="card" id="province-performance" data-page-section="province-performance" data-title="Province Performance">
         <div class="section-title-row">
             <h2>Province Performance</h2>
             <span class="badge badge-light">All provinces combined / individual view</span>
@@ -150,7 +152,7 @@
     </section>
 
     <div class="grid two-col">
-        <section class="card" id="royalties-per-month">
+        <section class="card" id="royalties-per-month" data-page-section="royalties-per-month" data-title="Royalties per Month">
             <h2>Royalties per Month</h2>
             <table class="data-table compact-table">
                 <thead><tr><th>Period</th><th>Rows</th><th>Gross</th><th>Royalties</th><th></th></tr></thead>
