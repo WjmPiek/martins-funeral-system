@@ -19,7 +19,7 @@
         </form>
     </div>
 
-    <div class="section-title-row">
+    <div class="section-title-row" id="executive-summary">
         <h2>{{ selected_year }}-{{ "%02d"|format(selected_month) }} Executive Summary</h2>
         <span class="badge badge-light">Previous period: {{ previous_period.year }}-{{ "%02d"|format(previous_period.month) if previous_period.month else 'n/a' }}</span>
     </div>
@@ -44,7 +44,7 @@
     </div>
 
     <div class="grid two-col">
-        <section class="card">
+        <section class="card" id="executive-alerts">
             <div class="section-title-row">
                 <h2>Executive Alerts</h2>
                 <span class="badge badge-light">Live system health</span>
@@ -59,7 +59,7 @@
             </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="quick-actions">
             <div class="section-title-row">
                 <h2>Quick Actions</h2>
                 <span class="badge badge-light">Admin / Finance</span>
@@ -75,7 +75,7 @@
         </section>
     </div>
 
-    <div class="grid two-col">
+    <div class="grid two-col" id="franchise-rankings">
         <section class="card">
             <div class="section-title-row">
                 <h2>Top 10 Franchises</h2>
@@ -125,7 +125,7 @@
         </section>
     </div>
 
-    <section class="card">
+    <section class="card" id="province-performance">
         <div class="section-title-row">
             <h2>Province Performance</h2>
             <span class="badge badge-light">All provinces combined / individual view</span>
@@ -150,8 +150,8 @@
     </section>
 
     <div class="grid two-col">
-        <section class="card">
-            <h2>Recent Periods</h2>
+        <section class="card" id="royalties-per-month">
+            <h2>Royalties per Month</h2>
             <table class="data-table compact-table">
                 <thead><tr><th>Period</th><th>Rows</th><th>Gross</th><th>Royalties</th><th></th></tr></thead>
                 <tbody>
@@ -168,25 +168,7 @@
             </table>
         </section>
 
-        <section class="card">
-            <h2>Latest Imports</h2>
-            <table class="data-table compact-table">
-                <thead><tr><th>ID</th><th>Status</th><th>Progress</th><th>File</th><th>Started</th></tr></thead>
-                <tbody>
-                {% for job in latest_imports %}
-                    <tr>
-                        <td><a href="{{ url_for('admin.import_centre_detail', job_id=job.id) }}">#{{ job.id }}</a></td>
-                        <td><span class="badge {{ 'badge-danger' if job.status in ['failed','needs_review'] else ('badge-warning' if job.is_active else 'badge-success') }}">{{ job.status }}</span></td>
-                        <td>{{ job.progress_percent }}%</td>
-                        <td>{{ job.filename or job.kind }}</td>
-                        <td>{{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '' }}</td>
-                    </tr>
-                {% else %}
-                    <tr><td colspan="5" class="muted">No imports found.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </section>
+
     </div>
 </section>
 

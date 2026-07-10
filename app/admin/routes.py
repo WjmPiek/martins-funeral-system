@@ -2199,13 +2199,13 @@ def executive_dashboard():
 
     warnings = [
         {"label": "Imports needing review", "value": len(needs_review_imports), "tone": "danger" if needs_review_imports else "ok", "url": url_for("admin.import_centre")},
-        {"label": "Running import jobs", "value": len(running_imports), "tone": "warning" if running_imports else "ok", "url": url_for("admin.operations_centre")},
+        {"label": "Running import jobs", "value": len(running_imports), "tone": "warning" if running_imports else "ok", "url": url_for("admin.database_diagnostics")},
         {"label": "Royalty rows needing review", "value": _safe_scalar("SELECT COUNT(*) FROM royalty_calculation_snapshots WHERE status = 'needs_review'", default=0), "tone": "danger", "url": url_for("admin.royalty_management")},
         {"label": "Rows with gross turnover but zero royalty", "value": _safe_scalar("SELECT COUNT(*) FROM monthly_figures WHERE COALESCE(gross_turnover,0) > 0 AND COALESCE(royalty_amount,0) = 0", default=0), "tone": "warning", "url": url_for("admin.database_diagnostics")},
         {"label": "Missing agreement dates", "value": _safe_scalar("SELECT COUNT(*) FROM franchises WHERE agreement_start_date IS NULL OR agreement_end_date IS NULL", default=0), "tone": "warning", "url": url_for("admin.database_diagnostics")},
-        {"label": "Failed events", "value": event_stats_data.get("failed", 0), "tone": "danger", "url": url_for("admin.operations_centre")},
-        {"label": "Online workers", "value": len(online_workers), "tone": "ok" if online_workers else "warning", "url": url_for("admin.operations_centre")},
-        {"label": "Valid cache rows", "value": cache.get("valid", 0), "tone": "ok" if cache.get("valid", 0) else "warning", "url": url_for("admin.operations_centre")},
+        {"label": "Failed events", "value": event_stats_data.get("failed", 0), "tone": "danger", "url": url_for("admin.database_diagnostics")},
+        {"label": "Online workers", "value": len(online_workers), "tone": "ok" if online_workers else "warning", "url": url_for("admin.database_diagnostics")},
+        {"label": "Valid cache rows", "value": cache.get("valid", 0), "tone": "ok" if cache.get("valid", 0) else "warning", "url": url_for("admin.database_diagnostics")},
         {"label": "BI health score", "value": f"{bi_summary.get('avg_score', 0):.1f}%", "tone": "ok" if bi_summary.get("avg_score", 0) >= 70 else "warning", "url": url_for("admin.business_intelligence", year=selected_year, month=selected_month)},
     ]
 
@@ -2214,7 +2214,6 @@ def executive_dashboard():
         {"label": "Royalty Management", "detail": "Recalculate and audit royalties", "url": url_for("admin.royalty_management")},
         {"label": "Business Intelligence", "detail": "Health scoring, trends and insights", "url": url_for("admin.business_intelligence", year=selected_year, month=selected_month)},
         {"label": "Insight Explanations", "detail": "Plain-language explanations and monthly summaries", "url": url_for("admin.insights_dashboard", year=selected_year, month=selected_month)},
-        {"label": "Operations Centre", "detail": "Workers, events and system health", "url": url_for("admin.operations_centre")},
         {"label": "Performance Graphs", "detail": "View company and franchise graphs", "url": url_for("performance.graphs")},
         {"label": "Leaderboard", "detail": "Company-wide franchise ranking", "url": url_for("performance.index")},
         {"label": "Database Diagnostics", "detail": "Find missing links and data issues", "url": url_for("admin.database_diagnostics")},

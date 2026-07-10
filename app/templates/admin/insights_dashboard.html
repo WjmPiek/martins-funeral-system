@@ -42,7 +42,7 @@
         </div>
     </div>
 
-    <section class="card">
+    <section class="card" id="executive-summary">
         <div class="section-title-row">
             <h2>Executive Summary</h2>
             <form method="post" action="{{ url_for('admin.insights_rebuild') }}">
@@ -65,7 +65,7 @@
     </section>
 
     <div class="grid two-col">
-        <section class="card">
+        <section class="card" id="franchise-explanations">
             <div class="section-title-row"><h2>Franchise Explanations</h2><span class="badge badge-light">Growth / decline</span></div>
             <div class="alert-list">
                 {% for item in franchise_items %}
@@ -76,7 +76,7 @@
             </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="royalty-explanations">
             <div class="section-title-row"><h2>Royalty Explanations</h2><span class="badge badge-light">Formula trace</span></div>
             <div class="alert-list">
                 {% for item in royalty_items %}
@@ -89,7 +89,7 @@
     </div>
 
     <div class="grid two-col">
-        <section class="card">
+        <section class="card" id="province-summaries">
             <div class="section-title-row"><h2>Province Summaries</h2><span class="badge badge-light">Province view</span></div>
             <div class="alert-list">
                 {% for item in province_items %}
@@ -100,24 +100,7 @@
             </div>
         </section>
 
-        <section class="card">
-            <div class="section-title-row"><h2>All Generated Explanations</h2><span class="badge badge-light">Audit trail</span></div>
-            <table class="data-table compact-table">
-                <thead><tr><th>Type</th><th>Severity</th><th>Title</th><th>Created</th></tr></thead>
-                <tbody>
-                {% for item in narratives %}
-                    <tr>
-                        <td>{{ item.narrative_type }}</td>
-                        <td><span class="badge {{ 'badge-danger' if item.severity == 'danger' else ('badge-warning' if item.severity == 'warning' else 'badge-light') }}">{{ item.severity }}</span></td>
-                        <td>{{ item.title }}</td>
-                        <td>{{ item.created_at.strftime('%Y-%m-%d %H:%M') if item.created_at else '' }}</td>
-                    </tr>
-                {% else %}
-                    <tr><td colspan="4" class="muted">No explanations generated for this period.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </section>
+
     </div>
 </section>
 {% endblock %}

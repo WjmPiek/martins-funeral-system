@@ -19,7 +19,7 @@
         </form>
     </div>
 
-    <div class="stats-grid executive-kpi-grid">
+    <div class="stats-grid executive-kpi-grid" id="company-health-score">
         <div class="stat-card executive-kpi-card">
             <span>Company Health Score</span>
             <strong>{{ '%.1f'|format(summary.avg_score or 0) }}%</strong>
@@ -43,9 +43,9 @@
     </div>
 
     <div class="grid two-col">
-        <section class="card">
+        <section class="card" id="franchise-critical">
             <div class="section-title-row">
-                <h2>Executive Insights</h2>
+                <h2>Franchise Critical</h2>
                 <form method="post" action="{{ url_for('admin.business_intelligence_rebuild') }}">
                     <input type="hidden" name="month" value="{{ selected_month }}">
                     <input type="hidden" name="year" value="{{ selected_year }}">
@@ -67,9 +67,9 @@
             </div>
         </section>
 
-        <section class="card">
+        <section class="card" id="province-growth">
             <div class="section-title-row">
-                <h2>Province Intelligence</h2>
+                <h2>Province Growth</h2>
                 <span class="badge badge-light">Lowest score first</span>
             </div>
             <table class="data-table compact-table">
@@ -93,7 +93,7 @@
     </div>
 
     <div class="grid two-col">
-        <section class="card">
+        <section class="card" id="critical-watch">
             <div class="section-title-row">
                 <h2>Critical / Watch Franchises</h2>
                 <span class="badge badge-warning">Lowest health score</span>
@@ -117,7 +117,7 @@
             </table>
         </section>
 
-        <section class="card">
+        <section class="card" id="target-warnings">
             <div class="section-title-row">
                 <h2>Target Achievement Warnings</h2>
                 <span class="badge badge-danger">Below 80%</span>
@@ -141,7 +141,7 @@
         </section>
     </div>
 
-    <div class="grid two-col">
+    <div class="grid two-col" id="growth-declines">
         <section class="card">
             <div class="section-title-row"><h2>Fastest Growth</h2></div>
             <table class="data-table compact-table">
@@ -166,23 +166,6 @@
         </section>
     </div>
 
-    <section class="card">
-        <div class="section-title-row"><h2>BI Period History</h2><span class="badge badge-light">Generated snapshots</span></div>
-        <table class="data-table compact-table">
-            <thead><tr><th>Period</th><th>Snapshots</th><th>Average Score</th><th></th></tr></thead>
-            <tbody>
-            {% for row in periods %}
-                <tr>
-                    <td>{{ row.year }}-{{ "%02d"|format(row.month) }}</td>
-                    <td>{{ row.snapshots|count_value }}</td>
-                    <td>{{ '%.1f'|format(row.avg_health_score or 0) }}%</td>
-                    <td><a class="btn btn-light btn-sm" href="{{ url_for('admin.business_intelligence', year=row.year, month=row.month) }}">View</a></td>
-                </tr>
-            {% else %}
-                <tr><td colspan="4" class="muted">No generated BI history yet.</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </section>
+
 </section>
 {% endblock %}
