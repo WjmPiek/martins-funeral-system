@@ -2036,6 +2036,7 @@ table td { max-width:260px; overflow-wrap:anywhere; word-break:normal; vertical-
 .insights-kpi div{min-width:0;display:grid}.insights-kpi small{font-size:.78rem;color:#687588}.insights-kpi strong{font-size:1.35rem;color:#17263d;line-height:1.15;overflow-wrap:anywhere}.insights-kpi em{font-size:.7rem;color:#79869a;font-style:normal;margin-top:3px}
 .insights-panel{background:#fff;border:1px solid #dde5ee;border-radius:14px;padding:20px;box-shadow:0 8px 25px rgba(15,35,65,.05)}
 .insights-panel-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+.panel-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.panel-actions form{margin:0}
 .insights-panel-header h2{margin:2px 0 0;font-size:1.3rem}.panel-kicker{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#8a98aa}.result-count{padding:6px 10px;border-radius:999px;background:#eef2f7;color:#57667a;font-size:.75rem;font-weight:700}
 .executive-summary-card{display:flex;gap:14px;padding:18px;border:1px solid #d8e5f4;border-left:4px solid #2b76d2;border-radius:10px;background:linear-gradient(90deg,#f3f8ff,#fff)}
 .executive-summary-card.severity-warning{border-left-color:#e8a11a;background:linear-gradient(90deg,#fff9ed,#fff)}.executive-summary-card.severity-danger{border-left-color:#d94242;background:linear-gradient(90deg,#fff3f3,#fff)}

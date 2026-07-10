@@ -44,7 +44,7 @@
         <div class="insights-panel-header">
             <div><span class="panel-kicker">Current period</span><h2>Executive Summary</h2></div>
             <form method="post" action="{{ url_for('admin.insights_rebuild') }}">
-                <input type="hidden" name="month" value="{{ selected_month }}"><input type="hidden" name="year" value="{{ selected_year }}">
+                <input type="hidden" name="month" value="{{ selected_month }}"><input type="hidden" name="year" value="{{ selected_year }}"><input type="hidden" name="tab" value="{{ active_tab }}">
                 <button class="btn btn-light btn-sm" type="submit">Refresh Explanations</button>
             </form>
         </div>
@@ -66,7 +66,7 @@
 
     {% elif active_tab == 'franchise' %}
     <section class="insights-panel">
-        <div class="insights-panel-header"><div><span class="panel-kicker">Performance analysis</span><h2>Franchise Explanations</h2></div><span class="result-count">{{ franchise_items|length }} results</span></div>
+        <div class="insights-panel-header"><div><span class="panel-kicker">Performance analysis</span><h2>Franchise Explanations</h2></div><div class="panel-actions"><span class="result-count">{{ franchise_items|length }} results</span><form method="post" action="{{ url_for('admin.insights_rebuild') }}"><input type="hidden" name="month" value="{{ selected_month }}"><input type="hidden" name="year" value="{{ selected_year }}"><input type="hidden" name="tab" value="franchise"><button class="btn btn-light btn-sm" type="submit">Refresh</button></form></div></div>
         <div class="insight-list compact">
         {% for item in franchise_items %}
             <details class="insight-list-item severity-{{ item.severity or 'info' }}">
@@ -79,7 +79,7 @@
 
     {% elif active_tab == 'royalty' %}
     <section class="insights-panel">
-        <div class="insights-panel-header"><div><span class="panel-kicker">Calculation trace</span><h2>Royalty Explanations</h2></div><span class="result-count">{{ royalty_items|length }} results</span></div>
+        <div class="insights-panel-header"><div><span class="panel-kicker">Calculation trace</span><h2>Royalty Explanations</h2></div><div class="panel-actions"><span class="result-count">{{ royalty_items|length }} results</span><form method="post" action="{{ url_for('admin.insights_rebuild') }}"><input type="hidden" name="month" value="{{ selected_month }}"><input type="hidden" name="year" value="{{ selected_year }}"><input type="hidden" name="tab" value="royalty"><button class="btn btn-light btn-sm" type="submit">Refresh</button></form></div></div>
         <div class="insight-table-wrap">
             <table class="insight-table">
                 <thead><tr><th>Franchise / explanation</th><th>Royalty summary</th><th>Status</th><th></th></tr></thead>
@@ -94,7 +94,7 @@
 
     {% elif active_tab == 'province' %}
     <section class="insights-panel">
-        <div class="insights-panel-header"><div><span class="panel-kicker">Regional intelligence</span><h2>Province Summaries</h2></div><span class="result-count">{{ province_items|length }} provinces</span></div>
+        <div class="insights-panel-header"><div><span class="panel-kicker">Regional intelligence</span><h2>Province Summaries</h2></div><div class="panel-actions"><span class="result-count">{{ province_items|length }} provinces</span><form method="post" action="{{ url_for('admin.insights_rebuild') }}"><input type="hidden" name="month" value="{{ selected_month }}"><input type="hidden" name="year" value="{{ selected_year }}"><input type="hidden" name="tab" value="province"><button class="btn btn-light btn-sm" type="submit">Refresh</button></form></div></div>
         <div class="province-card-grid">
         {% for item in province_items %}
             <article class="province-insight-card severity-{{ item.severity or 'info' }}"><div class="province-card-top"><span class="province-mark">P</span><span class="status-pill status-{{ item.severity or 'info' }}">{{ item.severity|default('info')|title }}</span></div><h3>{{ item.title|replace(' province summary', '') }}</h3><p>{{ item.summary }}</p><small>{{ item.detail }}</small></article>

@@ -2371,8 +2371,32 @@ def insights_dashboard():
         active_tab = "executive"
 
     summary = get_insight_summary(selected_year, selected_month)
+
+    # Older/stale narrative sets may contain only the executive record.  Rebuild
+    # once when source data exists but one or more sub-tab datasets are absent.
+    # This keeps all four tabs populated without rebuilding on every page view.
+    narrative_counts = dict(
+        db.session.query(InsightNarrative.narrative_type, db.func.count(InsightNarrative.id))
+        .filter_by(year=selected_year, month=selected_month)
+        .group_by(InsightNarrative.narrative_type)
+        .all()
+    )
+    source_counts = {
+        "franchise": FranchiseHealthSnapshot.query.filter_by(year=selected_year, month=selected_month).count(),
+        "royalty": RoyaltyCalculationSnapshot.query.filter_by(year=selected_year, month=selected_month).count(),
+    }
+    expected_missing = (
+        (source_counts["franchise"] > 0 and not (narrative_counts.get("franchise_performance") or narrative_counts.get("business_insight_explanation")))
+        or (source_counts["royalty"] > 0 and not (narrative_counts.get("royalty_explanation") or narrative_counts.get("royalty_warning")))
+        or (source_counts["franchise"] > 0 and not narrative_counts.get("province_summary"))
+    )
+    if expected_missing:
+        from app.insights_engine import rebuild_insight_narratives
+        rebuild_insight_narratives(selected_year, selected_month, commit=True)
+        summary = get_insight_summary(selected_year, selected_month)
+
     narratives = (InsightNarrative.query.filter_by(year=selected_year, month=selected_month)
-        .order_by(InsightNarrative.created_at.desc(), InsightNarrative.id.desc()).limit(160).all())
+        .order_by(InsightNarrative.created_at.desc(), InsightNarrative.id.desc()).limit(240).all())
 
     # Keep each sub-tab tied to one narrative type.  Previously every record with
     # a franchise_id appeared under Franchise Explanations, which duplicated
@@ -2405,6 +2429,9 @@ def insights_rebuild():
     latest = latest_period()
     selected_year = int(request.form.get("year") or latest.get("year") or datetime.utcnow().year)
     selected_month = int(request.form.get("month") or latest.get("month") or datetime.utcnow().month)
+    active_tab = (request.form.get("tab") or "executive").strip().lower()
+    if active_tab not in {"executive", "franchise", "royalty", "province"}:
+        active_tab = "executive"
     result = rebuild_insight_narratives(selected_year, selected_month, commit=True)
     try:
         from app.events import emit_event
@@ -2421,7 +2448,7 @@ def insights_rebuild():
         db.session.rollback()
     log_action("Insights", "Rebuilt insight narratives", f"Period {selected_year}-{selected_month:02d}; narratives {result.get('narratives', 0)}")
     flash(f"Insight narratives rebuilt for {selected_year}-{selected_month:02d}.", "success")
-    return redirect(url_for("admin.insights_dashboard", year=selected_year, month=selected_month))
+    return redirect(url_for("admin.insights_dashboard", year=selected_year, month=selected_month, tab=active_tab))
 
 
 @admin_bp.route("/operations")
