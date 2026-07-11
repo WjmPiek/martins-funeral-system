@@ -510,13 +510,22 @@ def inactive_franchise_candidates(month, year, franchise_ids=None):
 
 
 def auto_hide_inactive_franchises(month, year, franchise_ids=None, changed_by_id=None):
-    """Legacy compatibility hook.
+    ids = franchise_ids if franchise_ids is not None else accessible_franchise_ids(include_inactive=True)
+    changed = 0
+    for item in inactive_franchise_candidates(month, year, ids):
+        franchise = item["franchise"]
+        if item["has_recent_data"]:
+            continue
+        if not is_franchise_performance_active(franchise):
+            continue
+        franchise.is_performance_active = False
+        franchise.performance_inactive_at = datetime.now(timezone.utc)
+        franchise.performance_inactive_reason = f"Auto-hidden: no imported KPI data for the 3 months ending {month_label(month, year)}."
+        changed += 1
+    if changed:
+        db.session.commit()
+    return changed
 
-    Franchise activation is now an explicit approval workflow. A lack of recent data
-    must never silently change lifecycle state, so this function intentionally does
-    nothing and remains only to avoid breaking older callers.
-    """
-    return 0
 
 def reactivate_franchise_performance(franchise_id, user_id=None):
     franchise = Franchise.query.get(franchise_id)
@@ -630,18 +639,34 @@ def period_has_stored_results(month, year, franchise_ids, metric_keys=None):
 
 
 def ensure_performance_results(month, year, franchise_ids=None, mode="growth_bracket"):
-    """Create missing cache rows for a period, but never block on repeated reads.
+    """Fast, read-only cache check used by page requests.
 
-    For normal page loads this function is intentionally conservative: if there
-    are already rows for the period it returns immediately.  Imports and the
-    recalculate button call rebuild_performance_results() for a full refresh.
+    IMPORTANT: this function must never rebuild analytics inside a web request.
+    Rebuilds belong to imports, explicit Admin refresh actions or CLI commands.
+    Returning ``False`` lets the route render a friendly "data preparing" state
+    immediately instead of blocking the browser for 40-60 seconds.
     """
     franchise_ids = filter_active_franchise_ids(franchise_ids or accessible_franchise_ids())
     if not franchise_ids:
-        return 0
-    if period_has_stored_results(month, year, franchise_ids):
-        return 0
-    return rebuild_performance_results(month, year, franchise_ids, mode)
+        return False
+    return period_has_stored_results(month, year, franchise_ids)
+
+
+def performance_cache_status(month, year, franchise_ids=None, metric_keys=None):
+    """Return lightweight readiness information without starting calculations."""
+    ids = filter_active_franchise_ids(franchise_ids or accessible_franchise_ids())
+    metrics = list(metric_keys or PERFORMANCE_METRICS.keys())
+    if not ids:
+        return {"ready": True, "expected": 0, "found": 0, "missing": 0}
+    stored = stored_results_for_period(month, year, ids, metrics)
+    found = sum(1 for fid in ids for metric in metrics if stored.get(fid, {}).get(metric))
+    expected = len(ids) * len(metrics)
+    return {
+        "ready": found >= expected,
+        "expected": expected,
+        "found": found,
+        "missing": max(expected - found, 0),
+    }
 
 def stored_targets(month, year, franchise_ids, metric_keys=None):
     metric_keys = list(metric_keys or PERFORMANCE_METRICS.keys())
@@ -693,21 +718,52 @@ def auto_target_for(franchise_id, metric_key, month, year, mode="previous_year_g
 
 
 def targets_for_period(month, year, franchise_ids, mode="manual", growth_percent=DEFAULT_GROWTH_PERCENT, metric_keys=None):
+    """Calculate targets with bulk period queries instead of one query per cell.
+
+    Manual targets still win exactly as before.  The common previous-year and
+    three-year modes now load whole periods once, eliminating the N+1 query
+    pattern on dashboards and target pages.  Complex bracket modes retain the
+    existing business formulas.
+    """
     franchise_ids = filter_active_franchise_ids(franchise_ids)
-    metric_keys = metric_keys or list(PERFORMANCE_METRICS.keys())
+    metric_keys = list(metric_keys or PERFORMANCE_METRICS.keys())
     manual = stored_targets(month, year, franchise_ids, metric_keys)
+    growth_percent = to_decimal(growth_percent)
+
+    bulk_auto = {}
+    if mode in ("previous_year", "previous_year_growth"):
+        prior = period_actuals(month, year - 1, franchise_ids, metric_keys)
+        factor = Decimal("1") if mode == "previous_year" else Decimal("1") + growth_percent / Decimal("100")
+        for fid in franchise_ids:
+            bulk_auto[fid] = {
+                key: round_money(prior.get(fid, {}).get(key, Decimal("0")) * factor)
+                for key in metric_keys
+            }
+    elif mode in ("three_year_average", "three_year_growth"):
+        periods = [period_actuals(month, year - offset, franchise_ids, metric_keys) for offset in (1, 2, 3)]
+        factor = Decimal("1") if mode == "three_year_average" else Decimal("1") + growth_percent / Decimal("100")
+        for fid in franchise_ids:
+            bulk_auto[fid] = {}
+            for key in metric_keys:
+                values = [data.get(fid, {}).get(key, Decimal("0")) for data in periods]
+                values = [value for value in values if value > 0]
+                average = sum(values, Decimal("0")) / Decimal(len(values)) if values else Decimal("0")
+                bulk_auto[fid][key] = round_money(average * factor)
+
     result = {}
     for franchise_id in franchise_ids:
         result[franchise_id] = {}
         for metric_key in metric_keys:
             manual_value = manual.get(franchise_id, {}).get(metric_key)
             if mode == "manual" and manual_value is not None:
-                result[franchise_id][metric_key] = manual_value
+                value = manual_value
             elif manual_value is not None and manual_value > 0:
-                # Manually captured Head Office targets always win when present.
-                result[franchise_id][metric_key] = manual_value
+                value = manual_value
+            elif bulk_auto:
+                value = bulk_auto.get(franchise_id, {}).get(metric_key, Decimal("0"))
             else:
-                result[franchise_id][metric_key] = auto_target_for(franchise_id, metric_key, month, year, mode, growth_percent)
+                value = auto_target_for(franchise_id, metric_key, month, year, mode, growth_percent)
+            result[franchise_id][metric_key] = value
     return result
 
 
@@ -1413,7 +1469,7 @@ def aggregate_growth_trend_series(franchise_ids, metric_key, end_month, end_year
     return series
 
 
-def graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, periods=12, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+def graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, periods=12, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT, allow_rebuild=False):
     franchise_ids = filter_active_franchise_ids(franchise_ids or [])
     cache_key = build_cache_key(
         'graph_aggregate',
@@ -1428,6 +1484,18 @@ def graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, 
     if cached is not None:
         cached['cache_status'] = 'hit'
         return cached
+    if not allow_rebuild:
+        return {
+            'metric_key': metric_key,
+            'metric_label': PERFORMANCE_METRICS[metric_key]['label'],
+            'actual_vs_target': [],
+            'previous_year': [],
+            'rolling_12': [],
+            'forecast': [],
+            'growth_trend': [],
+            'cache_status': 'missing',
+            'message': 'Analytics cache is not ready. Ask Admin to rebuild this period.',
+        }
     payload = {
         'metric_key': metric_key,
         'metric_label': PERFORMANCE_METRICS[metric_key]['label'],
@@ -1444,7 +1512,7 @@ def graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, 
     )
     return payload
 
-def graph_engine_payload(franchise_id, metric_key, month, year, periods=12, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT):
+def graph_engine_payload(franchise_id, metric_key, month, year, periods=12, mode='growth_bracket', growth_percent=DEFAULT_GROWTH_PERCENT, allow_rebuild=False):
     cache_key = build_cache_key(
         'graph_franchise',
         month=month,
@@ -1458,6 +1526,18 @@ def graph_engine_payload(franchise_id, metric_key, month, year, periods=12, mode
     if cached is not None:
         cached['cache_status'] = 'hit'
         return cached
+    if not allow_rebuild:
+        return {
+            'metric_key': metric_key,
+            'metric_label': PERFORMANCE_METRICS[metric_key]['label'],
+            'actual_vs_target': [],
+            'previous_year': [],
+            'rolling_12': [],
+            'forecast': [],
+            'growth_trend': [],
+            'cache_status': 'missing',
+            'message': 'Analytics cache is not ready. Ask Admin to rebuild this period.',
+        }
     actual_target = trend_series(franchise_id, metric_key, month, year, periods, mode, growth_percent)
     payload = {
         'metric_key': metric_key,
@@ -1474,6 +1554,17 @@ def graph_engine_payload(franchise_id, metric_key, month, year, periods=12, mode
         scope_type='franchise', scope_id=int(franchise_id), row_count=1,
     )
     return payload
+
+def warm_graph_caches_for_period(month, year, franchise_ids=None, periods=12, mode="annual_gross_scale", growth_percent=DEFAULT_SA_GDP_GROWTH_PERCENT):
+    """Build graph payloads outside user page requests and commit once."""
+    ids = filter_active_franchise_ids(franchise_ids or accessible_franchise_ids())
+    built = 0
+    for metric_key in PERFORMANCE_METRICS:
+        graph_engine_payload_for_franchises(ids, metric_key, month, year, periods, mode, growth_percent, allow_rebuild=True)
+        built += 1
+    db.session.commit()
+    return built
+
 
 # Phase 7: Leaderboard decision centre helpers
 

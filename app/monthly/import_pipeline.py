@@ -210,10 +210,11 @@ def run_month_end_import_pipeline(
     if report['status'] == 'completed':
         _stage(progress_job, 96, 'Stage 6/6: publishing performance graphs and leaderboard cache...')
         try:
-            from app.performance.service import rebuild_performance_results
+            from app.performance.service import rebuild_performance_results, warm_graph_caches_for_period
             from app.live import publish_trusted_financials
             for month, year in periods:
                 report['performance_rows'] += int(rebuild_performance_results(month, year, list(ids), 'annual_gross_scale') or 0)
+                warm_graph_caches_for_period(month, year, list(ids), periods=12, mode='annual_gross_scale')
                 publish_trusted_financials(month, year, ids, import_job=progress_job, source='month_end_import', report=report)
             report['published'] = True
             report['trusted_financials'] = True

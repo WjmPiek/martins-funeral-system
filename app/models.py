@@ -107,22 +107,18 @@ class User(UserMixin, db.Model):
     def accessible_franchises(self):
         # Global franchise access is controlled by permissions, not hardcoded role names.
         # Users with Franchise Management view/manage can see all franchises.
-        # Only activated franchises participate in the operational system. Potential
-        # franchises are managed from Admin > Potential Franchises and are deliberately
-        # excluded from dashboards, graphs, royalties, targets and decisions.
         if self.has_permission("franchise_management:view") or self.has_permission("franchise_management:manage"):
-            return Franchise.query.filter(Franchise.is_performance_active.is_(True)).order_by(Franchise.business_name).all()
+            return Franchise.query.order_by(Franchise.business_name).all()
         if self.assigned_franchises:
-            return sorted(
-                [item for item in self.assigned_franchises if bool(getattr(item, "is_performance_active", False))],
-                key=lambda item: item.business_name or "",
-            )
-        if getattr(self, "franchise", None) and bool(getattr(self.franchise, "is_performance_active", False)):
+            return sorted(self.assigned_franchises, key=lambda item: item.business_name or "")
+        if getattr(self, "franchise", None):
             return [self.franchise]
         return []
 
     def can_access_franchise(self, franchise_id):
         # Access to an individual franchise follows the same permission model.
+        if self.has_permission("franchise_management:view") or self.has_permission("franchise_management:manage"):
+            return True
         return any(franchise.id == franchise_id for franchise in self.accessible_franchises())
 
     def has_role(self, role_name):

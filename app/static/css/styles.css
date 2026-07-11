@@ -2619,6 +2619,3 @@ table{border-radius:13px;overflow:hidden}th{background:#f7f5f9!important;color:#
   .performance-filter-card .btn,
   .compact-filter-bar .btn { width: 100% !important; }
 }
-
-/* V118 potential-franchise lifecycle */
-.potential-franchises-page .info-banner{margin:0 0 18px;padding:14px 16px;border:1px solid #e5d7a5;background:#fffaf0;border-radius:12px;color:#5f4b16}.potential-franchises-page td{vertical-align:middle}.potential-franchises-page small,.muted{color:#7a7280}.badge.warning{white-space:nowrap}

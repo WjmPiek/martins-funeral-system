@@ -1,4 +1,4 @@
-from flask import session
+from flask import g, has_request_context, session
 from flask_login import current_user
 from app.models import Franchise
 
@@ -12,6 +12,13 @@ def is_privileged_user():
 def get_accessible_franchises():
     if not current_user.is_authenticated:
         return []
+    if has_request_context():
+        cached = getattr(g, "accessible_franchises_cache", None)
+        if cached is not None:
+            return cached
+        cached = current_user.accessible_franchises()
+        g.accessible_franchises_cache = cached
+        return cached
     return current_user.accessible_franchises()
 
 

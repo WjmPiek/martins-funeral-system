@@ -159,7 +159,7 @@
                         <details class="nav-section nav-domain">
                             <summary><span class="nav-icon">⚙</span><span><strong>Administration</strong><small>Users, imports and system control</small></span></summary>
                             <div class="nav-subtabs">
-                                {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.users') }}">Users</a><a href="{{ url_for('admin.franchise_users') }}">Active Franchise Users</a><a href="{{ url_for('admin.potential_franchises') }}">Potential Franchises</a><a href="{{ url_for('admin.franchise_employees') }}">Employees</a>{% endif %}
+                                {% if current_user.has_permission('users:view') %}<a href="{{ url_for('admin.users') }}">Users</a><a href="{{ url_for('admin.franchise_users') }}">Franchise Users</a><a href="{{ url_for('admin.franchise_employees') }}">Employees</a>{% endif %}
                                 {% if current_user.has_permission('user_roles:view') %}<a href="{{ url_for('admin.roles') }}">Roles & Permissions</a>{% endif %}
                                 {% if is_admin_user or is_finance_user %}<a href="{{ url_for('admin.import_centre') }}">Import Centre</a><a href="{{ url_for('admin.imports_data') }}">Imports & Data</a><a href="{{ url_for('admin.data_integrity') }}">Data Integrity</a><a href="{{ url_for('admin.database_diagnostics') }}">Database Diagnostics</a>{% endif %}
                                 {% if current_user.has_permission('audit_logs:view') %}<a href="{{ url_for('admin.audit_logs') }}">Audit Logs</a>{% endif %}
@@ -438,7 +438,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
   poll();
-  setInterval(poll, 10000);
+  var livePollTimer = setInterval(function () {
+    if (!document.hidden) poll();
+  }, 45000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) poll();
+  });
 })();
 </script>
 

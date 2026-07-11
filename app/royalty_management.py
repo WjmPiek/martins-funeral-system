@@ -182,15 +182,7 @@ def snapshot_monthly_figure(monthly_figure: MonthlyFigure, *, commit: bool = Fal
 
 
 def recalculate_royalties_for_period(month: int, year: int, franchise_ids: Optional[Iterable[int]] = None, *, commit: bool = True) -> dict:
-    query = (
-        MonthlyFigure.query
-        .join(Franchise, Franchise.id == MonthlyFigure.franchise_id)
-        .filter(
-            MonthlyFigure.month == int(month),
-            MonthlyFigure.year == int(year),
-            Franchise.is_performance_active.is_(True),
-        )
-    )
+    query = MonthlyFigure.query.filter_by(month=int(month), year=int(year))
     if franchise_ids:
         query = query.filter(MonthlyFigure.franchise_id.in_(list(franchise_ids)))
     rows = query.order_by(MonthlyFigure.franchise_id).all()

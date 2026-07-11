@@ -1,5 +1,7 @@
-from flask import Flask, request, url_for
+from flask import Flask, g, request, url_for
 import click
+import logging
+import time
 from pathlib import Path
 from datetime import datetime, timedelta
 from config import Config
@@ -20,6 +22,26 @@ def create_app(config_class=Config):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
             response.headers["Expires"] = (datetime.utcnow() + timedelta(days=365)).strftime("%a, %d %b %Y %H:%M:%S GMT")
             response.headers.pop("Pragma", None)
+        return response
+
+    @app.before_request
+    def start_request_timer():
+        g.request_started_at = time.perf_counter()
+
+    @app.after_request
+    def record_request_timing(response):
+        started = getattr(g, "request_started_at", None)
+        if started is None:
+            return response
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        response.headers["Server-Timing"] = f"app;dur={elapsed_ms:.1f}"
+        response.headers["X-Response-Time-Ms"] = f"{elapsed_ms:.1f}"
+        threshold_ms = float(app.config.get("SLOW_REQUEST_THRESHOLD_MS", 1500))
+        if elapsed_ms >= threshold_ms and not request.path.startswith(app.static_url_path + "/"):
+            app.logger.warning(
+                "SLOW_REQUEST method=%s path=%s status=%s duration_ms=%.1f query=%s",
+                request.method, request.path, response.status_code, elapsed_ms, request.query_string.decode("utf-8", "ignore")
+            )
         return response
 
     def _static_asset_version(relative_path):
@@ -215,6 +237,40 @@ def create_app(config_class=Config):
         from app.events import ensure_default_subscriptions
         count = ensure_default_subscriptions(commit=True)
         print(f"Event subscriptions created: {count}")
+
+    @app.cli.command("optimize-performance-indexes")
+    def optimize_performance_indexes_command():
+        """Create safe PostgreSQL indexes used by dashboards, graphs and royalties."""
+        from sqlalchemy import text
+        statements = [
+            "CREATE INDEX IF NOT EXISTS ix_monthly_figures_period_franchise ON monthly_figures (year, month, franchise_id)",
+            "CREATE INDEX IF NOT EXISTS ix_monthly_figures_franchise_period ON monthly_figures (franchise_id, year, month)",
+            "CREATE INDEX IF NOT EXISTS ix_performance_results_period_metric_franchise ON performance_results (year, month, metric, franchise_id)",
+            "CREATE INDEX IF NOT EXISTS ix_performance_results_franchise_period_metric ON performance_results (franchise_id, year, month, metric)",
+            "CREATE INDEX IF NOT EXISTS ix_franchise_targets_period_metric_franchise ON franchise_targets (year, month, metric, franchise_id)",
+            "CREATE INDEX IF NOT EXISTS ix_performance_page_cache_lookup ON performance_page_cache (cache_type, cache_key, invalidated_at)",
+        ]
+        for statement in statements:
+            db.session.execute(text(statement))
+            print(statement)
+        db.session.commit()
+        db.session.execute(text("ANALYZE monthly_figures"))
+        db.session.execute(text("ANALYZE performance_results"))
+        db.session.execute(text("ANALYZE franchise_targets"))
+        db.session.commit()
+        print("Performance indexes created and PostgreSQL statistics refreshed.")
+
+    @app.cli.command("warm-analytics-cache")
+    @click.option("--month", type=int, required=True)
+    @click.option("--year", type=int, required=True)
+    def warm_analytics_cache_command(month, year):
+        """Build performance rows and graph payloads before users open pages."""
+        from app.models import MonthlyFigure
+        from app.performance.service import rebuild_performance_results, warm_graph_caches_for_period
+        franchise_ids = [row[0] for row in db.session.query(MonthlyFigure.franchise_id).filter_by(month=month, year=year).distinct().all()]
+        rows = rebuild_performance_results(month, year, franchise_ids, "annual_gross_scale")
+        graphs = warm_graph_caches_for_period(month, year, franchise_ids, periods=12, mode="annual_gross_scale")
+        print(f"Warmed {year}-{month:02d}: {rows} performance rows and {graphs} aggregate graph caches.")
 
     @app.cli.command("rebuild-performance-cache")
     @click.option("--month", type=int, required=False, help="Reporting month number, 1-12. Omit to rebuild all periods.")
