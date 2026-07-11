@@ -547,10 +547,10 @@ def return_franchise_to_potential(franchise_id):
 def users():
     repair_existing_user_visibility()
     db.session.commit()
-    # Keep the franchise selector clean: branches with no KPI data in the last 3 months
-    # are hidden automatically and shown in the Old Franchises tab until reactivated.
+    # Franchise activation is now controlled explicitly by Head Office.
+    # Do not automatically move a franchise out of the live system because it has
+    # no figures in the latest three months.
     now = datetime.utcnow()
-    auto_hide_inactive_franchises(now.month, now.year, [franchise.id for franchise in Franchise.query.all()], current_user.id)
     franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
     old_franchise_rows = inactive_franchise_candidates(now.month, now.year, [franchise.id for franchise in Franchise.query.order_by(Franchise.business_name).all()])
     old_franchises = [row for row in old_franchise_rows if not row["is_performance_active"]]
@@ -629,8 +629,6 @@ def users():
 @permission_required("users:view")
 def franchise_users():
     repair_existing_user_visibility()
-    now = datetime.utcnow()
-    auto_hide_inactive_franchises(now.month, now.year, [franchise.id for franchise in Franchise.query.all()], current_user.id)
     db.session.commit()
     franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
     franchise_users = [
