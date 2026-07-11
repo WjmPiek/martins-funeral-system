@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block app_content %}
 <style>
-.insight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin:1rem 0}.insight-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}.insight-item{background:#fff;border:1px solid #e5e7eb;border-left:7px solid #198754;border-radius:14px;padding:1rem;margin:.75rem 0}.insight-item.warning{border-left-color:#f59f00}.insight-item.danger{border-left-color:#dc3545}.insight-badge{display:inline-block;border-radius:999px;padding:.25rem .55rem;font-weight:700}.insight-badge.good{background:#d1e7dd;color:#0f5132}.insight-badge.warning{background:#fff3cd;color:#664d03}.insight-badge.danger{background:#f8d7da;color:#842029}.muted{color:#6c757d}.button-row{display:flex;gap:.5rem;flex-wrap:wrap}.filter-bar{display:flex;gap:.75rem;flex-wrap:wrap;align-items:end;margin:1rem 0}.filter-bar label{display:flex;flex-direction:column;font-weight:600}.filter-bar select,.filter-bar input{padding:.45rem;border:1px solid #ced4da;border-radius:8px}</style>
+.performance-insights-page{max-width:1500px;margin:0 auto}.insight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin:1rem 0}.insight-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}.insight-item{background:#fff;border:1px solid #e5e7eb;border-left:7px solid #198754;border-radius:14px;padding:1rem;margin:.75rem 0}.insight-item.warning{border-left-color:#f59f00}.insight-item.danger{border-left-color:#dc3545}.insight-badge{display:inline-block;border-radius:999px;padding:.25rem .55rem;font-weight:700}.insight-badge.good{background:#d1e7dd;color:#0f5132}.insight-badge.warning{background:#fff3cd;color:#664d03}.insight-badge.danger{background:#f8d7da;color:#842029}.muted{color:#6c757d}.button-row{display:flex;gap:.5rem;flex-wrap:wrap}.filter-bar{display:flex;gap:.75rem;flex-wrap:wrap;align-items:end;margin:1rem 0}.filter-bar label{display:flex;flex-direction:column;font-weight:600}.filter-bar select,.filter-bar input{padding:.45rem;border:1px solid #ced4da;border-radius:8px}</style>
 
+<div class="performance-insights-page">
 <div class="page-header">
     <div>
         <h1>Performance Insights</h1>
@@ -62,4 +63,5 @@
         </div>
     {% endfor %}
 </section>
+</div>
 {% endblock %}

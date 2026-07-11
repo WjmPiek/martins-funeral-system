@@ -801,7 +801,9 @@ def _update_franchise_from_row(franchise: Franchise, row: Dict[str, Any]) -> int
         "agreement_start_date": parse_date(row.get("Agreement Start Date")),
         "agreement_end_date": parse_date(row.get("Agreement End Date")),
         "minimum_royalty_amount": decimal_or_zero(row.get("Minimum Royalty Amount")),
-        "is_performance_active": bool_from_cell(row.get("Active For Performance"), getattr(franchise, "is_performance_active", True)),
+        # Activation is an explicit Admin/Finance Manager approval step. Imports may
+        # update details and historical data, but may never promote a potential branch.
+        "is_performance_active": bool(getattr(franchise, "is_performance_active", False)),
     }
     method = str(row.get("Royalty Method") or franchise.royalty_gross_method or "old").lower().strip()
     updates["royalty_gross_method"] = method if method in ("old", "new") else "old"

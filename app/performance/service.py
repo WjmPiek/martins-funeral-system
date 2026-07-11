@@ -510,22 +510,13 @@ def inactive_franchise_candidates(month, year, franchise_ids=None):
 
 
 def auto_hide_inactive_franchises(month, year, franchise_ids=None, changed_by_id=None):
-    ids = franchise_ids if franchise_ids is not None else accessible_franchise_ids(include_inactive=True)
-    changed = 0
-    for item in inactive_franchise_candidates(month, year, ids):
-        franchise = item["franchise"]
-        if item["has_recent_data"]:
-            continue
-        if not is_franchise_performance_active(franchise):
-            continue
-        franchise.is_performance_active = False
-        franchise.performance_inactive_at = datetime.now(timezone.utc)
-        franchise.performance_inactive_reason = f"Auto-hidden: no imported KPI data for the 3 months ending {month_label(month, year)}."
-        changed += 1
-    if changed:
-        db.session.commit()
-    return changed
+    """Legacy compatibility hook.
 
+    Franchise activation is now an explicit approval workflow. A lack of recent data
+    must never silently change lifecycle state, so this function intentionally does
+    nothing and remains only to avoid breaking older callers.
+    """
+    return 0
 
 def reactivate_franchise_performance(franchise_id, user_id=None):
     franchise = Franchise.query.get(franchise_id)

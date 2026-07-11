@@ -2473,3 +2473,152 @@ table{border-radius:13px;overflow:hidden}th{background:#f7f5f9!important;color:#
 .sticky-form-actions{position:sticky;bottom:12px;display:flex;justify-content:flex-end;margin-top:18px;padding:12px;background:rgba(248,246,250,.94);backdrop-filter:blur(8px);border:1px solid #e4ddeb;border-radius:14px;z-index:5}
 @media(max-width:900px){.subtab-bar.target-subtabs{grid-template-columns:1fr}.filter-bar>label,.performance-filter-card>label,.compact-filter-bar>label{flex:1 1 180px!important}.info-banner{flex-direction:column;gap:4px}}
 @media(max-width:600px){.filter-bar,.performance-filter-card,.instant-filter-bar,.compact-filter-bar{display:grid!important;grid-template-columns:1fr!important}.filter-bar>label,.performance-filter-card>label,.compact-filter-bar>label,.filter-bar>.btn,.performance-filter-card>.btn,.compact-filter-bar>.btn{width:100%!important;min-width:0!important}.sticky-form-actions .btn{width:100%!important}.info-banner strong{white-space:normal}}
+
+/* V117 fixed navigation, compact layouts, leaderboard movement */
+@media (min-width: 900px) {
+  .app-shell {
+    display: block !important;
+    min-height: 100vh !important;
+  }
+  .app-menu {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    width: 290px !important;
+    height: 100vh !important;
+    display: block !important;
+    z-index: 1200 !important;
+  }
+  .app-menu > summary { display: none !important; }
+  .menu-panel {
+    position: absolute !important;
+    inset: 0 !important;
+    display: block !important;
+    width: 290px !important;
+    height: 100vh !important;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,.25) transparent;
+  }
+  .menu-panel::-webkit-scrollbar { width: 8px; }
+  .menu-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,.22); border-radius: 999px; }
+  .main-panel {
+    margin-left: 290px !important;
+    width: calc(100% - 290px) !important;
+    min-width: 0 !important;
+  }
+  .topbar {
+    left: auto !important;
+    width: 100% !important;
+  }
+}
+
+/* Prevent an additional empty sidebar-width column from being created. */
+@media (min-width: 1001px) {
+  .app-shell { grid-template-columns: none !important; }
+  .main-panel { grid-column: auto !important; }
+}
+
+.sidebar-nav .nav-section > summary { position: relative; }
+.sidebar-nav .nav-section[open] > summary {
+  background: rgba(255,255,255,.07) !important;
+  color: #fff !important;
+}
+.sidebar-nav .nav-subtabs a.is-active {
+  background: rgba(225,213,235,.16) !important;
+  box-shadow: inset 3px 0 0 #c9b4db !important;
+  color: #fff !important;
+}
+
+/* Compact, professional filter rows across performance pages. */
+.period-filter-form,
+.filter-bar,
+.performance-filter-card,
+.compact-filter-bar {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) auto !important;
+  gap: 14px !important;
+  align-items: end !important;
+}
+.period-filter-form > label,
+.filter-bar > label,
+.performance-filter-card > label,
+.compact-filter-bar > label {
+  min-width: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+.period-filter-form select,
+.period-filter-form input,
+.filter-bar select,
+.filter-bar input,
+.performance-filter-card select,
+.performance-filter-card input,
+.compact-filter-bar select,
+.compact-filter-bar input {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+.period-filter-form .btn,
+.filter-bar .btn,
+.performance-filter-card .btn,
+.compact-filter-bar .btn {
+  width: auto !important;
+  min-width: 132px !important;
+  min-height: 44px !important;
+}
+
+/* Leaderboard direction indicators */
+.leaderboard-movement,
+.leaderboard-move {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  min-width: 88px;
+  padding: 7px 11px !important;
+  border-radius: 999px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+}
+.leaderboard-movement::before,
+.leaderboard-move::before {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 900;
+}
+.leaderboard-movement.up,
+.leaderboard-move.up { color: #287a51 !important; background: #e8f5ee !important; }
+.leaderboard-movement.up::before,
+.leaderboard-move.up::before { content: "↑"; background: #cfe9db; }
+.leaderboard-movement.down,
+.leaderboard-move.down { color: #a3454b !important; background: #f9e9ea !important; }
+.leaderboard-movement.down::before,
+.leaderboard-move.down::before { content: "↓"; background: #efd0d2; }
+.leaderboard-movement.same,
+.leaderboard-move.same { color: #956b28 !important; background: #fbf1df !important; }
+.leaderboard-movement.same::before,
+.leaderboard-move.same::before { content: "→"; background: #f2dfb9; }
+.leaderboard-row.movement-up td:first-child { box-shadow: inset 4px 0 0 #6f9380; }
+.leaderboard-row.movement-down td:first-child { box-shadow: inset 4px 0 0 #ad6d72; }
+.leaderboard-row.movement-same td:first-child { box-shadow: inset 4px 0 0 #b18a55; }
+
+@media (max-width: 899px) {
+  .period-filter-form,
+  .filter-bar,
+  .performance-filter-card,
+  .compact-filter-bar { grid-template-columns: 1fr !important; }
+  .period-filter-form .btn,
+  .filter-bar .btn,
+  .performance-filter-card .btn,
+  .compact-filter-bar .btn { width: 100% !important; }
+}
+
+/* V118 potential-franchise lifecycle */
+.potential-franchises-page .info-banner{margin:0 0 18px;padding:14px 16px;border:1px solid #e5d7a5;background:#fffaf0;border-radius:12px;color:#5f4b16}.potential-franchises-page td{vertical-align:middle}.potential-franchises-page small,.muted{color:#7a7280}.badge.warning{white-space:nowrap}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block app_content %}
+<section class="page-section potential-franchises-page">
+  <div class="section-header">
+    <div>
+      <h1>Potential Franchises</h1>
+      <p>Franchises stay here until Head Office approves them. Their imported history is safely retained, but it is excluded from calculations, graphs, royalties, targets, leaderboards, insights and executive decisions.</p>
+    </div>
+  </div>
+  <div class="info-banner"><strong>Activation rule:</strong> Only an Admin or Finance Manager can activate a franchise. Activation immediately makes its existing and future data available to the operational system.</div>
+  <div class="form-section-card">
+    <div class="table-responsive">
+      <table class="system-report-table">
+        <thead><tr><th>Potential franchise</th><th>Franchise user</th><th>Stored history</th><th>Latest period</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+        {% for row in rows %}
+          <tr>
+            <td><strong>{{ row.franchise.business_name }}</strong><br><small>{{ row.franchise.province or 'Province not set' }}</small></td>
+            <td>{% for owner in row.owners %}<div>{{ owner.full_name }}<br><small>{{ owner.email }}</small></div>{% else %}<span class="muted">No linked franchise user</span>{% endfor %}</td>
+            <td>{{ row.figure_count }} monthly record{{ '' if row.figure_count == 1 else 's' }}</td>
+            <td>{% if row.latest_figure %}{{ row.latest_figure.year }}-{{ '%02d'|format(row.latest_figure.month) }}{% else %}No figures{% endif %}</td>
+            <td><span class="badge warning">Potential — excluded</span></td>
+            <td><form method="post" action="{{ url_for('admin.activate_potential_franchise', franchise_id=row.franchise.id) }}" onsubmit="return confirm('Activate {{ row.franchise.business_name|e }} and include all its stored data in the live system?');"><button class="btn primary button-auto" type="submit">Activate franchise</button></form></td>
+          </tr>
+        {% else %}<tr><td colspan="6" class="center-cell">No potential franchises. Every registered franchise is currently active.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

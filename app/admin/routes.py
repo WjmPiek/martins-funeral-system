@@ -146,13 +146,17 @@ def normalise_user_scope_for_role(user, role_name, franchise_ids=None):
     user.parent_franchise_user_id = None
 
     if role_requires_franchise_scope(role_name):
-        selected_franchises = Franchise.query.filter(
-            Franchise.id.in_(franchise_ids or []),
-            Franchise.is_performance_active == True,
-        ).order_by(Franchise.business_name).all()
+        query = Franchise.query.filter(Franchise.id.in_(franchise_ids or []))
+        if role_name == "Regional Manager":
+            query = query.filter(Franchise.is_performance_active.is_(True))
+        selected_franchises = query.order_by(Franchise.business_name).all()
         if not selected_franchises:
-            return False, "Please link at least one active franchise for Regional Manager or Franchise User accounts."
+            label = "active franchise" if role_name == "Regional Manager" else "franchise"
+            return False, f"Please link at least one {label} for this account."
         user.assigned_franchises = selected_franchises
+        if role_name == "Franchise User" and not any(f.is_performance_active for f in selected_franchises):
+            user.is_active_account = False
+            user.deactivation_reason = "Potential franchise awaiting Head Office activation"
         return True, ""
 
     # Finance/Admin-side users are Martins users. Finance Manager is linked to all active franchises.
@@ -458,6 +462,85 @@ def seed():
     return redirect(url_for("admin.roles"))
 
 
+
+
+def can_manage_potential_franchises():
+    return is_current_user_admin() or current_user.has_role("Finance Manager")
+
+
+def linked_owner_users(franchise):
+    return [
+        user for user in getattr(franchise, "assigned_users", [])
+        if user.has_role("Franchise User") and not getattr(user, "parent_franchise_user_id", None)
+    ]
+
+
+@admin_bp.route("/potential-franchises")
+@login_required
+def potential_franchises():
+    if not can_manage_potential_franchises():
+        abort(403)
+    franchises = Franchise.query.filter(Franchise.is_performance_active.is_(False)).order_by(Franchise.business_name).all()
+    rows = []
+    for franchise in franchises:
+        owners = linked_owner_users(franchise)
+        rows.append({
+            "franchise": franchise,
+            "owners": owners,
+            "figure_count": MonthlyFigure.query.filter_by(franchise_id=franchise.id).count(),
+            "latest_figure": MonthlyFigure.query.filter_by(franchise_id=franchise.id).order_by(MonthlyFigure.year.desc(), MonthlyFigure.month.desc()).first(),
+        })
+    return render_template("admin/potential_franchises.html", rows=rows)
+
+
+@admin_bp.route("/potential-franchises/<int:franchise_id>/activate", methods=["POST"])
+@login_required
+def activate_potential_franchise(franchise_id):
+    if not can_manage_potential_franchises():
+        abort(403)
+    franchise = Franchise.query.get_or_404(franchise_id)
+    franchise.is_performance_active = True
+    franchise.performance_reactivated_at = datetime.utcnow()
+    franchise.performance_reactivated_by_id = current_user.id
+    franchise.performance_inactive_at = None
+    franchise.performance_inactive_reason = ""
+    for owner in linked_owner_users(franchise):
+        owner.is_active = True
+        owner.is_active_account = True
+        owner.deactivated_at = None
+        owner.deactivation_reason = ""
+        for employee in owner.franchise_employees:
+            employee.is_active = True
+            employee.is_active_account = True
+    db.session.commit()
+    invalidate_performance_cache()
+    log_action("Potential Franchises", "Activated franchise", f"Franchise: {franchise.business_name}; ID: {franchise.id}")
+    flash(f"{franchise.business_name} is now active and will be included in calculations, graphs, royalties, targets and decisions.", "success")
+    return redirect(url_for("admin.potential_franchises"))
+
+
+@admin_bp.route("/potential-franchises/<int:franchise_id>/return", methods=["POST"])
+@login_required
+def return_franchise_to_potential(franchise_id):
+    if not can_manage_potential_franchises():
+        abort(403)
+    franchise = Franchise.query.get_or_404(franchise_id)
+    franchise.is_performance_active = False
+    franchise.performance_inactive_at = datetime.utcnow()
+    franchise.performance_inactive_reason = "Awaiting Head Office activation"
+    for owner in linked_owner_users(franchise):
+        owner.is_active_account = False
+        owner.deactivated_at = datetime.utcnow()
+        owner.deactivation_reason = "Potential franchise awaiting Head Office activation"
+        for employee in owner.franchise_employees:
+            employee.is_active_account = False
+    db.session.commit()
+    invalidate_performance_cache()
+    log_action("Potential Franchises", "Returned franchise to potential", f"Franchise: {franchise.business_name}; ID: {franchise.id}")
+    flash(f"{franchise.business_name} was moved to Potential Franchises and is excluded from all operational calculations.", "success")
+    return redirect(url_for("admin.potential_franchises"))
+
+
 @admin_bp.route("/users")
 @login_required
 @permission_required("users:view")
@@ -550,7 +633,10 @@ def franchise_users():
     auto_hide_inactive_franchises(now.month, now.year, [franchise.id for franchise in Franchise.query.all()], current_user.id)
     db.session.commit()
     franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
-    franchise_users = all_franchise_owner_users()
+    franchise_users = [
+        user for user in all_franchise_owner_users()
+        if any(bool(getattr(franchise, "is_performance_active", False)) for franchise in ordered_franchises_for_user(user))
+    ]
     return render_template(
         "admin/franchise_users.html",
         franchise_users=franchise_users,
@@ -567,7 +653,8 @@ def create_admin_user():
         abort(403)
 
     if request.method == "GET":
-        franchises = Franchise.query.filter(Franchise.is_performance_active == True).order_by(Franchise.business_name).all()
+        # Potential branches must be selectable when creating their owner account.
+        franchises = Franchise.query.order_by(Franchise.business_name).all()
         return render_template(
             "admin/create_martins_user.html",
             admin_creatable_roles=admin_creatable_roles(),
@@ -619,7 +706,7 @@ def create_admin_user():
     log_action("Users", "Created admin-managed user", f"User: {email}; Role: {role.name}")
     flash(f"User {user.full_name} was created as {role.name}.", "success")
     if role.name == "Franchise User":
-        return redirect(url_for("admin.franchise_users"))
+        return redirect(url_for("admin.potential_franchises" if not user.is_active_account else "admin.franchise_users"))
     return redirect(url_for("admin.users"))
 
 
@@ -675,14 +762,17 @@ def update_user_roles(user_id):
             user.assigned_franchises = []
     elif selected_role_names & {"Regional Manager", "Franchise User"}:
         user.parent_franchise_user_id = None
-        selected_franchises = Franchise.query.filter(
-            Franchise.id.in_(franchise_ids or []),
-            Franchise.is_performance_active == True,
-        ).order_by(Franchise.business_name).all()
+        query = Franchise.query.filter(Franchise.id.in_(franchise_ids or []))
+        if "Regional Manager" in selected_role_names:
+            query = query.filter(Franchise.is_performance_active.is_(True))
+        selected_franchises = query.order_by(Franchise.business_name).all()
         if not selected_franchises:
-            flash("Regional Manager and Franchise User accounts must be linked to at least one active franchise.", "danger")
+            flash("Please link this account to at least one suitable franchise.", "danger")
             return redirect(url_for("admin.users"))
         user.assigned_franchises = selected_franchises
+        if "Franchise User" in selected_role_names and not any(f.is_performance_active for f in selected_franchises):
+            user.is_active_account = False
+            user.deactivation_reason = "Potential franchise awaiting Head Office activation"
     else:
         # Admin > Users is only for Martins users and registered franchise owner/user accounts.
         # Franchise employees are managed separately under Admin > Employees and created by franchise owners.
@@ -751,14 +841,17 @@ def update_user(user_id):
             user.assigned_franchises = []
     elif selected_role_names & {"Regional Manager", "Franchise User"}:
         user.parent_franchise_user_id = None
-        selected_franchises = Franchise.query.filter(
-            Franchise.id.in_(franchise_ids or []),
-            Franchise.is_performance_active == True,
-        ).order_by(Franchise.business_name).all()
+        query = Franchise.query.filter(Franchise.id.in_(franchise_ids or []))
+        if "Regional Manager" in selected_role_names:
+            query = query.filter(Franchise.is_performance_active.is_(True))
+        selected_franchises = query.order_by(Franchise.business_name).all()
         if not selected_franchises:
-            flash("Regional Manager and Franchise User accounts must be linked to at least one active franchise.", "danger")
+            flash("Please link this account to at least one suitable franchise.", "danger")
             return redirect(url_for("admin.users"))
         user.assigned_franchises = selected_franchises
+        if "Franchise User" in selected_role_names and not any(f.is_performance_active for f in selected_franchises):
+            user.is_active_account = False
+            user.deactivation_reason = "Potential franchise awaiting Head Office activation"
     else:
         user.parent_franchise_user_id = None
 

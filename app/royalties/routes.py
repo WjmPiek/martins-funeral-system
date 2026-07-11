@@ -27,10 +27,11 @@ def current_reporting_period():
 
 
 def latest_imported_reporting_period():
-    latest = db.session.query(MonthlyFigure.year, MonthlyFigure.month).order_by(
-        MonthlyFigure.year.desc(),
-        MonthlyFigure.month.desc(),
-    ).first()
+    latest = (db.session.query(MonthlyFigure.year, MonthlyFigure.month)
+        .join(Franchise, Franchise.id == MonthlyFigure.franchise_id)
+        .filter(Franchise.is_performance_active.is_(True))
+        .order_by(MonthlyFigure.year.desc(), MonthlyFigure.month.desc())
+        .first())
     if latest:
         return int(latest.month), int(latest.year)
     return current_reporting_period()
@@ -60,7 +61,10 @@ def month_label(month, year):
 
 def reporting_years():
     default_month, current_year = current_reporting_period()
-    years = [row[0] for row in db.session.query(MonthlyFigure.year).distinct().order_by(MonthlyFigure.year.desc()).all()]
+    years = [row[0] for row in (db.session.query(MonthlyFigure.year)
+        .join(Franchise, Franchise.id == MonthlyFigure.franchise_id)
+        .filter(Franchise.is_performance_active.is_(True))
+        .distinct().order_by(MonthlyFigure.year.desc()).all())]
     if current_year not in years:
         years.insert(0, current_year)
     return years
@@ -270,6 +274,7 @@ def get_figures():
 
     if franchise_group_mode:
         main_franchise = get_main_franchise_for_group(linked_franchises, selected, group_user or current_user)
+        linked_franchises = [f for f in linked_franchises if f.is_performance_active]
         linked_ids = [franchise.id for franchise in linked_franchises]
         linked_figures = MonthlyFigure.query.filter(
             MonthlyFigure.month == selected_month,
@@ -281,9 +286,10 @@ def get_figures():
         figures = [grouped] if grouped else []
         return figures, main_franchise, linked_franchises, False, selected_month, selected_year
 
-    query = MonthlyFigure.query.filter(
+    query = MonthlyFigure.query.join(Franchise, Franchise.id == MonthlyFigure.franchise_id).filter(
         MonthlyFigure.month == selected_month,
         MonthlyFigure.year == selected_year,
+        Franchise.is_performance_active.is_(True),
     )
     if show_all_franchises:
         accessible_ids = [franchise.id for franchise in accessible_franchises]
@@ -294,7 +300,7 @@ def get_figures():
     elif selected:
         query = query.filter_by(franchise_id=selected.id)
 
-    figures = query.join(Franchise, MonthlyFigure.franchise_id == Franchise.id).order_by(
+    figures = query.order_by(
         Franchise.business_name.asc(),
         MonthlyFigure.id.desc(),
     ).all()
@@ -338,6 +344,8 @@ def index():
 @permission_required("royalties:approve")
 def approve(figure_id):
     figure = MonthlyFigure.query.get_or_404(figure_id)
+    if not figure.franchise or not figure.franchise.is_performance_active:
+        abort(404)
     figure.status = "Royalty Approved"
     log_action("Royalties", "Approved royalty calculation", f"Period: {figure.period_label}")
     db.session.commit()
@@ -350,6 +358,8 @@ def approve(figure_id):
 @permission_required("royalties:approve")
 def lock(figure_id):
     figure = MonthlyFigure.query.get_or_404(figure_id)
+    if not figure.franchise or not figure.franchise.is_performance_active:
+        abort(404)
     figure.status = "Royalty Locked"
     log_action("Royalties", "Locked royalty calculation", f"Period: {figure.period_label}")
     db.session.commit()
