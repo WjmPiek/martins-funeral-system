@@ -2759,3 +2759,59 @@ input,select,textarea,.form-control{min-height:46px!important;width:100%;padding
   .app-menu{background:transparent!important}.menu-panel{background:#fff!important;color:var(--ui-ink)!important;box-shadow:18px 0 42px rgba(30,18,39,.16)!important}.menu-toggle{position:fixed!important;top:17px!important;left:14px!important;z-index:1500!important;width:42px!important;height:42px!important;border-radius:11px!important;background:#fff!important;border:1px solid var(--ui-border)!important;box-shadow:var(--ui-shadow)!important}.topbar-brand{padding-left:48px!important}
   .page-header,.split-header,.insights-page-heading{grid-template-columns:1fr!important;align-items:stretch!important}.insights-period-form,.inline-form.card,.compact-form{min-width:0!important;grid-template-columns:1fr!important}.grid.two-col{grid-template-columns:1fr!important}.stats-grid,.executive-kpi-grid,.insights-kpi-grid,.province-card-grid,.insights-overview-grid{grid-template-columns:1fr!important}.quick-link-grid{grid-template-columns:1fr!important}.insights-panel-header{align-items:flex-start!important;flex-direction:column!important}.insights-footer{flex-direction:column!important}.royalty-management .inline-form,.executive-dashboard .inline-form{max-width:none!important}
 }
+
+/* V125 compact enterprise density: keep all data inside cards and columns */
+:root {
+  --ui-font-size: 13px;
+  --ui-small-size: 11.5px;
+  --ui-cell-padding-y: 6px;
+  --ui-cell-padding-x: 7px;
+}
+html { font-size: var(--ui-font-size); }
+body { font-size: 1rem; }
+.content-area { padding: 20px 22px; }
+.card, .welcome-card, .module-card, .form-card, .table-card { padding: 18px; }
+h1 { font-size: clamp(1.35rem, 1.8vw, 1.75rem); }
+h2 { font-size: clamp(1.15rem, 1.5vw, 1.45rem); }
+h3 { font-size: clamp(1rem, 1.2vw, 1.2rem); }
+p, label, input, select, textarea, button, .btn { font-size: .92rem; }
+small, .muted, .help-text, .field-help { font-size: var(--ui-small-size); }
+
+.table-responsive { overflow-x: auto; max-width: 100%; }
+table, .system-report-table { width: 100%; table-layout: fixed; }
+th, td, .system-report-table th, .system-report-table td {
+  padding: var(--ui-cell-padding-y) var(--ui-cell-padding-x);
+  font-size: .76rem;
+  max-width: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.25;
+}
+th, .system-report-table th { font-size: .72rem; }
+td input, td select, td textarea {
+  width: 100%; min-width: 0; padding: 7px 8px; font-size: .75rem;
+}
+.actions, .table-actions, td.actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.actions .btn, .table-actions .btn, td .btn, td button {
+  width: auto; min-width: 0; padding: 6px 8px; margin: 0; font-size: .72rem;
+}
+.grid, .module-grid, .kpi-grid, .metric-grid { gap: 12px; }
+.form-grid { grid-template-columns: minmax(110px, 170px) minmax(160px, 1fr); gap: 10px 12px; }
+.filter-toolbar, .filters-grid, .period-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+.filter-toolbar button, .filters-grid button, .period-filter-grid button { width: auto; min-width: 110px; }
+
+@media (min-width: 1200px) {
+  .content-area { padding: 20px 24px; }
+  .card, .welcome-card, .module-card, .form-card, .table-card { padding: 16px; }
+}
+@media (max-width: 899px) {
+  html { font-size: 12.5px; }
+  .content-area { padding: 14px; }
+  th, td { font-size: .72rem; }
+}

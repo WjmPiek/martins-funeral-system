@@ -1159,6 +1159,47 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
     }
 
 
+
+
+def detect_franchise_from_pdf_text(text):
+    """Match a PDF to the correct existing franchise using master data.
+
+    Matching priority: permanent franchise code, master import id, standardized
+    town, then exact/contained normalized business name.  No new franchise is
+    created from a month-end PDF.
+    """
+    normalized_text = normalize_franchise_key(text)
+    compact_text = re.sub(r"[^a-z0-9]+", "", str(text or "").lower())
+    if not normalized_text:
+        return None
+    franchises = Franchise.query.order_by(Franchise.id.asc()).all()
+    candidates = []
+    for franchise in franchises:
+        keys = [
+            getattr(franchise, "franchise_code", None),
+            getattr(franchise, "master_import_id", None),
+            getattr(franchise, "standardized_town", None),
+            getattr(franchise, "business_name", None),
+        ]
+        score = 0
+        for idx, value in enumerate(keys):
+            key = normalize_franchise_key(value)
+            compact = re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+            if not key:
+                continue
+            if idx == 0 and compact and compact in compact_text:
+                score = max(score, 100)
+            elif idx in (1, 2) and key in normalized_text:
+                score = max(score, 90 - idx)
+            elif idx == 3 and len(key) >= 4 and key in normalized_text:
+                score = max(score, 70 + min(len(key), 20))
+        if score:
+            candidates.append((score, len(franchise.business_name or ""), franchise))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda row: (row[0], row[1]), reverse=True)
+    return candidates[0][2]
+
 def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, year=None, progress_job=None, actor_user_id=None, trusted_admin_import=False):
     franchise = None
     if franchise_id:
@@ -1167,9 +1208,13 @@ def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, 
             franchise = candidate
             if has_request_context():
                 session["selected_franchise_id"] = candidate.id
+    text, tmp_path = extract_pdf_text(file_storage)
+    if not franchise:
+        franchise = detect_franchise_from_pdf_text(text)
     if not franchise:
         franchise = get_selected_franchise() or get_or_create_franchise()
-    text, tmp_path = extract_pdf_text(file_storage)
+    if not franchise:
+        raise ValueError("The PDF could not be matched to an existing franchise. Add the franchise code/name to the master data or select the franchise before importing.")
     imported = parse_pdf_values(text)
     month, year = parse_pdf_month_year(
         text,
@@ -1353,7 +1398,13 @@ def import_excel():
 
         log_action("Monthly Figures", "Queued Excel monthly import", f"Job {job.id}: {file_storage.filename}")
         db.session.commit()
-        flash(f"Excel import queued as Job #{job.id}. You can monitor progress in Import Centre or Operations Centre.", "success")
+        try:
+            from app.jobs import run_job
+            run_job(job, worker_id="web-inline")
+            flash(f"Excel import Job #{job.id} completed. Figures were allocated and calculations were updated.", "success")
+        except Exception as exc:
+            current_app.logger.exception("Inline Excel import Job %s failed", job.id)
+            flash(f"Excel import Job #{job.id} could not complete automatically: {exc}", "danger")
         return redirect(url_for("admin.import_centre_detail", job_id=job.id))
 
     return render_template("monthly/import_excel.html", result=None)
@@ -1401,7 +1452,16 @@ def import_pdf():
 
         log_action("Monthly Figures", "Queued PDF monthly import", f"Job {job.id}: {file_storage.filename}; Period: {selected_year}-{selected_month:02d}")
         db.session.commit()
-        flash(f"PDF import queued as Job #{job.id}. It will publish after validation and royalty recalculation.", "success")
+        try:
+            from app.jobs import run_job
+            run_job(job, worker_id="web-inline")
+            if job.status == "completed":
+                flash(f"PDF import Job #{job.id} completed. The figures were allocated to the matched franchise and all calculations were updated.", "success")
+            else:
+                flash(f"PDF import Job #{job.id} finished with status: {job.status}. Review the Import Centre details.", "warning")
+        except Exception as exc:
+            current_app.logger.exception("Inline PDF import Job %s failed", job.id)
+            flash(f"PDF import Job #{job.id} could not complete automatically: {exc}", "danger")
         return redirect(url_for("admin.import_centre_detail", job_id=job.id))
 
     default_month, default_year = None, None
