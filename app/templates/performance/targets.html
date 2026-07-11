@@ -15,8 +15,12 @@
 <form class="filter-bar compact-filter-bar" method="get">
     <label>Month<select name="month">{% for value, label in month_options %}<option value="{{ value }}" {% if value == selected_month %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
     <label>Year<select name="year">{% for value in year_options %}<option value="{{ value }}" {% if value == selected_year %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
-    <button class="btn" type="submit">Load</button>
+    <label class="filter-grow">Franchise<input type="search" name="q" value="{{ search }}" placeholder="Search franchise"></label>
+    <label>Rows<select name="per_page"><option value="10" {% if per_page == 10 %}selected{% endif %}>10</option><option value="20" {% if per_page == 20 %}selected{% endif %}>20</option><option value="50" {% if per_page == 50 %}selected{% endif %}>50</option></select></label>
+    <button class="btn" type="submit">Apply</button>
+    <a class="btn secondary" href="{{ url_for('performance.targets', month=selected_month, year=selected_year) }}">Reset</a>
 </form>
+<div class="result-summary"><strong>{{ total }}</strong> franchises found. Showing page {{ page }} of {{ pages }}.</div>
 
 <form class="filter-bar compact-filter-bar target-action-bar" method="post" action="{{ url_for('performance.generate_targets') }}">
     <input type="hidden" name="month" value="{{ selected_month }}">
@@ -26,6 +30,11 @@
 </form>
 
 <form method="post">
+<input type="hidden" name="month" value="{{ selected_month }}">
+<input type="hidden" name="year" value="{{ selected_year }}">
+<input type="hidden" name="q" value="{{ search }}">
+<input type="hidden" name="page" value="{{ page }}">
+<input type="hidden" name="per_page" value="{{ per_page }}">
 <div class="table-responsive">
 <table class="data-table">
 <thead>
@@ -58,6 +67,12 @@
 </tbody>
 </table>
 </div>
-<div class="sticky-form-actions"><button class="btn" type="submit">Save Manual Targets</button></div>
+<div class="pagination-bar">
+    <div>
+        {% if page > 1 %}<a class="btn secondary" href="{{ url_for('performance.targets', month=selected_month, year=selected_year, q=search, page=page-1, per_page=per_page) }}">Previous</a>{% endif %}
+        {% if page < pages %}<a class="btn secondary" href="{{ url_for('performance.targets', month=selected_month, year=selected_year, q=search, page=page+1, per_page=per_page) }}">Next</a>{% endif %}
+    </div>
+    <button class="btn" type="submit">Save This Page</button>
+</div>
 </form>
 {% endblock %}

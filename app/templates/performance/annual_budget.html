@@ -19,20 +19,23 @@
 {% include "performance/_targets_nav.html" %}
 
     <form class="card card-body mb-3" method="get">
-        <div class="row g-2 align-items-end">
-            <div class="col-md-3">
-                <label class="form-label">Budget Year</label>
-                <select class="form-select" name="year">
-                    {% for year in year_options %}
-                    <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
-                    {% endfor %}
+        <div class="analytics-filter-grid">
+            <label>Budget Year
+                <select name="year">
+                    {% for year in year_options %}<option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>{% endfor %}
                 </select>
-            </div>
-            <div class="col-md-3">
-                <button class="btn btn-primary" type="submit">Preview Budget</button>
-            </div>
+            </label>
+            <label class="filter-grow">Franchise
+                <input type="search" name="q" value="{{ search }}" placeholder="Search franchise">
+            </label>
+            <label>Rows
+                <select name="per_page"><option value="5" {% if per_page == 5 %}selected{% endif %}>5</option><option value="10" {% if per_page == 10 %}selected{% endif %}>10</option><option value="25" {% if per_page == 25 %}selected{% endif %}>25</option></select>
+            </label>
+            <button class="btn btn-primary" type="submit">Preview Budget</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('performance.annual_budget', year=selected_year) }}">Reset</a>
         </div>
     </form>
+    <div class="result-summary"><strong>{{ total }}</strong> franchises found. Showing page {{ page }} of {{ pages }}.</div>
 
     <div class="alert alert-info">
         Phase 3 builds a 12-month budget for Cash, Sales, Insurance Premiums, Joinings and Funerals. It uses the previous 3 years to calculate seasonal monthly weights, then applies the correct growth bracket per franchise and KPI.
@@ -87,5 +90,13 @@
     {% else %}
     <div class="alert alert-warning">No franchises available for your current access.</div>
     {% endfor %}
+
+    <div class="pagination-bar">
+        <div>
+            {% if page > 1 %}<a class="btn btn-outline-secondary" href="{{ url_for('performance.annual_budget', year=selected_year, q=search, page=page-1, per_page=per_page) }}">Previous</a>{% endif %}
+            {% if page < pages %}<a class="btn btn-outline-secondary" href="{{ url_for('performance.annual_budget', year=selected_year, q=search, page=page+1, per_page=per_page) }}">Next</a>{% endif %}
+        </div>
+        <span class="text-muted">Page {{ page }} of {{ pages }}</span>
+    </div>
 </div>
 {% endblock %}

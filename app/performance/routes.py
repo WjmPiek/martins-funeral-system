@@ -515,38 +515,54 @@ def insights():
 @login_required
 @permission_required("performance:manage_targets")
 def targets():
-    month, year = selected_period_from_request(request.args)
+    month, year = selected_period_from_request(request.values)
     ids = accessible_franchise_ids()
-    franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all() if ids else []
+    search = (request.values.get("q") or "").strip()
+    page = max(request.values.get("page", 1, type=int) or 1, 1)
+    per_page = min(max(request.values.get("per_page", 20, type=int) or 20, 10), 50)
+
+    query = Franchise.query.filter(Franchise.id.in_(ids)) if ids else Franchise.query.filter(False)
+    if search:
+        query = query.filter(Franchise.business_name.ilike(f"%{search}%"))
+    total = query.count()
+    franchises = query.order_by(Franchise.business_name.asc()).offset((page - 1) * per_page).limit(per_page).all()
+    page_ids = [row.id for row in franchises]
+
     if request.method == "POST":
         saved = 0
         bracket_metrics = {**{"gross_turnover": {"label": "Annual Gross Turnover Scale"}}, **PERFORMANCE_METRICS}
+        existing_rows = FranchiseTarget.query.filter(
+            FranchiseTarget.franchise_id.in_(page_ids),
+            FranchiseTarget.year == year,
+            FranchiseTarget.month == month,
+            FranchiseTarget.metric.in_(list(bracket_metrics.keys())),
+        ).all() if page_ids else []
+        existing = {(row.franchise_id, row.metric): row for row in existing_rows}
         for franchise in franchises:
             for metric_key in bracket_metrics:
                 field = f"target_{franchise.id}_{metric_key}"
+                if field not in request.form:
+                    continue
                 raw_value = (request.form.get(field) or "0").replace("R", "").replace(",", "").strip()
                 try:
                     value = Decimal(raw_value or "0")
                 except Exception:
                     value = Decimal("0")
-                target = FranchiseTarget.query.filter_by(
-                    franchise_id=franchise.id,
-                    metric=metric_key,
-                    year=year,
-                    month=month,
-                ).first()
+                target = existing.get((franchise.id, metric_key))
                 if not target:
                     target = FranchiseTarget(franchise_id=franchise.id, metric=metric_key, year=year, month=month)
                     db.session.add(target)
                 target.target_value = value
                 saved += 1
-        log_action("Performance", "Updated performance targets", f"Targets saved: {saved}; Period: {month_label(month, year)}")
         db.session.commit()
-        flash("Performance targets saved.", "success")
-        return redirect(url_for("performance.targets", month=month, year=year))
-    values = stored_targets(month, year, ids)
-    auto_values = targets_for_period(month, year, ids, "annual_gross_scale", DEFAULT_GROWTH_PERCENT)
-    bracket_plan = target_plan_for_period(month, year, ids)
+        log_action("Performance", "Updated performance targets", f"Targets saved: {saved}; Period: {month_label(month, year)}")
+        flash(f"Saved {saved} target values from this page.", "success")
+        return redirect(url_for("performance.targets", month=month, year=year, q=search, page=page, per_page=per_page))
+
+    values = stored_targets(month, year, page_ids)
+    auto_values = targets_for_period(month, year, page_ids, "annual_gross_scale", DEFAULT_GROWTH_PERCENT)
+    bracket_plan = target_plan_for_period(month, year, page_ids)
+    pages = max((total + per_page - 1) // per_page, 1)
     return render_template(
         "performance/targets.html",
         franchises=franchises,
@@ -559,6 +575,11 @@ def targets():
         selected_month=month,
         selected_year=year,
         selected_period_label=month_label(month, year),
+        search=search,
+        page=page,
+        pages=pages,
+        per_page=per_page,
+        total=total,
     )
 
 
@@ -582,13 +603,24 @@ def annual_budget():
     except Exception:
         target_year = selected_period_from_request(request.args)[1]
     ids = accessible_franchise_ids()
-    franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all() if ids else []
+    search = (request.values.get("q") or "").strip()
+    page = max(request.values.get("page", 1, type=int) or 1, 1)
+    per_page = min(max(request.values.get("per_page", 10, type=int) or 10, 5), 25)
+
     if request.method == "POST":
         saved = save_annual_budget_targets(target_year, ids)
         log_action("Performance", "Generated annual performance budget", f"Targets generated: {saved}; Year: {target_year}")
         flash(f"Generated {saved} monthly budget targets for {target_year}.", "success")
         return redirect(url_for("performance.annual_budget", year=target_year))
-    plan = annual_budget_plan_for_period(target_year, ids)
+
+    query = Franchise.query.filter(Franchise.id.in_(ids)) if ids else Franchise.query.filter(False)
+    if search:
+        query = query.filter(Franchise.business_name.ilike(f"%{search}%"))
+    total = query.count()
+    franchises = query.order_by(Franchise.business_name.asc()).offset((page - 1) * per_page).limit(per_page).all()
+    page_ids = [row.id for row in franchises]
+    plan = annual_budget_plan_for_period(target_year, page_ids)
+    pages = max((total + per_page - 1) // per_page, 1)
     return render_template(
         "performance/annual_budget.html",
         franchises=franchises,
@@ -597,6 +629,11 @@ def annual_budget():
         month_options=MONTHS,
         year_options=reporting_years(),
         selected_year=target_year,
+        search=search,
+        page=page,
+        pages=pages,
+        per_page=per_page,
+        total=total,
     )
 
 
