@@ -520,9 +520,9 @@ def targets():
     franchises = Franchise.query.filter(Franchise.id.in_(ids)).order_by(Franchise.business_name.asc()).all() if ids else []
     if request.method == "POST":
         saved = 0
+        bracket_metrics = {**{"gross_turnover": {"label": "Annual Gross Turnover Scale"}}, **PERFORMANCE_METRICS}
         for franchise in franchises:
-            bracket_metrics = {**{"gross_turnover": {"label": "Annual Gross Turnover Scale"}}, **PERFORMANCE_METRICS}
-        for metric_key in bracket_metrics:
+            for metric_key in bracket_metrics:
                 field = f"target_{franchise.id}_{metric_key}"
                 raw_value = (request.form.get(field) or "0").replace("R", "").replace(",", "").strip()
                 try:

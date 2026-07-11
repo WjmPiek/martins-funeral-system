@@ -1,0 +1,5 @@
+<nav class="subtab-bar target-subtabs" aria-label="Target management sections">
+  <a class="subtab-link {% if target_section == 'monthly' %}active{% endif %}" href="{{ url_for('performance.targets') }}"><strong>Monthly Targets</strong><small>Review and save franchise targets</small></a>
+  <a class="subtab-link {% if target_section == 'scale' %}active{% endif %}" href="{{ url_for('performance.growth_brackets') }}"><strong>Target Scale Bar</strong><small>Adjust SA GDP growth brackets</small></a>
+  <a class="subtab-link {% if target_section == 'annual' %}active{% endif %}" href="{{ url_for('performance.annual_budget') }}"><strong>Annual Targets</strong><small>Generate and review yearly budgets</small></a>
+</nav>

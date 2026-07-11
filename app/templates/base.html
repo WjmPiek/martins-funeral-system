@@ -69,6 +69,7 @@
                             <summary>Monthly Figures <span class="nav-count-badge">5</span></summary>
                             <div class="nav-subtabs">
                                 <a href="{{ url_for('performance.graphs') }}">Performance Graphs</a>
+                                {% if current_user.has_permission('performance:manage_targets') %}<a href="{{ url_for('performance.targets') }}">Targets</a>{% endif %}
                                 <a href="{{ url_for('performance.index') }}">Leaderboard</a>
                                 <a href="{{ url_for('monthly.index') }}">Monthly Figures</a>
                                 <a href="{{ url_for('royalties.index') }}">Royalties</a>
@@ -352,13 +353,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 <script>
-// Close the top-right menu after a link is clicked.
+// Sidebar behavior: persistent on desktop, slide-out on mobile, and one clear active group.
 (function () {
   var menu = document.querySelector('.app-menu');
   if (!menu) return;
   menu.querySelectorAll('a').forEach(function (link) {
-    link.addEventListener('click', function () { menu.open = false; });
+    link.addEventListener('click', function () {
+      if (window.matchMedia('(max-width: 899px)').matches) menu.open = false;
+    });
   });
+  var links = menu.querySelectorAll('.sidebar-nav a');
+  var currentPath = window.location.pathname;
+  var currentSearch = new URLSearchParams(window.location.search);
+  var best = null;
+  links.forEach(function (link) {
+    try {
+      var url = new URL(link.href, window.location.origin);
+      var samePath = url.pathname === currentPath;
+      var linkSection = url.searchParams.get('section');
+      var currentSection = currentSearch.get('section');
+      var exact = samePath && ((!linkSection && !currentSection) || linkSection === currentSection);
+      if (exact && !best) best = link;
+    } catch (e) {}
+  });
+  if (best) {
+    best.classList.add('is-active');
+    var group = best.closest('details.nav-section');
+    if (group) group.open = true;
+  }
 })();
 </script>
 

@@ -8,7 +8,11 @@
     <a class="btn secondary" href="{{ url_for('performance.index', target_mode='growth_bracket') }}">Back to Performance</a>
 </div>
 
-<form method="post">
+{% set target_section = 'scale' %}
+{% include "performance/_targets_nav.html" %}
+<div class="info-banner"><strong>SA GDP Growth Scale Bar</strong><span>Adjust the scale percentages here. The existing target formula and calculation logic are not changed.</span></div>
+
+<form method="post" class="target-scale-form">
 {% for metric_key, metric in metrics.items() %}
 <div class="panel-card" style="margin-bottom: 1rem;">
     <h2>{{ metric.label }}</h2>
@@ -34,6 +38,6 @@
     </div>
 </div>
 {% endfor %}
-<button class="btn" type="submit">Save Growth Brackets</button>
+<div class="sticky-form-actions"><button class="btn" type="submit">Save Target Scale Bar</button></div>
 </form>
 {% endblock %}
