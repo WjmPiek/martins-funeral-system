@@ -443,6 +443,18 @@ def filter_active_franchise_ids(franchise_ids, include_inactive=False):
 
 
 def accessible_franchise_ids(include_inactive=False):
+    """Return the request user's franchise scope.
+
+    CLI and background jobs must pass explicit franchise IDs to calculation
+    functions.  When no HTTP request exists, return all active franchises as a
+    safe maintenance scope instead of touching Flask-Login/session proxies.
+    """
+    if not has_request_context():
+        query = Franchise.query.order_by(Franchise.id)
+        if not include_inactive:
+            query = query.filter(Franchise.is_performance_active == True)
+        return [franchise.id for franchise in query.all()]
+
     selected = get_selected_franchise()
     if selected and is_franchise_view_mode():
         ids = [selected.id]
