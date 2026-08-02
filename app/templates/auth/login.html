@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block auth_content %}
 <section class="card narrow">
+    <img class="login-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Martins logo">
+    <div class="login-brand-copy">
+        <strong>Martins System</strong>
+        <span>Funeral System</span>
+    </div>
     <h1>Login</h1>
     <form method="post">
         <label>Email address</label>
