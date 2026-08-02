@@ -36,16 +36,18 @@ a {
 }
 
 .auth-container {
+  min-height: 100vh !important;
   max-width: none !important;
   margin: 0 !important;
-  padding: 72px 16px 32px !important;
+  padding: 24px 16px !important;
+  display: grid !important;
+  place-items: center !important;
 }
 
 .login-card {
-  width: min(100%, 1120px) !important;
+  width: min(100%, 430px) !important;
   margin: 0 auto !important;
-  padding: 0 !important;
-  overflow: hidden !important;
+  padding: 34px 30px 28px !important;
   background: var(--martins-card) !important;
   border: 1px solid var(--martins-border) !important;
   border-radius: 12px !important;
@@ -53,6 +55,7 @@ a {
 }
 
 .login-card-header {
+  display: none !important;
   width: 100% !important;
   padding: 24px 28px !important;
   text-align: center !important;
@@ -76,14 +79,14 @@ a {
 .login-card-body {
   display: grid !important;
   justify-items: center !important;
-  padding: 30px 24px 34px !important;
+  padding: 0 !important;
 }
 
 .login-branding {
   display: grid !important;
   justify-items: center !important;
   gap: 8px !important;
-  margin: 0 0 22px !important;
+  margin: 0 0 28px !important;
   text-align: center !important;
 }
 
@@ -108,11 +111,12 @@ a {
 }
 
 .login-form {
-  width: min(100%, 430px) !important;
+  width: 100% !important;
   margin: 0 !important;
 }
 
 .login-form label {
+  display: block !important;
   margin: 14px 0 6px !important;
   color: var(--martins-text) !important;
 }
@@ -146,6 +150,12 @@ button, .btn, input[type="submit"], .button-auto {
   box-shadow: none !important;
 }
 
+.login-form button {
+  width: 100% !important;
+  margin-top: 18px !important;
+  border-radius: 8px !important;
+}
+
 button.danger, .btn.danger, .danger-btn {
   background: var(--martins-primary-dark) !important;
   border-color: var(--martins-primary-dark) !important;
@@ -166,11 +176,21 @@ button:hover, .btn:hover, input[type="submit"]:hover, .button-auto:hover {
 
 .login-links {
   display: flex !important;
-  justify-content: center !important;
+  justify-content: space-between !important;
   gap: 18px !important;
   flex-wrap: wrap !important;
   margin-top: 18px !important;
   font-weight: 700 !important;
+}
+
+.login-links a {
+  color: var(--martins-primary) !important;
+  text-decoration: none !important;
+}
+
+.login-links a:hover {
+  color: var(--martins-primary-dark) !important;
+  text-decoration: underline !important;
 }
 
 .app-shell,
@@ -361,8 +381,8 @@ td {
     padding: 16px !important;
   }
 
-  .login-card-body {
-    padding: 24px 16px 28px !important;
+  .login-card {
+    padding: 28px 20px 24px !important;
   }
 
   .login-card-header {
