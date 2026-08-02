@@ -1,29 +1,42 @@
 {% extends "base.html" %}
 {% block auth_content %}
-<section class="card narrow login-card">
-    <div class="login-branding" aria-label="Martins Funerals">
-        <img
-            class="login-logo"
-            src="{{ brand_logo_url }}"
-            alt="Martins Funerals logo"
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-            onerror="this.onerror=null;this.src='{{ brand_logo_fallback_url }}';"
-        >
+<section class="login-card" aria-label="Martins login">
+    <header class="login-card-header">
+        <h1>Martins Login</h1>
+        <p>Martins Funeral System</p>
+    </header>
+
+    <div class="login-card-body">
+        <div class="login-branding" aria-label="Martins System">
+            <img
+                class="login-logo"
+                src="{{ brand_logo_url }}"
+                alt="Martins logo"
+                width="220"
+                height="100"
+                loading="eager"
+                decoding="async"
+                fetchpriority="high"
+                onerror="this.onerror=null;this.src='{{ brand_logo_fallback_url }}';"
+            >
+            <h2>Martins System</h2>
+            <p>Martins Funeral System</p>
+        </div>
+
+        <form method="post" class="login-form">
+            <label for="login-email">Email address</label>
+            <input id="login-email" type="email" name="email" autocomplete="email" required>
+
+            <label for="login-password">Password</label>
+            <input id="login-password" type="password" name="password" autocomplete="current-password" required>
+
+            <button type="submit">Login</button>
+        </form>
+
+        <div class="login-links">
+            <a href="{{ url_for('auth.forgot_password') }}">Forgot password?</a>
+            <a href="{{ url_for('auth.register') }}">Register</a>
+        </div>
     </div>
-    <h1>Martins Funerals System</h1>
-    <p class="login-subtitle">Sign in to continue</p>
-    <form method="post">
-        <label>Email address</label>
-        <input type="email" name="email" required>
-
-        <label>Password</label>
-        <input type="password" name="password" required>
-
-        <button type="submit">Login</button>
-    </form>
-    <p><a href="{{ url_for('auth.forgot_password') }}">Forgot password?</a></p>
-    <p>No account yet? <a href="{{ url_for('auth.register') }}">Register here</a></p>
 </section>
 {% endblock %}

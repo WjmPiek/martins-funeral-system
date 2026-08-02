@@ -60,6 +60,7 @@ def create_app(config_class=Config):
     mail.init_app(app)
 
     login_manager.login_view = "auth.login"
+    login_manager.login_message = None
     login_manager.login_message_category = "warning"
 
     from app.auth.routes import auth_bp

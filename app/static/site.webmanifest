@@ -1,12 +1,12 @@
 {
-  "name": "Martins Funerals System",
+  "name": "Martins System",
   "short_name": "Martins System",
-  "description": "Martins Funerals System",
+  "description": "Martins Funeral System",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#5f4598",
+  "background_color": "#f7f8fb",
+  "theme_color": "#6B4AA0",
   "icons": [
     {
       "src": "/static/img/app-icon-192.png",
