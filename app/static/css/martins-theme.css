@@ -45,7 +45,8 @@ a {
 }
 
 .login-card {
-  width: min(100%, 430px) !important;
+  width: min(100%, 360px) !important;
+  max-width: 360px !important;
   margin: 0 auto !important;
   padding: 34px 30px 28px !important;
   background: var(--martins-card) !important;
@@ -383,6 +384,8 @@ td {
 
   .login-card {
     padding: 28px 20px 24px !important;
+    width: min(100%, 340px) !important;
+    max-width: 340px !important;
   }
 
   .login-card-header {
@@ -393,4 +396,18 @@ td {
   .sidebar-nav {
     background: var(--martins-primary) !important;
   }
+}
+
+/* Keep the auth card compact even if an older login template is still rendered. */
+.auth-container > .login-card,
+.auth-container .login-card {
+  width: min(100%, 360px) !important;
+  max-width: 360px !important;
+}
+
+.auth-container .login-card form,
+.auth-container .login-form,
+.auth-container .login-card input,
+.auth-container .login-card button {
+  max-width: 100% !important;
 }
