@@ -152,7 +152,9 @@ def calculate_base(monthly_figure, franchise: Franchise | None, *, method: str |
     sales = calculate_sales(monthly_figure)
     selected_method = method or select_royalty_method(franchise)[0]
     if selected_method == "new":
-        base = sales + decimal_value(getattr(monthly_figure, "admin_fee", 0))
+        admin_fee = decimal_value(getattr(monthly_figure, "insurance_receipts", 0)) - decimal_value(getattr(monthly_figure, "insurance_payover", 0))
+        base = sales + admin_fee
+        return base
     else:
         notes = (getattr(monthly_figure, "notes", "") or "").lower()
         imported_base = max(
@@ -288,7 +290,10 @@ def get_royalty_scales(franchise: Franchise | None):
 
 
 def calculate_royalty_amount(franchise: Franchise | None, royalty_base: Decimal):
-    royalty_base = max(decimal_value(royalty_base), Decimal("0"))
+    royalty_base = decimal_value(royalty_base)
+    if royalty_base <= 0:
+        minimum = decimal_value(getattr(franchise, "minimum_royalty_amount", 0)) if franchise else Decimal("0")
+        return Decimal("0"), Decimal("0"), minimum, False, franchise, "non_positive_base", [], []
     scales, source_franchise, source_label = get_royalty_scales(franchise)
     percentage = Decimal("0")
     matched_scale = None
@@ -333,8 +338,6 @@ def calculate_monthly_figure(monthly_figure) -> RoyaltyResult:
 
     sales = calculate_sales(monthly_figure)
     admin_fee = decimal_value(getattr(monthly_figure, "insurance_receipts", 0)) - decimal_value(getattr(monthly_figure, "insurance_payover", 0))
-    if admin_fee < 0:
-        admin_fee = Decimal("0")
     cash = sales + decimal_value(getattr(monthly_figure, "insurance_receipts", 0))
 
     # Keep compatibility fields synchronized.
