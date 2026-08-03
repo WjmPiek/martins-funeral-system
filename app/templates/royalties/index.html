@@ -142,10 +142,8 @@
                 <td><strong>{{ source.period_label }}</strong></td>
                 <td>{% set method = source.gross_method if source.gross_method is defined else (source.franchise.royalty_gross_method if source.franchise else 'old') %}{% if method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
                 <td>{{ source.gross_revenue|rand }}</td>
-                <td colspan="2">
-                  <strong>Grouped under {{ source.grouped_royalty_main_name or figures[0].franchise.business_name }}</strong><br>
-                  <small class="muted">Group total: {{ '%.2f'|format(figures[0].royalty_percentage|float) }}% · {{ figures[0].royalty_amount|rand }}</small>
-                </td>
+                <td>{{ '%.2f'|format(source.royalty_percentage|float) }}%</td>
+                <td><strong>{{ source.royalty_amount|rand }}</strong></td>
                 <td>{{ source.cash|rand }}</td>
                 <td>{{ source.admin_fee|rand }}</td>
                 <td>{{ source.insurance_receipts|rand }}</td>
@@ -205,12 +203,8 @@
           <td><span class="badge {% if item.status == 'Royalty Locked' %}success{% elif item.status == 'Royalty Approved' %}warning{% endif %}">{{ 'Calc' if item.status == 'Calculated' else item.status }}</span></td>
           <td>{% set method = item.gross_method if item.gross_method is defined else (item.franchise.royalty_gross_method if item.franchise else 'old') %}{% if method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
           <td>{{ item.gross_revenue|rand }}</td>
-          {% if item.grouped_royalty_main_name is defined and item.grouped_royalty_main_name and not item.is_grouped_summary|default(false) and not item.is_grouped|default(false) %}
-            <td colspan="2"><small class="muted">Grouped under {{ item.grouped_royalty_main_name }}</small></td>
-          {% else %}
-            <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
-            <td><strong>{{ item.royalty_amount|rand }}</strong></td>
-          {% endif %}
+          <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
+          <td><strong>{{ item.royalty_amount|rand }}</strong></td>
           <td>{% if item.minimum_royalty_applied %}<span class="badge warning">Yes</span>{% else %}No{% endif %}</td>
           <td>{{ item.cash|rand }}</td>
           <td>{{ item.admin_fee|rand }}</td>

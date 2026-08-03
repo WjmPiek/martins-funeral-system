@@ -146,11 +146,12 @@ def _append_note(row, note):
 
 
 def apply_grouped_royalties_for_period(month, year, touched_franchise_ids=None):
-    """Roll linked franchise rows into the primary franchise for royalty billing.
+    """Calculate branch rows and the grouped royalty billing total.
 
-    Franchise grouping is controlled by user_franchises.is_primary.  The primary
-    linked franchise is the main Business Name, and its royalty method/scale are
-    used for the combined monthly figures of every linked branch in that group.
+    Every linked franchise keeps its own calculated figures for audit/reporting.
+    The main franchise row also stores the grouped total so downstream exports
+    and approval flows can bill the combined group against the main franchise's
+    royalty method and agreement scale.
     """
     from app.royalty_engine import calculate_monthly_figure
 
@@ -169,6 +170,10 @@ def apply_grouped_royalties_for_period(month, year, touched_franchise_ids=None):
             continue
 
         rows_by_franchise = {row.franchise_id: row for row in rows}
+        for row in rows:
+            calculate_monthly_figure(row)
+            updated += 1
+
         main_row = rows_by_franchise.get(main.id)
         if not main_row:
             main_row = MonthlyFigure(franchise_id=main.id, month=month, year=year, status="Published")
@@ -200,13 +205,4 @@ def apply_grouped_royalties_for_period(month, year, touched_franchise_ids=None):
         main_row.royalty_review = result
         grouped += 1
         updated += 1
-
-        for row in rows:
-            if row.franchise_id == main.id:
-                continue
-            row.royalty_percentage = Decimal("0")
-            row.royalty_amount = Decimal("0")
-            row.minimum_royalty_applied = False
-            _append_note(row, f"Royalty grouped under main franchise: {main.business_name}.")
-            updated += 1
     return {"groups": grouped, "rows": updated}

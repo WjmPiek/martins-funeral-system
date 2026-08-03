@@ -20,6 +20,7 @@ from app.extensions import db
 from app.franchise.routes import get_or_create_franchise
 from app.franchise_context import get_selected_franchise, get_accessible_franchises, is_privileged_user, is_franchise_view_mode
 from app.models import MonthlyFigure, RoyaltyScale, Franchise, User, Role, user_franchises
+from app.grouped_royalties import ordered_linked_franchises_for_user
 
 monthly_bp = Blueprint("monthly", __name__, url_prefix="/monthly-figures")
 
@@ -160,20 +161,7 @@ def is_franchise_side_user():
 
 
 def get_ordered_linked_franchises_for_user(user):
-    linked = list(getattr(user, "assigned_franchises", []) or [])
-    if not linked:
-        return []
-    primary_id = db.session.execute(
-        db.select(user_franchises.c.franchise_id)
-        .where(user_franchises.c.user_id == user.id)
-        .where(user_franchises.c.is_primary == True)
-    ).scalar()
-    linked_sorted = sorted(linked, key=lambda item: item.business_name or "")
-    if primary_id:
-        primary = [item for item in linked_sorted if item.id == primary_id]
-        rest = [item for item in linked_sorted if item.id != primary_id]
-        return primary + rest
-    return linked_sorted
+    return ordered_linked_franchises_for_user(user)
 
 
 def get_group_user_for_selected_franchise(selected_franchise):
@@ -222,7 +210,13 @@ def build_grouped_monthly_totals(figures, main_franchise, selected_month, select
     grouped.cash_sales = total("cash_sales")
     grouped.tombstone_receipts = total("tombstone_receipts")
     grouped.obo_service_receipts = total("obo_service_receipts")
-    grouped.sales = total("sales")
+    grouped.sales = (
+        grouped.funeral_receipts
+        + grouped.society_receipts
+        + grouped.cash_sales
+        + grouped.tombstone_receipts
+        + grouped.obo_service_receipts
+    )
     grouped.insurance_receipts = total("insurance_receipts")
     grouped.insurance_payover = total("insurance_payover")
     grouped.admin_fee = total("admin_fee")
