@@ -857,9 +857,8 @@ def comparison_value(franchise_id, metric_key, month, year, comparison):
 def franchise_metric_summary(franchise_id, month, year, mode="manual", growth_percent=DEFAULT_GROWTH_PERCENT):
     stored_rows = stored_results_for_period(month, year, [franchise_id]).get(franchise_id, {})
     use_stored = bool(stored_rows)
-    if not use_stored:
-        actuals = period_actuals(month, year, [franchise_id]).get(franchise_id, {})
-        targets = targets_for_period(month, year, [franchise_id], mode, growth_percent).get(franchise_id, {})
+    actuals = period_actuals(month, year, [franchise_id]).get(franchise_id, {})
+    targets = targets_for_period(month, year, [franchise_id], mode, growth_percent).get(franchise_id, {})
     rows = []
     for metric_key, config in PERFORMANCE_METRICS.items():
         bracket_details = bracket_target_details(franchise_id, metric_key, month, year)
