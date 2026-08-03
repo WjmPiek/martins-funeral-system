@@ -57,17 +57,24 @@ def _identity_matched_main_franchise(user, linked):
     return None
 
 
+def identity_main_franchise_for_user(user, candidates=None):
+    candidates = list(candidates or [])
+    main = _identity_matched_main_franchise(user, candidates)
+    if main:
+        return main
+    all_franchises = Franchise.query.order_by(Franchise.business_name).all()
+    return _identity_matched_main_franchise(user, all_franchises)
+
+
 def _ordered_linked_franchises_for_user(user):
     linked = list(getattr(user, "assigned_franchises", []) or [])
-    if not linked:
-        return []
     primary_id = db.session.execute(
         db.select(user_franchises.c.franchise_id)
         .where(user_franchises.c.user_id == user.id)
         .where(user_franchises.c.is_primary == True)
     ).scalar()
     linked_sorted = sorted(linked, key=lambda item: item.business_name or "")
-    identity_main = _identity_matched_main_franchise(user, linked_sorted)
+    identity_main = identity_main_franchise_for_user(user, linked_sorted)
     if identity_main:
         rest = [item for item in linked_sorted if item.id != identity_main.id]
         return [identity_main] + rest
@@ -80,6 +87,29 @@ def _ordered_linked_franchises_for_user(user):
 
 def ordered_linked_franchises_for_user(user):
     return _ordered_linked_franchises_for_user(user)
+
+
+def normalise_franchise_user_links(user, selected_franchises):
+    """Keep a franchise user's Business Name franchise as the main grouped branch."""
+    selected = list(selected_franchises or [])
+    main = identity_main_franchise_for_user(user, selected)
+    if not main:
+        return sorted(selected, key=lambda item: item.business_name or ""), None
+    rest = sorted([item for item in selected if item.id != main.id], key=lambda item: item.business_name or "")
+    return [main] + rest, main
+
+
+def mark_primary_franchise_link(user, main_franchise):
+    if not user or not main_franchise:
+        return
+    db.session.flush()
+    db.session.execute(user_franchises.update().where(user_franchises.c.user_id == user.id).values(is_primary=False))
+    db.session.execute(
+        user_franchises.update()
+        .where(user_franchises.c.user_id == user.id)
+        .where(user_franchises.c.franchise_id == main_franchise.id)
+        .values(is_primary=True)
+    )
 
 
 def grouped_franchise_sets(touched_franchise_ids=None):
