@@ -551,9 +551,31 @@ def reactivate_franchise_performance(franchise_id, user_id=None):
     return franchise
 
 
-def selected_period_from_request(args):
+def default_reporting_period():
+    """Use the latest imported monthly figures as the default reporting period."""
+    cached = _performance_cache()
+    cache_key = ("default_reporting_period",)
+    if cached is not None and cache_key in cached:
+        return cached[cache_key]
+
     now = datetime.now()
-    default_month, default_year = previous_month(now.month, now.year)
+    fallback = previous_month(now.month, now.year)
+    try:
+        latest = (
+            db.session.query(MonthlyFigure.year, MonthlyFigure.month)
+            .order_by(MonthlyFigure.year.desc(), MonthlyFigure.month.desc())
+            .first()
+        )
+        period = (int(latest.month), int(latest.year)) if latest else fallback
+    except Exception:
+        period = fallback
+    if cached is not None:
+        cached[cache_key] = period
+    return period
+
+
+def selected_period_from_request(args):
+    default_month, default_year = default_reporting_period()
     try:
         month = int(args.get("month", default_month))
     except Exception:
