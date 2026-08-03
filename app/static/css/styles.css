@@ -3489,3 +3489,241 @@ td input, td select, td textarea {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* V124 sidebar restore: keep the app-menu content visible on desktop. */
+@media (min-width: 900px) {
+  .app-shell {
+    display: block !important;
+    min-height: 100vh !important;
+  }
+
+  .app-menu {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    display: block !important;
+    width: 290px !important;
+    min-width: 290px !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #6B4AA0 !important;
+    border-right: 1px solid rgba(255,255,255,.16) !important;
+    box-shadow: none !important;
+    z-index: 1200 !important;
+    overflow: visible !important;
+  }
+
+  .app-menu > summary.menu-toggle {
+    display: none !important;
+  }
+
+  .app-menu .menu-panel {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100vh !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #6B4AA0 !important;
+    color: #fff !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    transform: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  .main-panel {
+    margin-left: 290px !important;
+    width: calc(100% - 290px) !important;
+    min-width: 0 !important;
+  }
+}
+
+.sidebar-nav {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
+  background: #6B4AA0 !important;
+  color: #fff !important;
+  padding: 18px 14px 30px !important;
+  gap: 8px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.sidebar-logo {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 128px !important;
+  margin: 0 2px 16px !important;
+  padding: 14px 12px !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 14px !important;
+  background: rgba(255,255,255,.10) !important;
+  color: #fff !important;
+  text-align: center !important;
+  text-decoration: none !important;
+}
+
+.sidebar-logo img {
+  display: block !important;
+  width: 150px !important;
+  max-width: 150px !important;
+  height: auto !important;
+  max-height: 66px !important;
+  object-fit: contain !important;
+}
+
+.sidebar-logo span,
+.sidebar-logo strong,
+.sidebar-logo small {
+  display: block !important;
+  color: #fff !important;
+}
+
+.sidebar-logo strong {
+  font-size: .95rem !important;
+  font-weight: 700 !important;
+}
+
+.sidebar-logo small {
+  font-size: .75rem !important;
+  font-weight: 400 !important;
+  opacity: .8 !important;
+}
+
+.sidebar-nav .nav-primary-link,
+.sidebar-nav .nav-section {
+  display: block !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.sidebar-nav .nav-primary-link > a,
+.sidebar-nav .nav-section > summary {
+  display: grid !important;
+  grid-template-columns: 38px minmax(0,1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-height: 54px !important;
+  padding: 11px 12px !important;
+  border-radius: 12px !important;
+  color: #fff !important;
+  background: rgba(255,255,255,.08) !important;
+  border: 0 !important;
+  list-style: none !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+}
+
+.sidebar-nav .nav-section > summary::-webkit-details-marker {
+  display: none !important;
+}
+
+.sidebar-nav .nav-section > summary::after {
+  content: "›" !important;
+  justify-self: end !important;
+  font-size: 1.2rem !important;
+  color: rgba(255,255,255,.65) !important;
+  transform: rotate(90deg) !important;
+}
+
+.sidebar-nav .nav-section:not([open]) > summary::after {
+  transform: rotate(0deg) !important;
+}
+
+.sidebar-nav .nav-icon {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  border-radius: 10px !important;
+  background: rgba(255,255,255,.13) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+
+.sidebar-nav strong {
+  color: #fff !important;
+  font-size: .9rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+.sidebar-nav small {
+  display: block !important;
+  margin-top: 2px !important;
+  color: rgba(255,255,255,.68) !important;
+  font-size: .7rem !important;
+  font-weight: 400 !important;
+  line-height: 1.25 !important;
+}
+
+.sidebar-nav .nav-section[open] > summary,
+.sidebar-nav .nav-primary-link > a.is-active,
+.sidebar-nav .nav-primary-link > a:hover,
+.sidebar-nav .nav-section > summary:hover {
+  background: rgba(255,255,255,.16) !important;
+  color: #fff !important;
+}
+
+.sidebar-nav .nav-subtabs {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  margin: 8px 0 12px !important;
+  padding: 10px !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+}
+
+.sidebar-nav .nav-subtabs a,
+.sidebar-nav .nav-utility-links a {
+  display: block !important;
+  padding: 9px 10px !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #18202a !important;
+  font-size: .82rem !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.sidebar-nav .nav-subtabs a small,
+.sidebar-nav .nav-utility-links a small {
+  color: #64707d !important;
+}
+
+.sidebar-nav .nav-subtabs a:hover,
+.sidebar-nav .nav-subtabs a.is-active,
+.sidebar-nav .nav-subtabs a.active,
+.sidebar-nav a.is-active {
+  background: #f1ecf7 !important;
+  color: #6B4AA0 !important;
+  box-shadow: none !important;
+}
+
+.sidebar-nav .nav-subtabs a.is-active small,
+.sidebar-nav a.is-active small {
+  color: #8f73bd !important;
+}
+
+@media (max-width: 899px) {
+  .app-menu .menu-panel {
+    background: #6B4AA0 !important;
+  }
+}
