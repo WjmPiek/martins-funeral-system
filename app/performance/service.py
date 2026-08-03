@@ -602,6 +602,8 @@ def reporting_years():
 
 
 def metric_field(metric_key):
+    if metric_key == "funerals":
+        return func.coalesce(func.nullif(MonthlyFigure.number_of_funerals, 0), MonthlyFigure.mf_files, 0)
     return getattr(MonthlyFigure, PERFORMANCE_METRICS[metric_key]["source_field"])
 
 
@@ -861,7 +863,7 @@ def franchise_metric_summary(franchise_id, month, year, mode="manual", growth_pe
     rows = []
     for metric_key, config in PERFORMANCE_METRICS.items():
         bracket_details = bracket_target_details(franchise_id, metric_key, month, year)
-        if use_stored and metric_key in stored_rows:
+        if use_stored and metric_key != "funerals" and metric_key in stored_rows:
             result = stored_rows[metric_key]
             actual = to_decimal(result.actual_value)
             target = to_decimal(result.target_value)
@@ -950,7 +952,7 @@ def ranked_performance(month, year, franchise_ids, mode="manual", growth_percent
     franchises = _cached_value(("franchises", _ids_key(franchise_ids)), load_franchises)
 
     stored_by = stored_results_for_period(month, year, franchise_ids)
-    use_stored = any(stored_by.get(franchise.id) for franchise in franchises)
+    use_stored = metric_key != "funerals" and any(stored_by.get(franchise.id) for franchise in franchises)
     if not use_stored:
         actuals_by = period_actuals(month, year, franchise_ids)
         targets_by = targets_for_period(month, year, franchise_ids, mode, growth_percent)
@@ -1321,7 +1323,7 @@ def metric_page_summary(metric_key, month, year, franchise_ids, mode="growth_bra
         ranked_performance(previous_m, previous_y, franchise_ids, mode, growth_percent, metric_key),
     )
     stored = stored_results_for_period(month, year, franchise_ids, [metric_key])
-    if any(stored.get(fid, {}).get(metric_key) for fid in franchise_ids):
+    if metric_key != "funerals" and any(stored.get(fid, {}).get(metric_key) for fid in franchise_ids):
         total_actual = sum((to_decimal(stored.get(fid, {}).get(metric_key).actual_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)), Decimal("0"))
         total_target = sum((to_decimal(stored.get(fid, {}).get(metric_key).target_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)), Decimal("0"))
         previous_total = sum((to_decimal(stored.get(fid, {}).get(metric_key).previous_month_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)), Decimal("0"))
@@ -2261,3 +2263,5 @@ def warm_performance_cache_for_period(month, year, franchise_ids=None, mode='ann
             graph_engine_payload(fid, metric_key, month, year, 12, mode, growth_percent)
             cache_rows += 1
     return {'invalidated': invalidated, 'performance_rows': int(performance_rows or 0), 'cache_rows': cache_rows}
+
+
