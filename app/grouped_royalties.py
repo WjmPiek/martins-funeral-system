@@ -146,12 +146,10 @@ def _append_note(row, note):
 
 
 def apply_grouped_royalties_for_period(month, year, touched_franchise_ids=None):
-    """Calculate branch rows and the grouped royalty billing total.
+    """Calculate branch rows without replacing them with grouped totals.
 
-    Every linked franchise keeps its own calculated figures for audit/reporting.
-    The main franchise row also stores the grouped total so downstream exports
-    and approval flows can bill the combined group against the main franchise's
-    royalty method and agreement scale.
+    Grouped totals are built as virtual rows in the monthly/royalty views so
+    each franchise still shows its own imported figures and calculated royalty.
     """
     from app.royalty_engine import calculate_monthly_figure
 
@@ -174,35 +172,5 @@ def apply_grouped_royalties_for_period(month, year, touched_franchise_ids=None):
             calculate_monthly_figure(row)
             updated += 1
 
-        main_row = rows_by_franchise.get(main.id)
-        if not main_row:
-            main_row = MonthlyFigure(franchise_id=main.id, month=month, year=year, status="Published")
-            db.session.add(main_row)
-            rows.append(main_row)
-            rows_by_franchise[main.id] = main_row
-
-        grouped_row = SimpleNamespace(
-            franchise=main,
-            franchise_id=main.id,
-            month=month,
-            year=year,
-        )
-        for field in SUM_MONEY_FIELDS:
-            setattr(grouped_row, field, _money_total(rows, field))
-        for field in SUM_COUNT_FIELDS:
-            setattr(grouped_row, field, _count_total(rows, field))
-        grouped_row.number_of_funerals = int(getattr(grouped_row, "mf_files", 0) or getattr(grouped_row, "number_of_funerals", 0) or 0)
-        main_row.status = "Published" if main_row.status in {"Draft", "Imported", "Calculated"} else main_row.status
-        _append_note(main_row, "Grouped royalty total: linked branches calculated under this main franchise user.")
-
-        result = calculate_monthly_figure(grouped_row)
-        main_row.gross_turnover = grouped_row.gross_turnover
-        main_row.gross_revenue = grouped_row.gross_revenue
-        main_row.gross_method = grouped_row.gross_method
-        main_row.royalty_percentage = grouped_row.royalty_percentage
-        main_row.royalty_amount = grouped_row.royalty_amount
-        main_row.minimum_royalty_applied = grouped_row.minimum_royalty_applied
-        main_row.royalty_review = result
         grouped += 1
-        updated += 1
     return {"groups": grouped, "rows": updated}

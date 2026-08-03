@@ -154,7 +154,15 @@ def calculate_base(monthly_figure, franchise: Franchise | None, *, method: str |
     if selected_method == "new":
         base = sales + decimal_value(getattr(monthly_figure, "admin_fee", 0))
     else:
-        base = sales + decimal_value(getattr(monthly_figure, "insurance_receipts", 0))
+        notes = (getattr(monthly_figure, "notes", "") or "").lower()
+        imported_base = max(
+            decimal_value(getattr(monthly_figure, "gross_turnover", 0)),
+            decimal_value(getattr(monthly_figure, "gross_revenue", 0)),
+        )
+        calculated_base = sales + decimal_value(getattr(monthly_figure, "insurance_receipts", 0))
+        if "grouped royalty total" in notes:
+            imported_base = Decimal("0")
+        base = imported_base if imported_base > 0 else calculated_base
     return max(base, Decimal("0"))
 
 

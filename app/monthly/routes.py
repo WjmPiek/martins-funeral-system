@@ -345,6 +345,12 @@ def calculate_royalty_base(monthly_figure, franchise):
         period_month=getattr(monthly_figure, "month", None),
         period_year=getattr(monthly_figure, "year", None),
     )[0]
+    source_figures = getattr(monthly_figure, "source_figures", None)
+    if method == "old" and source_figures:
+        return sum(
+            calculate_base(item, getattr(item, "franchise", None), method="old")
+            for item in source_figures
+        ), method
     return calculate_base(monthly_figure, franchise, method=method), method
 
 def normalize_franchise_name_for_royalties(value):
