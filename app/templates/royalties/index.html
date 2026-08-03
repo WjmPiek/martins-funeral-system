@@ -180,7 +180,6 @@
           <th>Admin Fee</th>
           <th>Insurance Receipts</th>
           <th>Insurance Payover</th>
-          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -198,24 +197,27 @@
           <td>{{ item.admin_fee|rand }}</td>
           <td>{{ item.insurance_receipts|rand }}</td>
           <td>{{ item.insurance_payover|rand }}</td>
-          <td>
-            {% if item.is_grouped|default(false) %}
-              <span class="muted">Grouped calculation</span>
-            {% else %}
-            <div class="button-row">
-              <a class="btn small secondary" href="{{ url_for('monthly.export_pdf', figure_id=item.id) }}">PDF</a>
-              {% if item.status not in ['Royalty Approved', 'Royalty Locked'] and (current_user.has_permission('royalties:approve')) %}
-                <form method="post" action="{{ url_for('royalties.approve', figure_id=item.id) }}"><button class="small" type="submit">Approve</button></form>
-              {% endif %}
-              {% if item.status == 'Royalty Approved' and (current_user.has_permission('royalties:approve')) %}
-                <form method="post" action="{{ url_for('royalties.lock', figure_id=item.id) }}"><button class="small" type="submit">Lock</button></form>
+        </tr>
+        <tr class="royalty-action-row">
+          <td colspan="12">
+            <div class="royalty-row-actions">
+              <span class="royalty-action-label">Actions for {{ item.franchise.business_name if item.franchise else 'royalty record' }}</span>
+              {% if item.is_grouped|default(false) %}
+                <span class="muted">Grouped calculation</span>
+              {% else %}
+                <a class="btn small secondary" href="{{ url_for('monthly.export_pdf', figure_id=item.id) }}">PDF</a>
+                {% if item.status not in ['Royalty Approved', 'Royalty Locked'] and (current_user.has_permission('royalties:approve')) %}
+                  <form method="post" action="{{ url_for('royalties.approve', figure_id=item.id) }}"><button class="small" type="submit">Approve</button></form>
+                {% endif %}
+                {% if item.status == 'Royalty Approved' and (current_user.has_permission('royalties:approve')) %}
+                  <form method="post" action="{{ url_for('royalties.lock', figure_id=item.id) }}"><button class="small" type="submit">Lock</button></form>
+                {% endif %}
               {% endif %}
             </div>
-            {% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="13" class="center-cell">No active royalty calculations found for {{ selected_period_label }}.</td></tr>
+        <tr><td colspan="12" class="center-cell">No active royalty calculations found for {{ selected_period_label }}.</td></tr>
         {% endfor %}
       </tbody>
     </table>

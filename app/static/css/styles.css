@@ -2896,3 +2896,106 @@ td input, td select, td textarea {
     min-width: 1180px !important;
   }
 }
+
+/* Royalty Overview v2: keep financial columns in the table, move row actions underneath. */
+.royalties-table th:nth-child(1),
+.royalties-table td:nth-child(1) { width: 5% !important; }
+.royalties-table th:nth-child(2),
+.royalties-table td:nth-child(2) { width: 12% !important; }
+.royalties-table th:nth-child(3),
+.royalties-table td:nth-child(3) { width: 6% !important; text-align: center !important; }
+.royalties-table th:nth-child(4),
+.royalties-table td:nth-child(4) { width: 9% !important; text-align: center !important; }
+.royalties-table th:nth-child(5),
+.royalties-table td:nth-child(5) { width: 9% !important; }
+.royalties-table th:nth-child(6),
+.royalties-table td:nth-child(6) { width: 6% !important; text-align: center !important; }
+.royalties-table th:nth-child(7),
+.royalties-table td:nth-child(7) { width: 9% !important; }
+.royalties-table th:nth-child(8),
+.royalties-table td:nth-child(8) { width: 8% !important; text-align: center !important; }
+.royalties-table th:nth-child(9),
+.royalties-table td:nth-child(9) { width: 9% !important; }
+.royalties-table th:nth-child(10),
+.royalties-table td:nth-child(10) { width: 8.5% !important; }
+.royalties-table th:nth-child(11),
+.royalties-table td:nth-child(11) { width: 9.5% !important; }
+.royalties-table th:nth-child(12),
+.royalties-table td:nth-child(12) { width: 9% !important; }
+.royalties-table .royalty-action-row td {
+  padding: 0 8px 12px !important;
+  background: #fbfafc !important;
+  border-bottom: 1px solid #e8edf2 !important;
+}
+.royalty-row-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  padding: 10px 12px !important;
+  background: #fff !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 10px !important;
+}
+.royalty-action-label {
+  margin-right: auto !important;
+  color: #64707d !important;
+  font-size: .72rem !important;
+  font-weight: 700 !important;
+}
+.royalty-row-actions form {
+  margin: 0 !important;
+}
+.royalty-row-actions .btn,
+.royalty-row-actions button {
+  width: auto !important;
+  min-width: 74px !important;
+  min-height: 34px !important;
+  padding: 7px 12px !important;
+  font-size: .74rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}
+
+/* Keep period/filter cards aligned at the top across royalty side tabs. */
+.page-header.split-header,
+.insights-page-heading {
+  align-items: start !important;
+}
+.page-header.split-header > form,
+.insights-page-heading > form {
+  align-self: start !important;
+  width: min(100%, 520px) !important;
+  min-width: 0 !important;
+  grid-template-columns: repeat(2, minmax(130px, 1fr)) auto !important;
+}
+.page-header.split-header > form button,
+.insights-page-heading > form button {
+  min-width: 150px !important;
+  white-space: nowrap !important;
+}
+.branch-selector-row {
+  display: grid !important;
+  grid-template-columns: auto minmax(320px, 1fr) auto !important;
+  align-items: end !important;
+  gap: 14px !important;
+}
+.branch-selector-row .period-filter-form {
+  justify-self: end !important;
+  width: min(100%, 520px) !important;
+  grid-template-columns: repeat(2, minmax(130px, 1fr)) auto !important;
+}
+@media (max-width: 1150px) {
+  .page-header.split-header > form,
+  .insights-page-heading > form,
+  .branch-selector-row,
+  .branch-selector-row .period-filter-form {
+    width: 100% !important;
+    grid-template-columns: 1fr !important;
+  }
+  .branch-selector-row .period-filter-form {
+    justify-self: stretch !important;
+  }
+}
