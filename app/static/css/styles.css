@@ -3826,3 +3826,13 @@ td input, td select, td textarea {
     grid-template-columns: 1fr !important;
   }
 }
+
+.royalties-table tr.grouped-summary-row td {
+  background: #f6f1fb !important;
+  border-top: 2px solid #8f73bd !important;
+  border-bottom: 2px solid #8f73bd !important;
+}
+
+.royalties-table tr.grouped-summary-row td:first-child {
+  border-left: 4px solid #6B4AA0 !important;
+}

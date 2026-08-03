@@ -12,6 +12,7 @@ from app.audit import log_action
 from app.models import MonthlyFigure, Franchise, User, user_franchises
 from app.monthly.routes import recalculate_figures_for_display, calculate_royalty_base, calculate_royalty
 from app.franchise_context import get_selected_franchise, get_accessible_franchises, is_privileged_user, is_franchise_view_mode
+from app.grouped_royalties import grouped_franchise_sets
 
 royalties_bp = Blueprint("royalties", __name__, url_prefix="/royalties")
 
@@ -127,6 +128,39 @@ def build_grouped_royalty_row(figures, main_franchise, selected_month, selected_
         item.grouped_royalty_percentage = percentage
         item.grouped_royalty_amount = royalty_amount
     return grouped
+
+
+def insert_grouped_summary_rows(figures, selected_month, selected_year):
+    if not figures:
+        return figures
+    rows_by_franchise = {int(item.franchise_id): item for item in figures if getattr(item, "franchise_id", None)}
+    grouped_by_main = {}
+    linked_to_main = {}
+    for group in grouped_franchise_sets(rows_by_franchise.keys()):
+        main = group["main"]
+        linked = group["linked"]
+        linked_rows = [rows_by_franchise[franchise.id] for franchise in linked if franchise.id in rows_by_franchise]
+        if len(linked_rows) < 2 or main.id not in rows_by_franchise:
+            continue
+        grouped = build_grouped_royalty_row(linked_rows, main, selected_month, selected_year)
+        if not grouped:
+            continue
+        grouped.is_grouped_summary = True
+        grouped.status = "Grouped Total"
+        grouped_by_main[int(main.id)] = grouped
+        for franchise in linked:
+            if franchise.id != main.id:
+                linked_to_main[int(franchise.id)] = main.business_name
+
+    output = []
+    for item in figures:
+        if int(item.franchise_id) in linked_to_main:
+            item.grouped_royalty_main_name = linked_to_main[int(item.franchise_id)]
+        output.append(item)
+        grouped = grouped_by_main.get(int(item.franchise_id))
+        if grouped:
+            output.append(grouped)
+    return output
 
 
 def permission_required(code):
@@ -284,6 +318,8 @@ def get_figures():
         MonthlyFigure.id.desc(),
     ).all()
     recalculate_figures_for_display(figures)
+    if show_all_franchises:
+        figures = insert_grouped_summary_rows(figures, selected_month, selected_year)
 
     return figures, selected, accessible_franchises, show_all_franchises, selected_month, selected_year
 
