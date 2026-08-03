@@ -2999,3 +2999,148 @@ td input, td select, td textarea {
     justify-self: stretch !important;
   }
 }
+
+/* Royalty Overview final: style top like Royalty Management, keep original table/actions columns. */
+.royalty-overview-page .section-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  gap: 22px !important;
+  margin: 0 0 22px !important;
+}
+.royalty-overview-page .section-header h1 {
+  margin: 0 !important;
+  color: #1f1930 !important;
+  font-size: clamp(1.8rem, 2.3vw, 2.7rem) !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.035em !important;
+  font-weight: 800 !important;
+}
+.royalty-overview-page .section-header p {
+  max-width: 760px !important;
+  margin: 9px 0 0 !important;
+  color: #6a7280 !important;
+  font-size: 1rem !important;
+  line-height: 1.55 !important;
+}
+.royalty-overview-page .section-header .btn {
+  min-width: 160px !important;
+  min-height: 54px !important;
+  align-self: start !important;
+  border-radius: 12px !important;
+  white-space: nowrap !important;
+}
+.royalty-overview-page .branch-context-card {
+  display: grid !important;
+  grid-template-columns: minmax(260px, 1fr) minmax(420px, 760px) !important;
+  gap: 24px !important;
+  align-items: end !important;
+  min-height: 0 !important;
+  margin: 0 0 24px !important;
+  padding: 28px !important;
+  background: #fff !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 38px rgba(24, 32, 42, .06) !important;
+}
+.royalty-overview-page .branch-context-card > h2,
+.royalty-overview-page .branch-context-card > p {
+  grid-column: 1 !important;
+}
+.royalty-overview-page .branch-context-card h2 {
+  margin: 0 !important;
+  color: #1f1930 !important;
+  font-size: 1.35rem !important;
+  line-height: 1.2 !important;
+  font-weight: 800 !important;
+}
+.royalty-overview-page .branch-context-card > p {
+  margin: 10px 0 0 !important;
+  color: #64707d !important;
+  font-size: .92rem !important;
+  line-height: 1.45 !important;
+}
+.royalty-overview-page .branch-selector-row {
+  grid-column: 2 !important;
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1fr) minmax(330px, auto) auto !important;
+  gap: 14px !important;
+  align-items: end !important;
+  margin: 0 !important;
+}
+.royalty-overview-page .branch-selector-row > label {
+  align-self: center !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+.royalty-overview-page .branch-selector-row > select {
+  min-width: 280px !important;
+  height: 54px !important;
+}
+.royalty-overview-page .branch-selector-row .period-filter-form {
+  justify-self: end !important;
+  width: auto !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(120px, 150px)) auto !important;
+  gap: 0 !important;
+  padding: 18px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 38px rgba(24, 32, 42, .08) !important;
+}
+.royalty-overview-page .period-filter-form select,
+.royalty-overview-page .period-filter-form input {
+  min-height: 54px !important;
+}
+.royalty-overview-page .period-filter-form .btn {
+  min-width: 150px !important;
+  min-height: 54px !important;
+  white-space: nowrap !important;
+}
+.royalty-overview-page .royalties-table {
+  table-layout: auto !important;
+  min-width: 1500px !important;
+}
+.royalty-overview-page .royalties-table th,
+.royalty-overview-page .royalties-table td {
+  padding: 11px 12px !important;
+  font-size: .74rem !important;
+  line-height: 1.22 !important;
+}
+.royalty-overview-page .royalties-table th:nth-child(n),
+.royalty-overview-page .royalties-table td:nth-child(n) {
+  width: auto !important;
+}
+.royalty-overview-page .royalties-table td:nth-child(5),
+.royalty-overview-page .royalties-table td:nth-child(7),
+.royalty-overview-page .royalties-table td:nth-child(9),
+.royalty-overview-page .royalties-table td:nth-child(10),
+.royalty-overview-page .royalties-table td:nth-child(11),
+.royalty-overview-page .royalties-table td:nth-child(12) {
+  white-space: nowrap !important;
+}
+.royalty-overview-page .royalties-table .button-row {
+  justify-content: flex-start !important;
+  flex-wrap: nowrap !important;
+}
+.royalty-overview-page .royalties-table .button-row .btn,
+.royalty-overview-page .royalties-table .button-row button {
+  min-width: 72px !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}
+@media (max-width: 1250px) {
+  .royalty-overview-page .section-header,
+  .royalty-overview-page .branch-context-card,
+  .royalty-overview-page .branch-selector-row,
+  .royalty-overview-page .branch-selector-row .period-filter-form {
+    grid-template-columns: 1fr !important;
+  }
+  .royalty-overview-page .branch-selector-row {
+    grid-column: 1 !important;
+  }
+  .royalty-overview-page .branch-selector-row .period-filter-form {
+    justify-self: stretch !important;
+    width: 100% !important;
+  }
+}
