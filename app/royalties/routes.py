@@ -365,7 +365,23 @@ def export_pdf():
     figures, selected, accessible_franchises, show_all_franchises, selected_month, selected_year = get_figures()
     from app.reports.pdf import build_royalty_history_pdf
     period_label = month_label(selected_month, selected_year)
-    export_franchise = selected or SimpleNamespace(business_name="All Franchises")
+
+    if show_all_franchises:
+        export_franchise = SimpleNamespace(
+            business_name="Martin's Funerals South Africa",
+            franchise_code="MARTINS-SA",
+            pty_number="",
+            vat_number="",
+            office_address="South Africa",
+            office_number="",
+            after_hours_number="",
+            public_email="",
+            franchisee_email="",
+            is_company_profile=True,
+        )
+    else:
+        export_franchise = selected or (figures[0].franchise if figures else SimpleNamespace(business_name="Franchise"))
+
     pdf_path = build_royalty_history_pdf(figures, export_franchise, current_user, period_label=period_label)
     log_action("Royalties", "Exported royalty history PDF", f"{getattr(export_franchise, 'business_name', 'All franchises')} - {period_label}")
     db.session.commit()

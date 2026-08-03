@@ -194,9 +194,12 @@ def _footer(canvas, doc, report_title, franchise):
 
 
 def _info_table(franchise, generated_by, styles, available_width):
+    is_company_profile = getattr(franchise, "is_company_profile", False)
+    name_label = "Company Name" if is_company_profile else "Franchise Name"
+    code_label = "Company Code" if is_company_profile else "Franchise Code"
     rows = [
-        ["Franchise Name", getattr(franchise, "business_name", "")],
-        ["Franchise Code", getattr(franchise, "franchise_code", "")],
+        [name_label, getattr(franchise, "business_name", "")],
+        [code_label, getattr(franchise, "franchise_code", "")],
         ["PTY Number", getattr(franchise, "pty_number", "")],
         ["VAT Number", getattr(franchise, "vat_number", "")],
         ["Address", getattr(franchise, "office_address", "")],
