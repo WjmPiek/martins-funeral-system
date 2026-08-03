@@ -5,6 +5,7 @@ from datetime import datetime
 
 from flask import Blueprint, render_template, redirect, url_for, flash, abort, send_file, request
 from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.audit import log_action
@@ -364,8 +365,11 @@ def export_pdf():
     figures, selected, accessible_franchises, show_all_franchises, selected_month, selected_year = get_figures()
     from app.reports.pdf import build_royalty_history_pdf
     period_label = month_label(selected_month, selected_year)
-    pdf_path = build_royalty_history_pdf(figures, selected or (figures[0].franchise if figures else None), current_user, period_label=period_label)
-    log_action("Royalties", "Exported royalty history PDF", f"{getattr(selected, 'business_name', 'All franchises')} - {period_label}")
+    export_franchise = selected or SimpleNamespace(business_name="All Franchises")
+    pdf_path = build_royalty_history_pdf(figures, export_franchise, current_user, period_label=period_label)
+    log_action("Royalties", "Exported royalty history PDF", f"{getattr(export_franchise, 'business_name', 'All franchises')} - {period_label}")
     db.session.commit()
     safe_label = period_label.lower().replace(" ", "-")
-    return send_file(pdf_path, as_attachment=True, download_name=f"royalty-history-{safe_label}.pdf")
+    franchise_name = getattr(export_franchise, "business_name", None) or "All Franchises"
+    safe_franchise = secure_filename(franchise_name).lower() or "all-franchises"
+    return send_file(pdf_path, as_attachment=True, download_name=f"royalty-history-{safe_franchise}-{safe_label}.pdf")

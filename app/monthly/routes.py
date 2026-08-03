@@ -1595,7 +1595,9 @@ def export_period_pdf():
     log_action("Monthly Figures", "Exported monthly figures period PDF", period_label)
     db.session.commit()
     safe_label = period_label.lower().replace(" ", "-")
-    return send_file(pdf_path, as_attachment=True, download_name=f"monthly-figures-{safe_label}.pdf")
+    franchise_name = getattr(selected, "business_name", None) or "All Franchises"
+    safe_franchise = secure_filename(franchise_name).lower() or "all-franchises"
+    return send_file(pdf_path, as_attachment=True, download_name=f"monthly-figures-{safe_franchise}-{safe_label}.pdf")
 
 
 @monthly_bp.route("/<int:figure_id>/export-pdf")
@@ -1607,4 +1609,6 @@ def export_pdf(figure_id):
     pdf_path = build_monthly_figure_pdf(monthly_figure, current_user)
     log_action("Monthly Figures", "Exported PDF", f"Period: {monthly_figure.period_label}")
     db.session.commit()
-    return send_file(pdf_path, as_attachment=True, download_name=f"monthly-figures-{monthly_figure.period_label}.pdf")
+    franchise_name = getattr(getattr(monthly_figure, "franchise", None), "business_name", None) or "franchise"
+    safe_franchise = secure_filename(franchise_name).lower() or "franchise"
+    return send_file(pdf_path, as_attachment=True, download_name=f"monthly-figures-{safe_franchise}-{monthly_figure.period_label}.pdf")
