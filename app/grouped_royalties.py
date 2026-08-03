@@ -1,4 +1,5 @@
 from decimal import Decimal
+import re
 from types import SimpleNamespace
 
 from app.extensions import db
@@ -19,6 +20,43 @@ SUM_MONEY_FIELDS = (
 SUM_COUNT_FIELDS = ("insurance_joinings", "mf_files", "number_of_funerals")
 
 
+def _identity_key(value):
+    text = (value or "").strip().lower()
+    text = re.sub(r"\([^)]*\)", " ", text)
+    text = re.sub(r"\b(martins?|funerals?|franchise|branch|user|system|pty|ltd)\b", " ", text)
+    text = re.sub(r"[^a-z0-9]+", "", text)
+    return text
+
+
+def _user_identity_keys(user):
+    values = [
+        getattr(user, "business_name", None),
+        getattr(user, "full_name", None),
+        getattr(user, "name", None),
+        getattr(user, "username", None),
+    ]
+    email = getattr(user, "email", None)
+    if email and "@" in email:
+        values.append(email.split("@", 1)[0])
+    keys = {_identity_key(value) for value in values if value}
+    return {key for key in keys if len(key) >= 3}
+
+
+def _identity_matched_main_franchise(user, linked):
+    user_keys = _user_identity_keys(user)
+    if not user_keys:
+        return None
+    for franchise in linked:
+        franchise_key = _identity_key(getattr(franchise, "business_name", None))
+        if not franchise_key:
+            continue
+        if franchise_key in user_keys:
+            return franchise
+        if any(len(key) >= 5 and (franchise_key in key or key in franchise_key) for key in user_keys):
+            return franchise
+    return None
+
+
 def _ordered_linked_franchises_for_user(user):
     linked = list(getattr(user, "assigned_franchises", []) or [])
     if not linked:
@@ -29,11 +67,19 @@ def _ordered_linked_franchises_for_user(user):
         .where(user_franchises.c.is_primary == True)
     ).scalar()
     linked_sorted = sorted(linked, key=lambda item: item.business_name or "")
+    identity_main = _identity_matched_main_franchise(user, linked_sorted)
+    if identity_main:
+        rest = [item for item in linked_sorted if item.id != identity_main.id]
+        return [identity_main] + rest
     if primary_id:
         primary = [item for item in linked_sorted if item.id == primary_id]
         rest = [item for item in linked_sorted if item.id != primary_id]
         return primary + rest
     return linked_sorted
+
+
+def ordered_linked_franchises_for_user(user):
+    return _ordered_linked_franchises_for_user(user)
 
 
 def grouped_franchise_sets(touched_franchise_ids=None):
