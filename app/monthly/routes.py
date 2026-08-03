@@ -453,6 +453,8 @@ def calculate_royalty(franchise, royalty_base):
     return base, percentage, royalty_amount, minimum_applied
 
 def recalculate_monthly_figure(monthly_figure):
+    if int(getattr(monthly_figure, "number_of_funerals", 0) or 0) <= 0 and int(getattr(monthly_figure, "mf_files", 0) or 0) > 0:
+        monthly_figure.number_of_funerals = int(monthly_figure.mf_files or 0)
     from app.royalty_engine import calculate_monthly_figure
     result = calculate_monthly_figure(monthly_figure)
     monthly_figure.royalty_review = result
@@ -1106,6 +1108,7 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
             monthly_figure.insurance_payover = excel_decimal(values.get("insurance_payover"))
             monthly_figure.insurance_joinings = parse_int(values.get("insurance_joinings"))
             monthly_figure.mf_files = parse_int(values.get("mf_files"))
+            monthly_figure.number_of_funerals = monthly_figure.mf_files
             monthly_figure.notes = (
                 f"Imported from Excel workbook: {file_storage.filename}; "
                 f"Sheet: {sheet_title}; Franchise: {franchise_name}; Column: {column}"
@@ -1257,6 +1260,7 @@ def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, 
 
     monthly_figure.insurance_joinings = imported.get("insurance_joinings", 0)
     monthly_figure.mf_files = imported.get("mf_files", 0)
+    monthly_figure.number_of_funerals = monthly_figure.mf_files
     monthly_figure.notes = f"Imported from PDF: {file_storage.filename}"
 
     # Calculate and publish the imported period immediately so Admin, Finance
