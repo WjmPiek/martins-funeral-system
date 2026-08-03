@@ -187,12 +187,12 @@ def kpi(metric_key):
     if selected and selected.id in ids:
         my_row = next((row for row in summary["rows"] if row["franchise_id"] == selected.id), None)
         chart_data = trend_series(selected.id, metric_key, month, year, 12, mode, growth)
-        graph_data = graph_engine_payload(selected.id, metric_key, month, year, 12, mode, growth, allow_rebuild=True)
+        graph_data = graph_engine_payload(selected.id, metric_key, month, year, 12, mode, growth)
     elif not is_privileged_user() and ids:
         first_id = ids[0]
         my_row = next((row for row in summary["rows"] if row["franchise_id"] == first_id), None)
         chart_data = trend_series(first_id, metric_key, month, year, 12, mode, growth)
-        graph_data = graph_engine_payload(first_id, metric_key, month, year, 12, mode, growth, allow_rebuild=True)
+        graph_data = graph_engine_payload(first_id, metric_key, month, year, 12, mode, growth)
     graph_data = locals().get("graph_data")
     return render_template(
         "performance/kpi.html",
@@ -229,7 +229,7 @@ def franchise(franchise_id):
     if chart_metric not in PERFORMANCE_METRICS:
         chart_metric = "cash"
     chart_data = trend_series(franchise_id, chart_metric, month, year, 12, mode, growth)
-    graph_data = graph_engine_payload(franchise_id, chart_metric, month, year, 12, mode, growth, allow_rebuild=True)
+    graph_data = graph_engine_payload(franchise_id, chart_metric, month, year, 12, mode, growth)
     snapshot = dashboard_snapshot(franchise_id, month, year, mode, growth)
     return render_template(
         "performance/franchise.html",
@@ -376,10 +376,10 @@ def graphs_data():
     ensure_performance_results(month, year, ids, mode)
 
     if scope["is_combined_view"]:
-        graph_data = graph_engine_payload_for_franchises(ids, metric_key, month, year, periods, mode, growth, allow_rebuild=True) if ids else None
+        graph_data = graph_engine_payload_for_franchises(ids, metric_key, month, year, periods, mode, growth) if ids else None
     else:
         franchise_id = scope["selected_franchise_id"]
-        graph_data = graph_engine_payload(franchise_id, metric_key, month, year, periods, mode, growth, allow_rebuild=True) if franchise_id else None
+        graph_data = graph_engine_payload(franchise_id, metric_key, month, year, periods, mode, growth) if franchise_id else None
 
     return jsonify({
         "ok": True,

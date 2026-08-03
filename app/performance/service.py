@@ -2253,13 +2253,13 @@ def warm_performance_cache_for_period(month, year, franchise_ids=None, mode='ann
     performance_rows = rebuild_performance_results(month, year, franchise_ids, mode)
     cache_rows = 0
     for metric_key in PERFORMANCE_METRICS.keys():
-        graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, 12, mode, growth_percent)
+        graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, 12, mode, growth_percent, allow_rebuild=True)
         cache_rows += 1
     # Warm each linked branch graph only for the current period. Franchise users
     # then open their own portal from cache instead of doing graph calculations.
     for fid in franchise_ids:
         for metric_key in PERFORMANCE_METRICS.keys():
-            graph_engine_payload(fid, metric_key, month, year, 12, mode, growth_percent)
+            graph_engine_payload(fid, metric_key, month, year, 12, mode, growth_percent, allow_rebuild=True)
             cache_rows += 1
     return {'invalidated': invalidated, 'performance_rows': int(performance_rows or 0), 'cache_rows': cache_rows}
 

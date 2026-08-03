@@ -207,18 +207,23 @@ def run_month_end_import_pipeline(
     except Exception as live_exc:
         current_app.logger.exception('Could not publish live import event: %s', live_exc)
 
-    if report['status'] == 'completed':
-        _stage(progress_job, 96, 'Stage 6/6: publishing performance graphs and leaderboard cache...')
+    if periods and ids:
+        _stage(progress_job, 96, 'Stage 6/6: refreshing performance graphs and leaderboard cache...')
         try:
-            from app.performance.service import rebuild_performance_results, warm_graph_caches_for_period
+            from app.performance.service import warm_performance_cache_for_period
             from app.live import publish_trusted_financials
             for month, year in periods:
-                report['performance_rows'] += int(rebuild_performance_results(month, year, list(ids), 'annual_gross_scale') or 0)
-                warm_graph_caches_for_period(month, year, list(ids), periods=12, mode='annual_gross_scale')
-                publish_trusted_financials(month, year, ids, import_job=progress_job, source='month_end_import', report=report)
+                refreshed = warm_performance_cache_for_period(month, year, list(ids), mode='annual_gross_scale')
+                report['performance_rows'] += int(refreshed.get('performance_rows', 0) or 0)
+                report['performance_cache_rows'] = int(report.get('performance_cache_rows', 0) or 0) + int(refreshed.get('cache_rows', 0) or 0)
+                if report['status'] == 'completed':
+                    publish_trusted_financials(month, year, ids, import_job=progress_job, source='month_end_import', report=report)
             report['published'] = True
-            report['trusted_financials'] = True
-            report['publish_message'] = 'Imported figures are visible. Royalties reconciled. Graphs, leaderboard and performance summaries were refreshed.'
+            report['trusted_financials'] = report['status'] == 'completed'
+            if report['status'] == 'completed':
+                report['publish_message'] = 'Imported figures are visible. Royalties reconciled. Graphs, leaderboard and performance summaries were refreshed.'
+            else:
+                report['publish_message'] = 'Imported figures are visible and performance summaries were refreshed, but trusted publishing is blocked by review items.'
         except Exception as exc:
             current_app.logger.exception('Performance cache rebuild failed in import pipeline: %s', exc)
             report['status'] = 'needs_review'
@@ -237,4 +242,3 @@ def run_month_end_import_pipeline(
         progress_job.message = final_message
         db.session.commit()
     return report
-
