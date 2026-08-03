@@ -1432,6 +1432,47 @@ body.app-body {
   font-size: 0.82rem;
 }
 
+.user-management-modals .modal-role-grid,
+.modal-card .modal-role-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+.user-management-modals .modal-role-option,
+.modal-card .modal-role-option {
+  display: grid !important;
+  grid-template-columns: 22px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-height: 48px !important;
+  padding: 10px 12px !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.user-management-modals .modal-role-option input[type="checkbox"],
+.modal-card .modal-role-option input[type="checkbox"] {
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  margin: 0 !important;
+  justify-self: center !important;
+}
+
+.user-management-modals .modal-role-option span,
+.modal-card .modal-role-option span {
+  display: block !important;
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+  white-space: normal !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+}
+
 /* Nested sidebar menu with red numbered badges */
 .nav-section {
     display: block;
