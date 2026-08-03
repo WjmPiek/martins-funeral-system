@@ -4000,3 +4000,267 @@ td input, td select, td textarea {
     min-width: 1280px !important;
   }
 }
+
+/* Franchise user dashboard: align with the Martins professional visual system. */
+.page-section > .section-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 18px !important;
+  margin-bottom: 24px !important;
+}
+
+.page-section > .section-header h1 {
+  margin: 0 0 8px !important;
+  color: #18202a !important;
+  font-size: clamp(1.65rem, 2vw, 2.15rem) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+}
+
+.page-section > .section-header .muted {
+  color: #64707d !important;
+  font-size: .98rem !important;
+  line-height: 1.5 !important;
+}
+
+.page-section > .section-header .btn,
+.page-section > .section-header .badge {
+  flex: 0 0 auto !important;
+}
+
+.activity-summary-card,
+.linked-dashboard-group,
+.franchise-dashboard-card,
+.dashboard-leaderboard-card,
+.performance-dashboard-card {
+  background: #fff !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 14px 34px rgba(24,32,42,.07) !important;
+}
+
+.activity-summary-card {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-wrap: wrap !important;
+  padding: 16px 18px !important;
+  margin-bottom: 22px !important;
+}
+
+.dashboard-franchise-heading {
+  margin: 24px 0 14px !important;
+  color: #18202a !important;
+  font-size: 1.15rem !important;
+  font-weight: 700 !important;
+}
+
+.branch-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+  gap: 16px !important;
+}
+
+.branch-card,
+.dashboard-action-card {
+  display: block !important;
+  background: #fff !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 14px 34px rgba(24,32,42,.07) !important;
+  color: #18202a !important;
+  text-decoration: none !important;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease !important;
+}
+
+.branch-card:hover,
+.dashboard-action-card:hover {
+  transform: translateY(-1px) !important;
+  border-color: #cfc5df !important;
+  box-shadow: 0 18px 42px rgba(24,32,42,.1) !important;
+}
+
+.branch-card {
+  padding: 20px 22px !important;
+}
+
+.branch-card-active,
+.branch-card.active,
+.franchise-dashboard-card {
+  border-left: 5px solid #6B4AA0 !important;
+}
+
+.branch-card-inactive {
+  border-left: 5px solid #d64252 !important;
+}
+
+.branch-card h2 {
+  margin: 0 0 18px !important;
+  color: #18202a !important;
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+}
+
+.branch-status-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  margin-bottom: 14px !important;
+}
+
+.branch-details {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  gap: 16px 22px !important;
+}
+
+.branch-details div {
+  min-width: 0 !important;
+}
+
+.branch-details span {
+  display: block !important;
+  margin-bottom: 5px !important;
+  color: #64707d !important;
+  font-size: .72rem !important;
+  font-weight: 700 !important;
+  letter-spacing: .055em !important;
+  line-height: 1.2 !important;
+  text-transform: uppercase !important;
+}
+
+.branch-details strong {
+  display: block !important;
+  color: #18202a !important;
+  font-size: .94rem !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+  overflow-wrap: anywhere !important;
+}
+
+.branch-meta {
+  margin-top: 18px !important;
+  color: #6B4AA0 !important;
+  font-size: .84rem !important;
+  font-weight: 700 !important;
+}
+
+.linked-dashboard-group {
+  padding: 18px 20px !important;
+  margin-bottom: 18px !important;
+}
+
+.linked-dashboard-group h2 {
+  margin: 0 0 8px !important;
+  color: #18202a !important;
+  font-size: 1.15rem !important;
+  font-weight: 700 !important;
+}
+
+.franchise-dashboard-card {
+  margin-bottom: 22px !important;
+}
+
+.dashboard-action-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+  gap: 16px !important;
+  margin-top: 22px !important;
+}
+
+.dashboard-action-card {
+  min-height: 106px !important;
+  padding: 20px 22px !important;
+}
+
+.dashboard-action-card strong {
+  display: block !important;
+  margin-bottom: 8px !important;
+  color: #6B4AA0 !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+
+.dashboard-action-card span {
+  display: block !important;
+  color: #64707d !important;
+  font-size: .98rem !important;
+  line-height: 1.45 !important;
+}
+
+.dashboard-leaderboard-card {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 18px !important;
+  padding: 20px 22px !important;
+  margin-top: 18px !important;
+}
+
+.dashboard-leaderboard-card h2 {
+  margin: 4px 0 !important;
+  color: #18202a !important;
+  font-size: 1.6rem !important;
+  font-weight: 700 !important;
+}
+
+.dashboard-leaderboard-metrics {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+}
+
+.performance-dashboard-card {
+  padding: 20px 22px !important;
+  margin: 18px 0 !important;
+}
+
+.topbar-user,
+.topbar-user .logout-link,
+.topbar-user .secondary-link {
+  border-radius: 12px !important;
+}
+
+.sidebar-nav .franchise-logo-text {
+  min-height: 116px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px 16px !important;
+  border-radius: 12px !important;
+  background: rgba(255,255,255,.14) !important;
+  color: #fff !important;
+  text-align: center !important;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+}
+
+.topbar-logo-text {
+  color: #18202a !important;
+  font-size: 1.35rem !important;
+  font-weight: 700 !important;
+}
+
+.alert.success {
+  background: #eef8f1 !important;
+  border: 1px solid #cfead8 !important;
+  color: #1f6237 !important;
+  border-radius: 12px !important;
+}
+
+@media (max-width: 900px) {
+  .page-section > .section-header,
+  .dashboard-leaderboard-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .page-section > .section-header .btn,
+  .page-section > .section-header .badge {
+    align-self: flex-start !important;
+  }
+}
