@@ -3768,3 +3768,61 @@ td input, td select, td textarea {
     background: #6B4AA0 !important;
   }
 }
+
+/* Responsive user edit/detail popups */
+.user-management-modals .modal-backdrop,
+.modal-backdrop[id^="edit-user-"],
+.modal-backdrop[id^="view-user-"] {
+  padding: clamp(10px, 2vw, 24px) !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  overflow-y: auto !important;
+}
+
+.user-management-modals .modal-card,
+.modal-backdrop[id^="edit-user-"] .modal-card,
+.modal-backdrop[id^="view-user-"] .modal-card {
+  width: min(760px, calc(100vw - 32px)) !important;
+  max-width: calc(100vw - 32px) !important;
+  max-height: calc(100vh - 28px) !important;
+  margin: 14px auto !important;
+  overflow-x: hidden !important;
+}
+
+.user-management-modals .inline-form-grid,
+.modal-backdrop[id^="edit-user-"] .inline-form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)) !important;
+}
+
+.user-management-modals .modal-role-grid,
+.modal-backdrop[id^="edit-user-"] .modal-role-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)) !important;
+}
+
+.user-management-modals .modal-role-option,
+.modal-backdrop[id^="edit-user-"] .modal-role-option {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+@media (min-width: 900px) {
+  .modal-backdrop[id^="edit-user-"],
+  .modal-backdrop[id^="view-user-"] {
+    left: var(--sidebar-w, 270px) !important;
+    width: calc(100vw - var(--sidebar-w, 270px)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .user-management-modals .modal-card,
+  .modal-backdrop[id^="edit-user-"] .modal-card,
+  .modal-backdrop[id^="view-user-"] .modal-card {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    padding: 16px !important;
+  }
+  .user-management-modals .modal-role-grid,
+  .modal-backdrop[id^="edit-user-"] .modal-role-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
