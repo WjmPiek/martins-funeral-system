@@ -218,8 +218,15 @@
                 <td>{{ item.mf_files|count_value }}</td>
                 <td>{{ item.gross_revenue|rand }}</td>
                 <td>{% set method = item.gross_method if item.gross_method is defined else (item.franchise.royalty_gross_method if item.franchise else 'old') %}{% if method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
-                <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
-                <td>{{ item.royalty_amount|rand }}</td>
+                {% if item.grouped_royalty_main_name is defined and item.grouped_royalty_main_name %}
+                  <td colspan="2">
+                    <strong>Grouped under {{ item.grouped_royalty_main_name }}</strong><br>
+                    <small class="muted">Group total: {{ '%.2f'|format(item.grouped_royalty_percentage|float) }}% · {{ item.grouped_royalty_amount|rand }}</small>
+                  </td>
+                {% else %}
+                  <td>{{ '%.2f'|format(item.royalty_percentage|float) }}%</td>
+                  <td>{{ item.royalty_amount|rand }}</td>
+                {% endif %}
                 <td>{% if item.minimum_royalty_applied %}<span class="badge warning">Yes</span>{% else %}No{% endif %}</td>
                 <td>
                   <div class="button-row">

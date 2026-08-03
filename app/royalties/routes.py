@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 from app.extensions import db
 from app.audit import log_action
 from app.models import MonthlyFigure, Franchise, User, user_franchises
-from app.monthly.routes import recalculate_figures_for_display, calculate_royalty_base, calculate_royalty, get_royalty_scales_for_franchise
+from app.monthly.routes import recalculate_figures_for_display, calculate_royalty_base, calculate_royalty
 from app.franchise_context import get_selected_franchise, get_accessible_franchises, is_privileged_user, is_franchise_view_mode
 
 royalties_bp = Blueprint("royalties", __name__, url_prefix="/royalties")
@@ -70,25 +70,6 @@ def reporting_years():
 
 
 
-def has_valid_royalty_scale(franchise):
-    return bool(get_royalty_scales_for_franchise(franchise))
-
-
-def pick_royalty_scale_franchise(main_franchise, linked_franchises):
-    """Use the main franchise scale where possible; otherwise use the first linked franchise with a valid scale.
-
-    This prevents grouped royalty rows from staying at 0.00% when the main
-    dashboard branch has no saved brackets yet, but one of the linked franchise
-    records already has the correct scale imported/saved.
-    """
-    if main_franchise and has_valid_royalty_scale(main_franchise):
-        return main_franchise
-    for franchise in linked_franchises or []:
-        if has_valid_royalty_scale(franchise):
-            return franchise
-    return main_franchise
-
-
 def build_grouped_royalty_row(figures, main_franchise, selected_month, selected_year):
     """Build one combined royalty row for a main franchise user with linked branches.
 
@@ -136,12 +117,15 @@ def build_grouped_royalty_row(figures, main_franchise, selected_month, selected_
     grouped.gross_turnover = royalty_base
     grouped.gross_revenue = royalty_base
     grouped.gross_method = gross_method
-    scale_franchise = pick_royalty_scale_franchise(main_franchise, [getattr(item, "franchise", None) for item in figures])
-    grouped.scale_franchise = scale_franchise
-    _gross, percentage, royalty_amount, minimum_applied = calculate_royalty(scale_franchise, royalty_base)
+    grouped.scale_franchise = main_franchise
+    _gross, percentage, royalty_amount, minimum_applied = calculate_royalty(main_franchise, royalty_base)
     grouped.royalty_percentage = percentage
     grouped.royalty_amount = royalty_amount
     grouped.minimum_royalty_applied = minimum_applied
+    for item in figures:
+        item.grouped_royalty_main_name = main_franchise.business_name
+        item.grouped_royalty_percentage = percentage
+        item.grouped_royalty_amount = royalty_amount
     return grouped
 
 

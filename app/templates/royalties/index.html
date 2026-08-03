@@ -142,8 +142,10 @@
                 <td><strong>{{ source.period_label }}</strong></td>
                 <td>{% set method = source.gross_method if source.gross_method is defined else (source.franchise.royalty_gross_method if source.franchise else 'old') %}{% if method == 'new' %}Gross = New Gross Method{% else %}Gross = Old{% endif %}</td>
                 <td>{{ source.gross_revenue|rand }}</td>
-                <td>{{ '%.2f'|format(source.royalty_percentage|float) }}%</td>
-                <td><strong>{{ source.royalty_amount|rand }}</strong></td>
+                <td colspan="2">
+                  <strong>Grouped under {{ source.grouped_royalty_main_name or figures[0].franchise.business_name }}</strong><br>
+                  <small class="muted">Group total: {{ '%.2f'|format(figures[0].royalty_percentage|float) }}% · {{ figures[0].royalty_amount|rand }}</small>
+                </td>
                 <td>{{ source.cash|rand }}</td>
                 <td>{{ source.admin_fee|rand }}</td>
                 <td>{{ source.insurance_receipts|rand }}</td>
