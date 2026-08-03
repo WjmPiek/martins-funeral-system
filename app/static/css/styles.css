@@ -3144,3 +3144,84 @@ td input, td select, td textarea {
     width: 100% !important;
   }
 }
+
+/* Royalty Overview top controls: match the compact top-card layout used by the other royalty tabs. */
+.royalty-overview-page .branch-context-card {
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 760px) !important;
+  align-items: start !important;
+  gap: 28px !important;
+  min-height: 0 !important;
+}
+.royalty-overview-page .branch-context-card > h2,
+.royalty-overview-page .branch-context-card > p {
+  grid-column: 1 !important;
+}
+.royalty-overview-page .branch-selector-row {
+  grid-column: 2 !important;
+  grid-row: 1 / span 2 !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+  justify-self: end !important;
+  width: min(100%, 760px) !important;
+  margin: 0 !important;
+  padding: 18px !important;
+  background: #fff !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 38px rgba(24, 32, 42, .08) !important;
+}
+.royalty-overview-page .branch-selector-row > label {
+  margin: 0 !important;
+  color: #51475a !important;
+  font-size: .76rem !important;
+  font-weight: 850 !important;
+  white-space: normal !important;
+}
+.royalty-overview-page .branch-selector-row > select {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 54px !important;
+}
+.royalty-overview-page .branch-selector-row .period-filter-form {
+  justify-self: stretch !important;
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto !important;
+  gap: 12px !important;
+  align-items: end !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.royalty-overview-page .period-filter-form > label {
+  min-width: 0 !important;
+}
+.royalty-overview-page .period-filter-form select,
+.royalty-overview-page .period-filter-form input {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 54px !important;
+}
+.royalty-overview-page .period-filter-form .btn {
+  min-width: 150px !important;
+  min-height: 54px !important;
+  white-space: nowrap !important;
+}
+@media (max-width: 1250px) {
+  .royalty-overview-page .branch-context-card,
+  .royalty-overview-page .branch-selector-row,
+  .royalty-overview-page .branch-selector-row .period-filter-form {
+    grid-template-columns: 1fr !important;
+  }
+  .royalty-overview-page .branch-selector-row {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+  }
+}
