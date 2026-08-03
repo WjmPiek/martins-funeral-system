@@ -171,11 +171,32 @@ def run_month_end_import_pipeline(
             if result.blocking_errors:
                 report['status'] = 'needs_review'
                 report['stage'] = 'royalty_needs_review'
+    try:
+        from app.grouped_royalties import apply_grouped_royalties_for_period
+        report['grouped_royalties'] = []
+        for month, year in periods:
+            grouped_result = apply_grouped_royalties_for_period(month, year, ids)
+            if grouped_result.get('groups'):
+                report['grouped_royalties'].append({
+                    'period': f'{year}-{month:02d}',
+                    'groups': grouped_result.get('groups', 0),
+                    'rows': grouped_result.get('rows', 0),
+                })
+        if report['grouped_royalties']:
+            for monthly_figure in rows:
+                snapshot_monthly_figure(monthly_figure, commit=False)
+    except Exception as grouped_exc:
+        current_app.logger.exception('Grouped royalty calculation failed: %s', grouped_exc)
+        report['status'] = 'needs_review'
+        report['stage'] = 'grouped_royalty_needs_review'
+        report['errors'].append(f'Grouped royalty calculation failed: {grouped_exc}')
     db.session.commit()
 
     _stage(progress_job, 86, 'Stage 4/6: checking royalty exceptions...')
     zero_royalty_rows = []
     for monthly_figure in rows:
+        if "Royalty grouped under main franchise:" in (monthly_figure.notes or ""):
+            continue
         if Decimal(monthly_figure.gross_revenue or 0) > 0 and Decimal(monthly_figure.royalty_percentage or 0) <= 0:
             zero_royalty_rows.append({
                 'franchise': monthly_figure.franchise.business_name if monthly_figure.franchise else monthly_figure.franchise_id,

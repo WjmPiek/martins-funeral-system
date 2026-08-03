@@ -492,6 +492,21 @@ def recalculate_figures_for_display(figures, commit=True):
         )
         if before != after:
             changed = True
+    if figures:
+        try:
+            from app.grouped_royalties import apply_grouped_royalties_for_period
+            periods = {
+                (int(item.month), int(item.year))
+                for item in figures
+                if getattr(item, "month", None) and getattr(item, "year", None)
+            }
+            touched_ids = {int(item.franchise_id) for item in figures if getattr(item, "franchise_id", None)}
+            for month, year in periods:
+                result = apply_grouped_royalties_for_period(month, year, touched_ids)
+                if result.get("rows"):
+                    changed = True
+        except Exception as exc:
+            current_app.logger.exception("Grouped royalty display recalculation failed: %s", exc)
     if changed and commit:
         db.session.commit()
     return figures
@@ -1502,6 +1517,11 @@ def edit(figure_id):
 
         monthly_figure.insurance_payover = parse_decimal(request.form.get("insurance_payover"))
         recalculate_monthly_figure(monthly_figure)
+        try:
+            from app.grouped_royalties import apply_grouped_royalties_for_period
+            apply_grouped_royalties_for_period(monthly_figure.month, monthly_figure.year, {monthly_figure.franchise_id})
+        except Exception as exc:
+            current_app.logger.exception("Grouped royalty recalculation failed after monthly edit: %s", exc)
         monthly_figure.status = "Calculated"
         log_action("Monthly Figures", "Saved payover and recalculated monthly figures", f"Period: {monthly_figure.period_label}")
         db.session.commit()
