@@ -372,14 +372,14 @@ def graphs_data():
     growth = scope["growth"]
 
     # This endpoint may do work, but it runs after the page shell is displayed.
-    # In normal use it reads the pre-calculated performance_results cache.
-    ensure_performance_results(month, year, ids, "annual_gross_scale")
+    # In normal use it reads cached graph data; if it is missing, rebuild it now so the charts are not blank.
+    ensure_performance_results(month, year, ids, mode)
 
     if scope["is_combined_view"]:
-        graph_data = graph_engine_payload_for_franchises(ids, metric_key, month, year, periods, mode, growth) if ids else None
+        graph_data = graph_engine_payload_for_franchises(ids, metric_key, month, year, periods, mode, growth, allow_rebuild=True) if ids else None
     else:
         franchise_id = scope["selected_franchise_id"]
-        graph_data = graph_engine_payload(franchise_id, metric_key, month, year, periods, mode, growth) if franchise_id else None
+        graph_data = graph_engine_payload(franchise_id, metric_key, month, year, periods, mode, growth, allow_rebuild=True) if franchise_id else None
 
     return jsonify({
         "ok": True,
