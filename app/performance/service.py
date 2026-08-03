@@ -702,6 +702,40 @@ def performance_cache_status(month, year, franchise_ids=None, metric_keys=None):
         "missing": max(expected - found, 0),
     }
 
+
+def franchise_ids_with_monthly_data(month, year, franchise_ids=None):
+    """Return active franchise IDs that have imported monthly figures for a period."""
+    ids = filter_active_franchise_ids(franchise_ids or accessible_franchise_ids())
+    if not ids:
+        return []
+    rows = (
+        db.session.query(MonthlyFigure.franchise_id)
+        .filter(MonthlyFigure.franchise_id.in_(ids))
+        .filter(MonthlyFigure.month == month, MonthlyFigure.year == year)
+        .distinct()
+        .all()
+    )
+    found = {int(row[0]) for row in rows}
+    return [fid for fid in ids if int(fid) in found]
+
+
+def metric_has_period_data(metric_key, month, year, franchise_ids):
+    """True when the selected KPI has any imported value in the period/history window."""
+    if metric_key not in PERFORMANCE_METRICS:
+        return False
+    ids = filter_active_franchise_ids(franchise_ids or [])
+    if not ids:
+        return False
+    periods = [(month, year), (month, year - 1)] + previous_years(month, year, 3)
+    field = metric_field(metric_key)
+    conditions = [db.and_(MonthlyFigure.month == m, MonthlyFigure.year == y) for m, y in periods]
+    total = (
+        db.session.query(func.coalesce(func.sum(field), 0))
+        .filter(MonthlyFigure.franchise_id.in_(ids))
+        .filter(db.or_(*conditions))
+        .scalar()
+    )
+    return to_decimal(total) > 0
 def stored_targets(month, year, franchise_ids, metric_keys=None):
     metric_keys = list(metric_keys or PERFORMANCE_METRICS.keys())
     franchise_ids = list(franchise_ids or [])
@@ -1697,10 +1731,14 @@ def executive_dashboard(month, year, franchise_ids, mode='growth_bracket', growt
     items clearly: top performers, lowest performers, growth, decline, forecast
     risk and branch health.
     """
-    overall_rows = leaderboard_rows('overall', month, year, franchise_ids, mode, growth_percent)
+    measured_ids = franchise_ids_with_monthly_data(month, year, franchise_ids)
+    calculation_ids = measured_ids or filter_active_franchise_ids(franchise_ids)
+    overall_rows = leaderboard_rows('overall', month, year, calculation_ids, mode, growth_percent)
     kpi_summaries = []
     for metric_key, metric in PERFORMANCE_METRICS.items():
-        summary = metric_page_summary(metric_key, month, year, franchise_ids, mode, growth_percent)
+        if not metric_has_period_data(metric_key, month, year, calculation_ids):
+            continue
+        summary = metric_page_summary(metric_key, month, year, calculation_ids, mode, growth_percent)
         kpi_summaries.append({
             'key': metric_key,
             'label': metric['label'],
@@ -1768,7 +1806,7 @@ def executive_dashboard(month, year, franchise_ids, mode='growth_bracket', growt
         'branch_health': branch_health[:10],
         'needs_attention': needs_attention,
         'forecast_risk': forecast_risk[:15],
-        'total_franchises': len(overall_rows),
+        'total_franchises': len(measured_ids),
     }
 
 
