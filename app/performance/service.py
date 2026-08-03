@@ -49,8 +49,8 @@ PERFORMANCE_METRICS = {
     },
     "funerals": {
         "label": "Funerals",
-        "source_field": "number_of_funerals",
-        "format": "number",
+        "source_field": "funeral_receipts",
+        "format": "money",
         "weight": Decimal("0.10"),
         "higher_is_better": True,
     },
