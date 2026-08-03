@@ -2815,3 +2815,84 @@ td input, td select, td textarea {
   .content-area { padding: 14px; }
   th, td { font-size: .72rem; }
 }
+
+/* Royalty Overview: fit the wide finance table inside the content panel. */
+.royalties-table {
+  width: 100% !important;
+  table-layout: fixed !important;
+  min-width: 0 !important;
+}
+.royalties-table th,
+.royalties-table td {
+  padding: 10px 8px !important;
+  font-size: .74rem !important;
+  line-height: 1.18 !important;
+  vertical-align: middle !important;
+  white-space: normal !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+.royalties-table th:nth-child(1),
+.royalties-table td:nth-child(1) { width: 4.5% !important; }
+.royalties-table th:nth-child(2),
+.royalties-table td:nth-child(2) { width: 9.5% !important; }
+.royalties-table th:nth-child(3),
+.royalties-table td:nth-child(3) { width: 5.5% !important; text-align: center !important; }
+.royalties-table th:nth-child(4),
+.royalties-table td:nth-child(4) { width: 8% !important; text-align: center !important; }
+.royalties-table th:nth-child(5),
+.royalties-table td:nth-child(5) { width: 8% !important; }
+.royalties-table th:nth-child(6),
+.royalties-table td:nth-child(6) { width: 5.5% !important; text-align: center !important; }
+.royalties-table th:nth-child(7),
+.royalties-table td:nth-child(7) { width: 8.5% !important; }
+.royalties-table th:nth-child(8),
+.royalties-table td:nth-child(8) { width: 7% !important; text-align: center !important; }
+.royalties-table th:nth-child(9),
+.royalties-table td:nth-child(9) { width: 8% !important; }
+.royalties-table th:nth-child(10),
+.royalties-table td:nth-child(10) { width: 7.5% !important; }
+.royalties-table th:nth-child(11),
+.royalties-table td:nth-child(11) { width: 8% !important; }
+.royalties-table th:nth-child(12),
+.royalties-table td:nth-child(12) { width: 8% !important; }
+.royalties-table th:nth-child(13),
+.royalties-table td:nth-child(13) { width: 12% !important; }
+.royalties-table td:nth-child(5),
+.royalties-table td:nth-child(7),
+.royalties-table td:nth-child(9),
+.royalties-table td:nth-child(10),
+.royalties-table td:nth-child(11),
+.royalties-table td:nth-child(12) {
+  white-space: nowrap !important;
+}
+.royalties-table .button-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+}
+.royalties-table .button-row form {
+  display: contents !important;
+}
+.royalties-table .button-row .btn,
+.royalties-table .button-row button {
+  width: auto !important;
+  min-width: 58px !important;
+  min-height: 36px !important;
+  padding: 8px 10px !important;
+  font-size: .72rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: keep-all !important;
+}
+@media (max-width: 1200px) {
+  .table-responsive:has(.royalties-table) {
+    overflow-x: auto !important;
+  }
+  .royalties-table {
+    min-width: 1180px !important;
+  }
+}
