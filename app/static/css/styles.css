@@ -3836,3 +3836,11 @@ td input, td select, td textarea {
 .royalties-table tr.grouped-summary-row td:first-child {
   border-left: 4px solid #6B4AA0 !important;
 }
+
+.royalties-table tr.grouped-linked-row td {
+  background: #fbf9fd !important;
+}
+
+.royalties-table tr.grouped-linked-row td:first-child {
+  border-left: 4px solid #d6c8e8 !important;
+}

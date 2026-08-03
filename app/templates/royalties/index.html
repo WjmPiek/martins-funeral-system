@@ -187,7 +187,7 @@
       </thead>
       <tbody>
         {% for item in figures %}
-        <tr class="{% if item.is_grouped_summary|default(false) %}grouped-summary-row{% endif %}">
+        <tr class="{% if item.is_grouped_summary|default(false) %}grouped-summary-row{% elif item.grouped_royalty_main_name is defined and item.grouped_royalty_main_name %}grouped-linked-row{% endif %}">
           <td><strong>{{ item.period_label }}</strong></td>
           <td>
             {% if item.is_grouped_summary|default(false) %}

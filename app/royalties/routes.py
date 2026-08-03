@@ -136,6 +136,7 @@ def insert_grouped_summary_rows(figures, selected_month, selected_year):
     rows_by_franchise = {int(item.franchise_id): item for item in figures if getattr(item, "franchise_id", None)}
     grouped_by_main = {}
     linked_to_main = {}
+    linked_rows_by_main = {}
     for group in grouped_franchise_sets(rows_by_franchise.keys()):
         main = group["main"]
         linked = group["linked"]
@@ -148,16 +149,32 @@ def insert_grouped_summary_rows(figures, selected_month, selected_year):
         grouped.is_grouped_summary = True
         grouped.status = "Grouped Total"
         grouped_by_main[int(main.id)] = grouped
+        linked_rows_by_main[int(main.id)] = [
+            rows_by_franchise[franchise.id]
+            for franchise in linked
+            if franchise.id != main.id and franchise.id in rows_by_franchise
+        ]
         for franchise in linked:
             if franchise.id != main.id:
                 linked_to_main[int(franchise.id)] = main.business_name
 
     output = []
+    emitted = set()
     for item in figures:
-        if int(item.franchise_id) in linked_to_main:
-            item.grouped_royalty_main_name = linked_to_main[int(item.franchise_id)]
+        franchise_id = int(item.franchise_id)
+        if franchise_id in emitted:
+            continue
+        if franchise_id in linked_to_main:
+            continue
         output.append(item)
-        grouped = grouped_by_main.get(int(item.franchise_id))
+        emitted.add(franchise_id)
+        linked_rows = linked_rows_by_main.get(franchise_id, [])
+        for linked_item in linked_rows:
+            linked_id = int(linked_item.franchise_id)
+            linked_item.grouped_royalty_main_name = item.franchise.business_name if item.franchise else linked_to_main.get(linked_id, "")
+            output.append(linked_item)
+            emitted.add(linked_id)
+        grouped = grouped_by_main.get(franchise_id)
         if grouped:
             output.append(grouped)
     return output
