@@ -551,9 +551,31 @@ def reactivate_franchise_performance(franchise_id, user_id=None):
     return franchise
 
 
-def selected_period_from_request(args):
+def default_reporting_period():
+    """Use the latest imported monthly figures as the default reporting period."""
+    cached = _performance_cache()
+    cache_key = ("default_reporting_period",)
+    if cached is not None and cache_key in cached:
+        return cached[cache_key]
+
     now = datetime.now()
-    default_month, default_year = previous_month(now.month, now.year)
+    fallback = previous_month(now.month, now.year)
+    try:
+        latest = (
+            db.session.query(MonthlyFigure.year, MonthlyFigure.month)
+            .order_by(MonthlyFigure.year.desc(), MonthlyFigure.month.desc())
+            .first()
+        )
+        period = (int(latest.month), int(latest.year)) if latest else fallback
+    except Exception:
+        period = fallback
+    if cached is not None:
+        cached[cache_key] = period
+    return period
+
+
+def selected_period_from_request(args):
+    default_month, default_year = default_reporting_period()
     try:
         month = int(args.get("month", default_month))
     except Exception:
@@ -580,6 +602,8 @@ def reporting_years():
 
 
 def metric_field(metric_key):
+    if metric_key == "funerals":
+        return func.coalesce(func.nullif(MonthlyFigure.number_of_funerals, 0), MonthlyFigure.mf_files, 0)
     return getattr(MonthlyFigure, PERFORMANCE_METRICS[metric_key]["source_field"])
 
 
@@ -680,6 +704,40 @@ def performance_cache_status(month, year, franchise_ids=None, metric_keys=None):
         "missing": max(expected - found, 0),
     }
 
+
+def franchise_ids_with_monthly_data(month, year, franchise_ids=None):
+    """Return active franchise IDs that have imported monthly figures for a period."""
+    ids = filter_active_franchise_ids(franchise_ids or accessible_franchise_ids())
+    if not ids:
+        return []
+    rows = (
+        db.session.query(MonthlyFigure.franchise_id)
+        .filter(MonthlyFigure.franchise_id.in_(ids))
+        .filter(MonthlyFigure.month == month, MonthlyFigure.year == year)
+        .distinct()
+        .all()
+    )
+    found = {int(row[0]) for row in rows}
+    return [fid for fid in ids if int(fid) in found]
+
+
+def metric_has_period_data(metric_key, month, year, franchise_ids):
+    """True when the selected KPI has any imported value in the period/history window."""
+    if metric_key not in PERFORMANCE_METRICS:
+        return False
+    ids = filter_active_franchise_ids(franchise_ids or [])
+    if not ids:
+        return False
+    periods = [(month, year), (month, year - 1)] + previous_years(month, year, 3)
+    field = metric_field(metric_key)
+    conditions = [db.and_(MonthlyFigure.month == m, MonthlyFigure.year == y) for m, y in periods]
+    total = (
+        db.session.query(func.coalesce(func.sum(field), 0))
+        .filter(MonthlyFigure.franchise_id.in_(ids))
+        .filter(db.or_(*conditions))
+        .scalar()
+    )
+    return to_decimal(total) > 0
 def stored_targets(month, year, franchise_ids, metric_keys=None):
     metric_keys = list(metric_keys or PERFORMANCE_METRICS.keys())
     franchise_ids = list(franchise_ids or [])
@@ -799,13 +857,12 @@ def comparison_value(franchise_id, metric_key, month, year, comparison):
 def franchise_metric_summary(franchise_id, month, year, mode="manual", growth_percent=DEFAULT_GROWTH_PERCENT):
     stored_rows = stored_results_for_period(month, year, [franchise_id]).get(franchise_id, {})
     use_stored = bool(stored_rows)
-    if not use_stored:
-        actuals = period_actuals(month, year, [franchise_id]).get(franchise_id, {})
-        targets = targets_for_period(month, year, [franchise_id], mode, growth_percent).get(franchise_id, {})
+    actuals = period_actuals(month, year, [franchise_id]).get(franchise_id, {})
+    targets = targets_for_period(month, year, [franchise_id], mode, growth_percent).get(franchise_id, {})
     rows = []
     for metric_key, config in PERFORMANCE_METRICS.items():
         bracket_details = bracket_target_details(franchise_id, metric_key, month, year)
-        if use_stored and metric_key in stored_rows:
+        if use_stored and metric_key != "funerals" and metric_key in stored_rows:
             result = stored_rows[metric_key]
             actual = to_decimal(result.actual_value)
             target = to_decimal(result.target_value)
@@ -894,7 +951,7 @@ def ranked_performance(month, year, franchise_ids, mode="manual", growth_percent
     franchises = _cached_value(("franchises", _ids_key(franchise_ids)), load_franchises)
 
     stored_by = stored_results_for_period(month, year, franchise_ids)
-    use_stored = any(stored_by.get(franchise.id) for franchise in franchises)
+    use_stored = metric_key != "funerals" and any(stored_by.get(franchise.id) for franchise in franchises)
     if not use_stored:
         actuals_by = period_actuals(month, year, franchise_ids)
         targets_by = targets_for_period(month, year, franchise_ids, mode, growth_percent)
@@ -1265,7 +1322,7 @@ def metric_page_summary(metric_key, month, year, franchise_ids, mode="growth_bra
         ranked_performance(previous_m, previous_y, franchise_ids, mode, growth_percent, metric_key),
     )
     stored = stored_results_for_period(month, year, franchise_ids, [metric_key])
-    if any(stored.get(fid, {}).get(metric_key) for fid in franchise_ids):
+    if metric_key != "funerals" and any(stored.get(fid, {}).get(metric_key) for fid in franchise_ids):
         total_actual = sum((to_decimal(stored.get(fid, {}).get(metric_key).actual_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)), Decimal("0"))
         total_target = sum((to_decimal(stored.get(fid, {}).get(metric_key).target_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)), Decimal("0"))
         previous_total = sum((to_decimal(stored.get(fid, {}).get(metric_key).previous_month_value) for fid in franchise_ids if stored.get(fid, {}).get(metric_key)), Decimal("0"))
@@ -1675,10 +1732,14 @@ def executive_dashboard(month, year, franchise_ids, mode='growth_bracket', growt
     items clearly: top performers, lowest performers, growth, decline, forecast
     risk and branch health.
     """
-    overall_rows = leaderboard_rows('overall', month, year, franchise_ids, mode, growth_percent)
+    measured_ids = franchise_ids_with_monthly_data(month, year, franchise_ids)
+    calculation_ids = measured_ids or filter_active_franchise_ids(franchise_ids)
+    overall_rows = leaderboard_rows('overall', month, year, calculation_ids, mode, growth_percent)
     kpi_summaries = []
     for metric_key, metric in PERFORMANCE_METRICS.items():
-        summary = metric_page_summary(metric_key, month, year, franchise_ids, mode, growth_percent)
+        if not metric_has_period_data(metric_key, month, year, calculation_ids):
+            continue
+        summary = metric_page_summary(metric_key, month, year, calculation_ids, mode, growth_percent)
         kpi_summaries.append({
             'key': metric_key,
             'label': metric['label'],
@@ -1746,7 +1807,7 @@ def executive_dashboard(month, year, franchise_ids, mode='growth_bracket', growt
         'branch_health': branch_health[:10],
         'needs_attention': needs_attention,
         'forecast_risk': forecast_risk[:15],
-        'total_franchises': len(overall_rows),
+        'total_franchises': len(measured_ids),
     }
 
 
@@ -2192,12 +2253,14 @@ def warm_performance_cache_for_period(month, year, franchise_ids=None, mode='ann
     performance_rows = rebuild_performance_results(month, year, franchise_ids, mode)
     cache_rows = 0
     for metric_key in PERFORMANCE_METRICS.keys():
-        graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, 12, mode, growth_percent)
+        graph_engine_payload_for_franchises(franchise_ids, metric_key, month, year, 12, mode, growth_percent, allow_rebuild=True)
         cache_rows += 1
     # Warm each linked branch graph only for the current period. Franchise users
     # then open their own portal from cache instead of doing graph calculations.
     for fid in franchise_ids:
         for metric_key in PERFORMANCE_METRICS.keys():
-            graph_engine_payload(fid, metric_key, month, year, 12, mode, growth_percent)
+            graph_engine_payload(fid, metric_key, month, year, 12, mode, growth_percent, allow_rebuild=True)
             cache_rows += 1
     return {'invalidated': invalidated, 'performance_rows': int(performance_rows or 0), 'cache_rows': cache_rows}
+
+

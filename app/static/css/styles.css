@@ -1432,6 +1432,47 @@ body.app-body {
   font-size: 0.82rem;
 }
 
+.user-management-modals .modal-role-grid,
+.modal-card .modal-role-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+.user-management-modals .modal-role-option,
+.modal-card .modal-role-option {
+  display: grid !important;
+  grid-template-columns: 22px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-height: 48px !important;
+  padding: 10px 12px !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.user-management-modals .modal-role-option input[type="checkbox"],
+.modal-card .modal-role-option input[type="checkbox"] {
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  margin: 0 !important;
+  justify-self: center !important;
+}
+
+.user-management-modals .modal-role-option span,
+.modal-card .modal-role-option span {
+  display: block !important;
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+  white-space: normal !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+}
+
 /* Nested sidebar menu with red numbered badges */
 .nav-section {
     display: block;
@@ -2816,92 +2857,856 @@ td input, td select, td textarea {
   th, td { font-size: .72rem; }
 }
 
-/* Final responsive sidebar guardrails: desktop stays visible; mobile stays hidden until opened. */
+/* Royalty Overview: fit the wide finance table inside the content panel. */
+.royalties-table {
+  width: 100% !important;
+  table-layout: fixed !important;
+  min-width: 0 !important;
+}
+.royalties-table th,
+.royalties-table td {
+  padding: 10px 8px !important;
+  font-size: .74rem !important;
+  line-height: 1.18 !important;
+  vertical-align: middle !important;
+  white-space: normal !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+.royalties-table th:nth-child(1),
+.royalties-table td:nth-child(1) { width: 4.5% !important; }
+.royalties-table th:nth-child(2),
+.royalties-table td:nth-child(2) { width: 9.5% !important; }
+.royalties-table th:nth-child(3),
+.royalties-table td:nth-child(3) { width: 5.5% !important; text-align: center !important; }
+.royalties-table th:nth-child(4),
+.royalties-table td:nth-child(4) { width: 8% !important; text-align: center !important; }
+.royalties-table th:nth-child(5),
+.royalties-table td:nth-child(5) { width: 8% !important; }
+.royalties-table th:nth-child(6),
+.royalties-table td:nth-child(6) { width: 5.5% !important; text-align: center !important; }
+.royalties-table th:nth-child(7),
+.royalties-table td:nth-child(7) { width: 8.5% !important; }
+.royalties-table th:nth-child(8),
+.royalties-table td:nth-child(8) { width: 7% !important; text-align: center !important; }
+.royalties-table th:nth-child(9),
+.royalties-table td:nth-child(9) { width: 8% !important; }
+.royalties-table th:nth-child(10),
+.royalties-table td:nth-child(10) { width: 7.5% !important; }
+.royalties-table th:nth-child(11),
+.royalties-table td:nth-child(11) { width: 8% !important; }
+.royalties-table th:nth-child(12),
+.royalties-table td:nth-child(12) { width: 8% !important; }
+.royalties-table th:nth-child(13),
+.royalties-table td:nth-child(13) { width: 12% !important; }
+.royalties-table td:nth-child(5),
+.royalties-table td:nth-child(7),
+.royalties-table td:nth-child(9),
+.royalties-table td:nth-child(10),
+.royalties-table td:nth-child(11),
+.royalties-table td:nth-child(12) {
+  white-space: nowrap !important;
+}
+.royalties-table .button-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+}
+.royalties-table .button-row form {
+  display: contents !important;
+}
+.royalties-table .button-row .btn,
+.royalties-table .button-row button {
+  width: auto !important;
+  min-width: 58px !important;
+  min-height: 36px !important;
+  padding: 8px 10px !important;
+  font-size: .72rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: keep-all !important;
+}
+@media (max-width: 1200px) {
+  .table-responsive:has(.royalties-table) {
+    overflow-x: auto !important;
+  }
+  .royalties-table {
+    min-width: 1180px !important;
+  }
+}
+
+/* Royalty Overview v2: keep financial columns in the table, move row actions underneath. */
+.royalties-table th:nth-child(1),
+.royalties-table td:nth-child(1) { width: 5% !important; }
+.royalties-table th:nth-child(2),
+.royalties-table td:nth-child(2) { width: 12% !important; }
+.royalties-table th:nth-child(3),
+.royalties-table td:nth-child(3) { width: 6% !important; text-align: center !important; }
+.royalties-table th:nth-child(4),
+.royalties-table td:nth-child(4) { width: 9% !important; text-align: center !important; }
+.royalties-table th:nth-child(5),
+.royalties-table td:nth-child(5) { width: 9% !important; }
+.royalties-table th:nth-child(6),
+.royalties-table td:nth-child(6) { width: 6% !important; text-align: center !important; }
+.royalties-table th:nth-child(7),
+.royalties-table td:nth-child(7) { width: 9% !important; }
+.royalties-table th:nth-child(8),
+.royalties-table td:nth-child(8) { width: 8% !important; text-align: center !important; }
+.royalties-table th:nth-child(9),
+.royalties-table td:nth-child(9) { width: 9% !important; }
+.royalties-table th:nth-child(10),
+.royalties-table td:nth-child(10) { width: 8.5% !important; }
+.royalties-table th:nth-child(11),
+.royalties-table td:nth-child(11) { width: 9.5% !important; }
+.royalties-table th:nth-child(12),
+.royalties-table td:nth-child(12) { width: 9% !important; }
+.royalties-table .royalty-action-row td {
+  padding: 0 8px 12px !important;
+  background: #fbfafc !important;
+  border-bottom: 1px solid #e8edf2 !important;
+}
+.royalty-row-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  padding: 10px 12px !important;
+  background: #fff !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 10px !important;
+}
+.royalty-action-label {
+  margin-right: auto !important;
+  color: #64707d !important;
+  font-size: .72rem !important;
+  font-weight: 700 !important;
+}
+.royalty-row-actions form {
+  margin: 0 !important;
+}
+.royalty-row-actions .btn,
+.royalty-row-actions button {
+  width: auto !important;
+  min-width: 74px !important;
+  min-height: 34px !important;
+  padding: 7px 12px !important;
+  font-size: .74rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}
+
+/* Keep period/filter cards aligned at the top across royalty side tabs. */
+.page-header.split-header,
+.insights-page-heading {
+  align-items: start !important;
+}
+.page-header.split-header > form,
+.insights-page-heading > form {
+  align-self: start !important;
+  width: min(100%, 520px) !important;
+  min-width: 0 !important;
+  grid-template-columns: repeat(2, minmax(130px, 1fr)) auto !important;
+}
+.page-header.split-header > form button,
+.insights-page-heading > form button {
+  min-width: 150px !important;
+  white-space: nowrap !important;
+}
+.branch-selector-row {
+  display: grid !important;
+  grid-template-columns: auto minmax(320px, 1fr) auto !important;
+  align-items: end !important;
+  gap: 14px !important;
+}
+.branch-selector-row .period-filter-form {
+  justify-self: end !important;
+  width: min(100%, 520px) !important;
+  grid-template-columns: repeat(2, minmax(130px, 1fr)) auto !important;
+}
+@media (max-width: 1150px) {
+  .page-header.split-header > form,
+  .insights-page-heading > form,
+  .branch-selector-row,
+  .branch-selector-row .period-filter-form {
+    width: 100% !important;
+    grid-template-columns: 1fr !important;
+  }
+  .branch-selector-row .period-filter-form {
+    justify-self: stretch !important;
+  }
+}
+
+/* Royalty Overview final: style top like Royalty Management, keep original table/actions columns. */
+.royalty-overview-page .section-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  gap: 22px !important;
+  margin: 0 0 22px !important;
+}
+.royalty-overview-page .section-header h1 {
+  margin: 0 !important;
+  color: #1f1930 !important;
+  font-size: clamp(1.8rem, 2.3vw, 2.7rem) !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.035em !important;
+  font-weight: 800 !important;
+}
+.royalty-overview-page .section-header p {
+  max-width: 760px !important;
+  margin: 9px 0 0 !important;
+  color: #6a7280 !important;
+  font-size: 1rem !important;
+  line-height: 1.55 !important;
+}
+.royalty-overview-page .section-header .btn {
+  min-width: 160px !important;
+  min-height: 54px !important;
+  align-self: start !important;
+  border-radius: 12px !important;
+  white-space: nowrap !important;
+}
+.royalty-overview-page .branch-context-card {
+  display: grid !important;
+  grid-template-columns: minmax(260px, 1fr) minmax(420px, 760px) !important;
+  gap: 24px !important;
+  align-items: end !important;
+  min-height: 0 !important;
+  margin: 0 0 24px !important;
+  padding: 28px !important;
+  background: #fff !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 38px rgba(24, 32, 42, .06) !important;
+}
+.royalty-overview-page .branch-context-card > h2,
+.royalty-overview-page .branch-context-card > p {
+  grid-column: 1 !important;
+}
+.royalty-overview-page .branch-context-card h2 {
+  margin: 0 !important;
+  color: #1f1930 !important;
+  font-size: 1.35rem !important;
+  line-height: 1.2 !important;
+  font-weight: 800 !important;
+}
+.royalty-overview-page .branch-context-card > p {
+  margin: 10px 0 0 !important;
+  color: #64707d !important;
+  font-size: .92rem !important;
+  line-height: 1.45 !important;
+}
+.royalty-overview-page .branch-selector-row {
+  grid-column: 2 !important;
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1fr) minmax(330px, auto) auto !important;
+  gap: 14px !important;
+  align-items: end !important;
+  margin: 0 !important;
+}
+.royalty-overview-page .branch-selector-row > label {
+  align-self: center !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+.royalty-overview-page .branch-selector-row > select {
+  min-width: 280px !important;
+  height: 54px !important;
+}
+.royalty-overview-page .branch-selector-row .period-filter-form {
+  justify-self: end !important;
+  width: auto !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(120px, 150px)) auto !important;
+  gap: 0 !important;
+  padding: 18px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 38px rgba(24, 32, 42, .08) !important;
+}
+.royalty-overview-page .period-filter-form select,
+.royalty-overview-page .period-filter-form input {
+  min-height: 54px !important;
+}
+.royalty-overview-page .period-filter-form .btn {
+  min-width: 150px !important;
+  min-height: 54px !important;
+  white-space: nowrap !important;
+}
+.royalty-overview-page .royalties-table {
+  table-layout: auto !important;
+  min-width: 1500px !important;
+}
+.royalty-overview-page .royalties-table th,
+.royalty-overview-page .royalties-table td {
+  padding: 11px 12px !important;
+  font-size: .74rem !important;
+  line-height: 1.22 !important;
+}
+.royalty-overview-page .royalties-table th:nth-child(n),
+.royalty-overview-page .royalties-table td:nth-child(n) {
+  width: auto !important;
+}
+.royalty-overview-page .royalties-table td:nth-child(5),
+.royalty-overview-page .royalties-table td:nth-child(7),
+.royalty-overview-page .royalties-table td:nth-child(9),
+.royalty-overview-page .royalties-table td:nth-child(10),
+.royalty-overview-page .royalties-table td:nth-child(11),
+.royalty-overview-page .royalties-table td:nth-child(12) {
+  white-space: nowrap !important;
+}
+.royalty-overview-page .royalties-table .button-row {
+  justify-content: flex-start !important;
+  flex-wrap: nowrap !important;
+}
+.royalty-overview-page .royalties-table .button-row .btn,
+.royalty-overview-page .royalties-table .button-row button {
+  min-width: 72px !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}
+@media (max-width: 1250px) {
+  .royalty-overview-page .section-header,
+  .royalty-overview-page .branch-context-card,
+  .royalty-overview-page .branch-selector-row,
+  .royalty-overview-page .branch-selector-row .period-filter-form {
+    grid-template-columns: 1fr !important;
+  }
+  .royalty-overview-page .branch-selector-row {
+    grid-column: 1 !important;
+  }
+  .royalty-overview-page .branch-selector-row .period-filter-form {
+    justify-self: stretch !important;
+    width: 100% !important;
+  }
+}
+
+/* Royalty Overview top controls: match the compact top-card layout used by the other royalty tabs. */
+.royalty-overview-page .branch-context-card {
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 760px) !important;
+  align-items: start !important;
+  gap: 28px !important;
+  min-height: 0 !important;
+}
+.royalty-overview-page .branch-context-card > h2,
+.royalty-overview-page .branch-context-card > p {
+  grid-column: 1 !important;
+}
+.royalty-overview-page .branch-selector-row {
+  grid-column: 2 !important;
+  grid-row: 1 / span 2 !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+  justify-self: end !important;
+  width: min(100%, 760px) !important;
+  margin: 0 !important;
+  padding: 18px !important;
+  background: #fff !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 38px rgba(24, 32, 42, .08) !important;
+}
+.royalty-overview-page .branch-selector-row > label {
+  margin: 0 !important;
+  color: #51475a !important;
+  font-size: .76rem !important;
+  font-weight: 850 !important;
+  white-space: normal !important;
+}
+.royalty-overview-page .branch-selector-row > select {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 54px !important;
+}
+.royalty-overview-page .branch-selector-row .period-filter-form {
+  justify-self: stretch !important;
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto !important;
+  gap: 12px !important;
+  align-items: end !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.royalty-overview-page .period-filter-form > label {
+  min-width: 0 !important;
+}
+.royalty-overview-page .period-filter-form select,
+.royalty-overview-page .period-filter-form input {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 54px !important;
+}
+.royalty-overview-page .period-filter-form .btn {
+  min-width: 150px !important;
+  min-height: 54px !important;
+  white-space: nowrap !important;
+}
+@media (max-width: 1250px) {
+  .royalty-overview-page .branch-context-card,
+  .royalty-overview-page .branch-selector-row,
+  .royalty-overview-page .branch-selector-row .period-filter-form {
+    grid-template-columns: 1fr !important;
+  }
+  .royalty-overview-page .branch-selector-row {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+  }
+}
+
+/* Royalty Overview: align page rhythm with the Insight Explanations style. */
+.royalty-overview-page {
+  display: block !important;
+}
+.royalty-overview-page .section-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  gap: 24px !important;
+  margin: 0 0 24px !important;
+}
+.royalty-overview-page .section-header h1 {
+  margin: 0 !important;
+  color: #1f1930 !important;
+  font-size: clamp(1.9rem, 2.35vw, 2.75rem) !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.035em !important;
+  font-weight: 800 !important;
+}
+.royalty-overview-page .section-header p {
+  max-width: 780px !important;
+  margin: 10px 0 0 !important;
+  color: #64707d !important;
+  font-size: 1rem !important;
+  line-height: 1.55 !important;
+}
+.royalty-overview-page .section-header .btn {
+  min-width: 190px !important;
+  min-height: 54px !important;
+  align-self: start !important;
+  border-radius: 12px !important;
+  box-shadow: 0 14px 32px rgba(107, 74, 160, .16) !important;
+  white-space: nowrap !important;
+}
+.royalty-overview-page .branch-context-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(520px, 760px) !important;
+  gap: 24px !important;
+  align-items: start !important;
+  min-height: 0 !important;
+  margin: 0 0 24px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.royalty-overview-page .branch-context-card > h2 {
+  grid-column: 1 !important;
+  margin: 0 !important;
+  color: #1f1930 !important;
+  font-size: 1.35rem !important;
+  line-height: 1.2 !important;
+  font-weight: 800 !important;
+}
+.royalty-overview-page .branch-context-card > p {
+  grid-column: 1 !important;
+  margin: 10px 0 0 !important;
+  max-width: 780px !important;
+  color: #64707d !important;
+  font-size: .95rem !important;
+  line-height: 1.5 !important;
+}
+.royalty-overview-page .branch-selector-row {
+  grid-column: 2 !important;
+  grid-row: 1 / span 2 !important;
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1fr) auto !important;
+  gap: 12px !important;
+  align-items: end !important;
+  justify-self: end !important;
+  width: min(100%, 760px) !important;
+  margin: 0 !important;
+  padding: 18px !important;
+  background: #fff !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 38px rgba(24, 32, 42, .08) !important;
+}
+.royalty-overview-page .branch-selector-row > label {
+  grid-column: 1 !important;
+  margin: 0 !important;
+  color: #51475a !important;
+  font-size: .76rem !important;
+  line-height: 1.2 !important;
+  font-weight: 850 !important;
+}
+.royalty-overview-page .branch-selector-row > select {
+  grid-column: 1 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 54px !important;
+}
+.royalty-overview-page .branch-selector-row .period-filter-form {
+  grid-column: 2 !important;
+  grid-row: 1 / span 2 !important;
+  justify-self: end !important;
+  width: auto !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(130px, 160px)) minmax(150px, auto) !important;
+  gap: 12px !important;
+  align-items: end !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.royalty-overview-page .period-filter-form > label {
+  min-width: 0 !important;
+  margin: 0 !important;
+  color: #51475a !important;
+  font-size: .76rem !important;
+  font-weight: 850 !important;
+}
+.royalty-overview-page .period-filter-form select,
+.royalty-overview-page .period-filter-form input {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 54px !important;
+}
+.royalty-overview-page .period-filter-form .btn {
+  min-width: 150px !important;
+  min-height: 54px !important;
+  border-radius: 12px !important;
+  white-space: nowrap !important;
+}
+.royalty-overview-page .royalty-dashboard-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+  margin: 24px 0 24px !important;
+}
+.royalty-overview-page .metric-card {
+  min-height: 132px !important;
+  padding: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  background: #fff !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 38px rgba(24, 32, 42, .06) !important;
+}
+.royalty-overview-page .metric-card span {
+  color: #746b7b !important;
+  font-size: .72rem !important;
+  font-weight: 900 !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+.royalty-overview-page .metric-card strong {
+  color: #1f1930 !important;
+  font-size: 1.7rem !important;
+  line-height: 1.15 !important;
+  font-weight: 800 !important;
+}
+.royalty-overview-page .table-responsive:has(.royalties-table) {
+  overflow-x: auto !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  box-shadow: 0 16px 38px rgba(24, 32, 42, .06) !important;
+}
+.royalty-overview-page .royalties-table {
+  width: 100% !important;
+  min-width: 1320px !important;
+  table-layout: fixed !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+.royalty-overview-page .royalties-table th,
+.royalty-overview-page .royalties-table td {
+  padding: 11px 10px !important;
+  font-size: .72rem !important;
+  line-height: 1.18 !important;
+  vertical-align: middle !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+.royalty-overview-page .royalties-table th {
+  color: #5c5566 !important;
+  font-size: .66rem !important;
+  letter-spacing: .065em !important;
+}
+.royalty-overview-page .royalties-table th:nth-child(1),
+.royalty-overview-page .royalties-table td:nth-child(1) { width: 5.2% !important; }
+.royalty-overview-page .royalties-table th:nth-child(2),
+.royalty-overview-page .royalties-table td:nth-child(2) { width: 9.5% !important; }
+.royalty-overview-page .royalties-table th:nth-child(3),
+.royalty-overview-page .royalties-table td:nth-child(3) { width: 5.5% !important; text-align: center !important; }
+.royalty-overview-page .royalties-table th:nth-child(4),
+.royalty-overview-page .royalties-table td:nth-child(4) { width: 8% !important; text-align: center !important; }
+.royalty-overview-page .royalties-table th:nth-child(5),
+.royalty-overview-page .royalties-table td:nth-child(5) { width: 8% !important; }
+.royalty-overview-page .royalties-table th:nth-child(6),
+.royalty-overview-page .royalties-table td:nth-child(6) { width: 5.2% !important; text-align: center !important; }
+.royalty-overview-page .royalties-table th:nth-child(7),
+.royalty-overview-page .royalties-table td:nth-child(7) { width: 8.5% !important; }
+.royalty-overview-page .royalties-table th:nth-child(8),
+.royalty-overview-page .royalties-table td:nth-child(8) { width: 7% !important; text-align: center !important; }
+.royalty-overview-page .royalties-table th:nth-child(9),
+.royalty-overview-page .royalties-table td:nth-child(9) { width: 8% !important; }
+.royalty-overview-page .royalties-table th:nth-child(10),
+.royalty-overview-page .royalties-table td:nth-child(10) { width: 7.5% !important; }
+.royalty-overview-page .royalties-table th:nth-child(11),
+.royalty-overview-page .royalties-table td:nth-child(11) { width: 8.5% !important; }
+.royalty-overview-page .royalties-table th:nth-child(12),
+.royalty-overview-page .royalties-table td:nth-child(12) { width: 8.5% !important; }
+.royalty-overview-page .royalties-table th:nth-child(13),
+.royalty-overview-page .royalties-table td:nth-child(13) { width: 10.4% !important; }
+.royalty-overview-page .royalties-table td:nth-child(5),
+.royalty-overview-page .royalties-table td:nth-child(7),
+.royalty-overview-page .royalties-table td:nth-child(9),
+.royalty-overview-page .royalties-table td:nth-child(10),
+.royalty-overview-page .royalties-table td:nth-child(11),
+.royalty-overview-page .royalties-table td:nth-child(12) {
+  white-space: nowrap !important;
+}
+.royalty-overview-page .royalties-table .button-row {
+  display: flex !important;
+  gap: 7px !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-start !important;
+}
+.royalty-overview-page .royalties-table .button-row form {
+  display: contents !important;
+}
+.royalty-overview-page .royalties-table .button-row .btn,
+.royalty-overview-page .royalties-table .button-row button {
+  min-width: 62px !important;
+  min-height: 34px !important;
+  padding: 7px 9px !important;
+  font-size: .7rem !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+}
+@media (max-width: 1350px) {
+  .royalty-overview-page .branch-context-card,
+  .royalty-overview-page .section-header,
+  .royalty-overview-page .branch-selector-row,
+  .royalty-overview-page .branch-selector-row .period-filter-form {
+    grid-template-columns: 1fr !important;
+  }
+  .royalty-overview-page .branch-selector-row {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+  }
+  .royalty-overview-page .branch-selector-row .period-filter-form {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    justify-self: stretch !important;
+  }
+}
+@media (max-width: 900px) {
+  .royalty-overview-page .royalty-dashboard-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* V124 sidebar restore: keep the app-menu content visible on desktop. */
 @media (min-width: 900px) {
   .app-shell {
-    display: flex !important;
-    align-items: stretch !important;
+    display: block !important;
     min-height: 100vh !important;
   }
 
   .app-menu {
-    display: block !important;
     position: fixed !important;
     inset: 0 auto 0 0 !important;
-    width: var(--sidebar-w, 270px) !important;
-    min-width: var(--sidebar-w, 270px) !important;
+    display: block !important;
+    width: 290px !important;
+    min-width: 290px !important;
     height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: #6B4AA0 !important;
     border-right: 1px solid rgba(255,255,255,.16) !important;
-    box-shadow: 8px 0 26px rgba(38,27,48,.13) !important;
-    z-index: 200 !important;
+    box-shadow: none !important;
+    z-index: 1200 !important;
+    overflow: visible !important;
   }
 
-  .app-menu > summary {
+  .app-menu > summary.menu-toggle {
     display: none !important;
   }
 
-  .menu-panel {
-    display: block !important;
+  .app-menu .menu-panel {
     position: static !important;
+    display: block !important;
     width: 100% !important;
     height: 100vh !important;
     max-height: none !important;
-    overflow-y: auto !important;
-    transform: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: #6B4AA0 !important;
     color: #fff !important;
-    box-shadow: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    transform: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
   }
 
   .main-panel {
-    width: calc(100% - var(--sidebar-w, 270px)) !important;
-    margin-left: var(--sidebar-w, 270px) !important;
+    margin-left: 290px !important;
+    width: calc(100% - 290px) !important;
     min-width: 0 !important;
   }
 }
 
 .sidebar-nav {
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100vh !important;
   background: #6B4AA0 !important;
   color: #fff !important;
+  padding: 18px 14px 30px !important;
+  gap: 8px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
-.sidebar-nav .sidebar-logo,
-.sidebar-nav .sidebar-logo span,
-.sidebar-nav .sidebar-logo strong,
-.sidebar-nav .nav-group-title,
-.sidebar-nav .nav-section > summary,
-.sidebar-nav .nav-primary-link > a,
-.sidebar-nav a,
-.sidebar-nav strong {
+.sidebar-logo {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 128px !important;
+  margin: 0 2px 16px !important;
+  padding: 14px 12px !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 14px !important;
+  background: rgba(255,255,255,.10) !important;
   color: #fff !important;
-  opacity: 1 !important;
-  visibility: visible !important;
+  text-align: center !important;
+  text-decoration: none !important;
 }
 
-.sidebar-nav .sidebar-logo small,
-.sidebar-nav small,
-.sidebar-nav a small,
-.sidebar-nav summary small {
-  color: rgba(255,255,255,.72) !important;
-  opacity: 1 !important;
-  visibility: visible !important;
+.sidebar-logo img {
+  display: block !important;
+  width: 150px !important;
+  max-width: 150px !important;
+  height: auto !important;
+  max-height: 66px !important;
+  object-fit: contain !important;
 }
 
-.sidebar-nav .nav-group-title {
-  color: rgba(255,255,255,.62) !important;
+.sidebar-logo span,
+.sidebar-logo strong,
+.sidebar-logo small {
+  display: block !important;
+  color: #fff !important;
+}
+
+.sidebar-logo strong {
+  font-size: .95rem !important;
   font-weight: 700 !important;
+}
+
+.sidebar-logo small {
+  font-size: .75rem !important;
+  font-weight: 400 !important;
+  opacity: .8 !important;
 }
 
 .sidebar-nav .nav-primary-link,
 .sidebar-nav .nav-section {
+  display: block !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
   background: transparent !important;
+  box-shadow: none !important;
 }
 
-.sidebar-nav .nav-section > summary,
-.sidebar-nav .nav-primary-link > a {
-  background: transparent !important;
+.sidebar-nav .nav-primary-link > a,
+.sidebar-nav .nav-section > summary {
+  display: grid !important;
+  grid-template-columns: 38px minmax(0,1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-height: 54px !important;
+  padding: 11px 12px !important;
+  border-radius: 12px !important;
+  color: #fff !important;
+  background: rgba(255,255,255,.08) !important;
   border: 0 !important;
+  list-style: none !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+}
+
+.sidebar-nav .nav-section > summary::-webkit-details-marker {
+  display: none !important;
+}
+
+.sidebar-nav .nav-section > summary::after {
+  content: "›" !important;
+  justify-self: end !important;
+  font-size: 1.2rem !important;
+  color: rgba(255,255,255,.65) !important;
+  transform: rotate(90deg) !important;
+}
+
+.sidebar-nav .nav-section:not([open]) > summary::after {
+  transform: rotate(0deg) !important;
+}
+
+.sidebar-nav .nav-icon {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  border-radius: 10px !important;
+  background: rgba(255,255,255,.13) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+
+.sidebar-nav strong {
+  color: #fff !important;
+  font-size: .9rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+.sidebar-nav small {
+  display: block !important;
+  margin-top: 2px !important;
+  color: rgba(255,255,255,.68) !important;
+  font-size: .7rem !important;
+  font-weight: 400 !important;
+  line-height: 1.25 !important;
 }
 
 .sidebar-nav .nav-section[open] > summary,
@@ -2935,6 +3740,8 @@ td input, td select, td textarea {
   line-height: 1.25 !important;
   text-decoration: none !important;
   box-shadow: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .sidebar-nav .nav-subtabs a small,
@@ -2957,190 +3764,83 @@ td input, td select, td textarea {
 }
 
 @media (max-width: 899px) {
-  .app-shell {
-    display: block !important;
-  }
-
-  .app-menu {
-    position: fixed !important;
-    inset: 14px auto auto 14px !important;
-    width: auto !important;
-    min-width: 0 !important;
-    height: auto !important;
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    z-index: 2000 !important;
-  }
-
-  .menu-toggle {
-    display: grid !important;
-    place-items: center !important;
-    width: 42px !important;
-    height: 42px !important;
-    border-radius: 11px !important;
-    background: #fff !important;
-    border: 1px solid #dce2e8 !important;
-    box-shadow: 0 10px 30px rgba(42,27,57,.12) !important;
-  }
-
-  .menu-panel {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: min(86vw, 320px) !important;
-    height: 100vh !important;
-    max-height: none !important;
-    overflow-y: auto !important;
-    transform: translateX(-105%) !important;
-    transition: transform .22s ease !important;
+  .app-menu .menu-panel {
     background: #6B4AA0 !important;
-    box-shadow: 18px 0 42px rgba(30,18,39,.22) !important;
-    z-index: 1999 !important;
-  }
-
-  .app-menu[open] .menu-panel {
-    transform: translateX(0) !important;
-  }
-
-  .main-panel {
-    width: 100% !important;
-    margin-left: 0 !important;
-  }
-
-  .topbar {
-    padding-left: 72px !important;
   }
 }
 
-/* Royalty overview responsive alignment */
-.royalties-page .section-header {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto !important;
-  align-items: start !important;
-  gap: 18px !important;
+/* Responsive user edit/detail popups */
+.user-management-modals .modal-backdrop,
+.modal-backdrop[id^="edit-user-"],
+.modal-backdrop[id^="view-user-"] {
+  padding: clamp(10px, 2vw, 24px) !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  overflow-y: auto !important;
 }
 
-.royalties-page .section-header .btn {
-  justify-self: end !important;
-  min-width: 150px !important;
-  white-space: nowrap !important;
+.user-management-modals .modal-card,
+.modal-backdrop[id^="edit-user-"] .modal-card,
+.modal-backdrop[id^="view-user-"] .modal-card {
+  width: min(760px, calc(100vw - 32px)) !important;
+  max-width: calc(100vw - 32px) !important;
+  max-height: calc(100vh - 28px) !important;
+  margin: 14px auto !important;
+  overflow-x: hidden !important;
 }
 
-.royalties-page .branch-context-card {
-  overflow: hidden !important;
+.user-management-modals .inline-form-grid,
+.modal-backdrop[id^="edit-user-"] .inline-form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)) !important;
 }
 
-.royalties-page .branch-selector-row {
-  display: grid !important;
-  grid-template-columns: minmax(150px, auto) minmax(260px, 1fr) minmax(420px, auto) !important;
-  align-items: end !important;
-  gap: 14px !important;
-  margin-top: 18px !important;
+.user-management-modals .modal-role-grid,
+.modal-backdrop[id^="edit-user-"] .modal-role-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)) !important;
 }
 
-.royalties-page .branch-selector-row > label {
-  align-self: center !important;
-  margin: 0 !important;
-  line-height: 1.3 !important;
-  white-space: normal !important;
-}
-
-.royalties-page .branch-selector-row > select {
+.user-management-modals .modal-role-option,
+.modal-backdrop[id^="edit-user-"] .modal-role-option {
   width: 100% !important;
-  min-width: 0 !important;
+  max-width: 100% !important;
 }
 
-.royalties-page .period-filter-form {
-  width: 100% !important;
-  max-width: 560px !important;
-  justify-self: end !important;
-  grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) minmax(130px, auto) !important;
-}
-
-.topbar-user,
-.topbar-user strong,
-.logout-link {
-  min-width: 0 !important;
-}
-
-.topbar-user strong,
-.logout-link {
-  overflow-wrap: normal !important;
-  word-break: normal !important;
-  white-space: nowrap !important;
-}
-
-@media (max-width: 1280px) {
-  .royalties-page .branch-selector-row {
-    grid-template-columns: minmax(150px, auto) minmax(260px, 1fr) !important;
-  }
-
-  .royalties-page .period-filter-form {
-    grid-column: 1 / -1 !important;
-    justify-self: stretch !important;
-    max-width: none !important;
-    grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) minmax(150px, auto) !important;
+@media (min-width: 900px) {
+  .modal-backdrop[id^="edit-user-"],
+  .modal-backdrop[id^="view-user-"] {
+    left: var(--sidebar-w, 270px) !important;
+    width: calc(100vw - var(--sidebar-w, 270px)) !important;
   }
 }
 
-@media (max-width: 899px) {
-  .topbar-user {
-    gap: 6px !important;
-    padding: 7px 8px !important;
-    max-width: calc(100vw - 190px) !important;
-    flex-wrap: nowrap !important;
+@media (max-width: 720px) {
+  .user-management-modals .modal-card,
+  .modal-backdrop[id^="edit-user-"] .modal-card,
+  .modal-backdrop[id^="view-user-"] .modal-card {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    padding: 16px !important;
   }
-
-  .topbar-user strong {
-    max-width: 92px !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-
-  .logout-link {
-    padding: 8px 10px !important;
-  }
-
-  .royalties-page .section-header {
+  .user-management-modals .modal-role-grid,
+  .modal-backdrop[id^="edit-user-"] .modal-role-grid {
     grid-template-columns: 1fr !important;
-    align-items: stretch !important;
-  }
-
-  .royalties-page .section-header .btn {
-    justify-self: stretch !important;
-    width: 100% !important;
-  }
-
-  .royalties-page .branch-selector-row {
-    grid-template-columns: 1fr !important;
-    gap: 12px !important;
-  }
-
-  .royalties-page .branch-selector-row > label {
-    align-self: start !important;
-  }
-
-  .royalties-page .period-filter-form {
-    grid-template-columns: 1fr !important;
-    padding: 14px !important;
-  }
-
-  .royalties-page .period-filter-form .btn {
-    width: 100% !important;
-  }
-
-  .royalties-page .royalty-dashboard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
-@media (max-width: 560px) {
-  .topbar-user strong {
-    display: none !important;
-  }
+.royalties-table tr.grouped-summary-row td {
+  background: #f6f1fb !important;
+  border-top: 2px solid #8f73bd !important;
+  border-bottom: 2px solid #8f73bd !important;
+}
 
-.royalties-page .royalty-dashboard-grid {
-  grid-template-columns: 1fr !important;
-  }
+.royalties-table tr.grouped-summary-row td:first-child {
+  border-left: 4px solid #6B4AA0 !important;
+}
+
+.royalties-table tr.grouped-linked-row td {
+  background: #fbf9fd !important;
+}
+
+.royalties-table tr.grouped-linked-row td:first-child {
+  border-left: 4px solid #d6c8e8 !important;
 }

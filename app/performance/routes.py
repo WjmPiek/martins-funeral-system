@@ -95,7 +95,7 @@ def dashboard():
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
-    ensure_performance_results(month, year, ids, "growth_bracket")
+    ensure_performance_results(month, year, ids, mode)
     selected = get_selected_franchise()
     franchise_id = selected.id if selected else (ids[0] if ids else None)
     if not franchise_id:
@@ -129,7 +129,7 @@ def index():
     mode = request_mode()
     growth = request_growth()
     ids = active_leaderboard_franchise_ids()
-    ensure_performance_results(month, year, ids, "growth_bracket")
+    ensure_performance_results(month, year, ids, mode)
     previous_m, previous_y = previous_month(month, year)
     ensure_performance_results(previous_m, previous_y, ids, "growth_bracket")
 
@@ -179,7 +179,7 @@ def kpi(metric_key):
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
-    ensure_performance_results(month, year, ids, "growth_bracket")
+    ensure_performance_results(month, year, ids, mode)
     summary = metric_page_summary(metric_key, month, year, ids, mode, growth)
     selected = get_selected_franchise()
     my_row = None
@@ -222,7 +222,7 @@ def franchise(franchise_id):
     month, year = selected_period_from_request(request.args)
     mode = request_mode()
     growth = request_growth()
-    ensure_performance_results(month, year, [franchise_id], "growth_bracket")
+    ensure_performance_results(month, year, [franchise_id], mode)
     franchise = Franchise.query.get_or_404(franchise_id)
     metric_rows = franchise_metric_summary(franchise_id, month, year, mode, growth)
     chart_metric = request.args.get("chart_metric", "cash")
@@ -372,8 +372,8 @@ def graphs_data():
     growth = scope["growth"]
 
     # This endpoint may do work, but it runs after the page shell is displayed.
-    # In normal use it reads the pre-calculated performance_results cache.
-    ensure_performance_results(month, year, ids, "annual_gross_scale")
+    # In normal use it reads cached graph data; if it is missing, rebuild it now so the charts are not blank.
+    ensure_performance_results(month, year, ids, mode)
 
     if scope["is_combined_view"]:
         graph_data = graph_engine_payload_for_franchises(ids, metric_key, month, year, periods, mode, growth) if ids else None
@@ -397,7 +397,7 @@ def decision_centre_view():
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
-    ensure_performance_results(month, year, ids, "growth_bracket")
+    ensure_performance_results(month, year, ids, mode)
     centre = decision_centre(month, year, ids, mode, growth)
     return render_template(
         "performance/decision_centre.html",
@@ -422,7 +422,7 @@ def executive():
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
-    ensure_performance_results(month, year, ids, "growth_bracket")
+    ensure_performance_results(month, year, ids, mode)
     dashboard = executive_dashboard(month, year, ids, mode, growth)
     return render_template(
         "performance/executive.html",
@@ -447,7 +447,7 @@ def leaderboards():
     mode = request_mode()
     growth = request_growth()
     ids = active_leaderboard_franchise_ids()
-    ensure_performance_results(month, year, ids, "growth_bracket")
+    ensure_performance_results(month, year, ids, mode)
     boards = leaderboard_decision_centre(month, year, ids, mode, growth)
     return render_template(
         "performance/leaderboards.html",
@@ -472,7 +472,7 @@ def insights():
     mode = request_mode()
     growth = request_growth()
     ids = accessible_franchise_ids()
-    ensure_performance_results(month, year, ids, "growth_bracket")
+    ensure_performance_results(month, year, ids, mode)
     selected = get_selected_franchise()
     franchise_id = request.args.get("franchise_id", type=int)
     if franchise_id and franchise_id not in ids:

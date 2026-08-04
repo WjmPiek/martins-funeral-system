@@ -126,6 +126,17 @@ def _p(text, style):
     return Paragraph(safe, style)
 
 
+def _p_bold(text, style):
+    text = _clean_text(text)
+    safe = (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\n", "<br/>")
+    )
+    return Paragraph(f"<b>{safe}</b>", style)
+
+
 
 
 def _count(value):
@@ -194,9 +205,12 @@ def _footer(canvas, doc, report_title, franchise):
 
 
 def _info_table(franchise, generated_by, styles, available_width):
+    is_company_profile = getattr(franchise, "is_company_profile", False)
+    name_label = "Company Name" if is_company_profile else "Franchise Name"
+    code_label = "Company Code" if is_company_profile else "Franchise Code"
     rows = [
-        ["Franchise Name", getattr(franchise, "business_name", "")],
-        ["Franchise Code", getattr(franchise, "franchise_code", "")],
+        [name_label, getattr(franchise, "business_name", "")],
+        [code_label, getattr(franchise, "franchise_code", "")],
         ["PTY Number", getattr(franchise, "pty_number", "")],
         ["VAT Number", getattr(franchise, "vat_number", "")],
         ["Address", getattr(franchise, "office_address", "")],
@@ -495,14 +509,17 @@ def build_monthly_figures_period_pdf(figures, franchise, generated_by, period_la
 
 
 def build_royalty_history_pdf(figures, franchise, generated_by, period_label=None):
+    title = "Royalty Calculation & History" + (f" - {period_label}" if period_label else "")
+    styles = _styles()
     headers = [
         "Period",
+        "Franchise",
         "Status",
-        "Gross Method",
+        "Method",
         "Royalty Base",
-        "Royalty %",
-        "Royalty Amount",
-        "Minimum Applied",
+        "%",
+        "Royalty",
+        "Min.",
         "Cash",
         "Admin Fee",
         "Insurance Receipts",
@@ -510,10 +527,14 @@ def build_royalty_history_pdf(figures, franchise, generated_by, period_label=Non
     ]
     rows = []
     for item in figures:
+        item_franchise = getattr(item, "franchise", None)
+        franchise_name = getattr(item_franchise, "business_name", "")
+        franchise_cell = _p_bold(franchise_name, styles["TinyCell"]) if getattr(item, "is_grouped_summary", False) else franchise_name
         rows.append([
             item.period_label,
+            franchise_cell,
             item.status,
-            _gross_method_label(item.franchise),
+            _gross_method_label(item_franchise),
             _money(item.gross_revenue),
             f"{float(item.royalty_percentage or 0):.2f}%",
             _money(item.royalty_amount),
@@ -523,4 +544,51 @@ def build_royalty_history_pdf(figures, franchise, generated_by, period_label=Non
             _money(item.insurance_receipts),
             _money(item.insurance_payover),
         ])
-    return build_report_pdf("Royalty Calculation & History" + (f" - {period_label}" if period_label else ""), franchise, generated_by, headers, rows, pagesize=landscape(A4), tiny=True)
+
+    pagesize = landscape(A4)
+    tmp = NamedTemporaryFile(delete=False, suffix=".pdf")
+    tmp.close()
+
+    doc = SimpleDocTemplate(
+        tmp.name,
+        pagesize=pagesize,
+        rightMargin=6 * mm,
+        leftMargin=6 * mm,
+        topMargin=16 * mm,
+        bottomMargin=14 * mm,
+    )
+
+    available_width = pagesize[0] - doc.leftMargin - doc.rightMargin
+    story = []
+    add_cover_page(story, title, franchise, generated_by, styles, available_width)
+    story.append(_p("Royalty Overview", styles["SectionTitle"]))
+
+    weights = [0.72, 1.18, 0.80, 1.00, 1.02, 0.58, 1.00, 0.58, 1.00, 0.92, 1.08, 1.08]
+    total_weight = sum(weights)
+    col_widths = [(available_width * weight / total_weight) for weight in weights]
+
+    data = [[_p(header, styles["TinyHead"]) for header in headers]]
+    for row in rows:
+        data.append([cell if hasattr(cell, "wrapOn") else _p(cell, styles["TinyCell"]) for cell in row])
+
+    table = Table(data, colWidths=col_widths, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), LIGHT_BLUE),
+        ("TEXTCOLOR", (0, 0), (-1, 0), DARK_TEXT),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (5, 1), (5, -1), "CENTER"),
+        ("ALIGN", (7, 1), (7, -1), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 1.0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 1.0),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.2),
+    ]))
+    story.append(table)
+
+    doc.build(
+        story,
+        onFirstPage=lambda c, d: _footer(c, d, title, franchise),
+        onLaterPages=lambda c, d: _footer(c, d, title, franchise),
+    )
+    return tmp.name
