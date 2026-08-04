@@ -4,7 +4,6 @@ import re
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, send_file, session
 from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
 from app.extensions import db
 from app.audit import log_action
 from app.models import Franchise, RoyaltyScale, User, Role, MonthlyFigure
@@ -324,8 +323,7 @@ def export_details_pdf():
     pdf_path = build_franchise_details_pdf(franchise, scales, current_user)
     log_action("Franchise Details", "Exported PDF", f"Franchise: {franchise.business_name}")
     db.session.commit()
-    safe_franchise = secure_filename(franchise.business_name or "franchise").lower() or "franchise"
-    return send_file(pdf_path, as_attachment=True, download_name=f"franchise-details-{safe_franchise}.pdf")
+    return send_file(pdf_path, as_attachment=True, download_name="franchise-details.pdf")
 
 # ---------------------------------------------------------------------------
 # Franchise employee user management
