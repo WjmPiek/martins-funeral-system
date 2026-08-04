@@ -369,16 +369,6 @@ document.addEventListener('DOMContentLoaded', function () {
 (function () {
   var menu = document.querySelector('.app-menu');
   if (!menu) return;
-  var desktopQuery = window.matchMedia('(min-width: 900px)');
-  function syncSidebarForViewport() {
-    menu.open = desktopQuery.matches;
-  }
-  syncSidebarForViewport();
-  if (desktopQuery.addEventListener) {
-    desktopQuery.addEventListener('change', syncSidebarForViewport);
-  } else if (desktopQuery.addListener) {
-    desktopQuery.addListener(syncSidebarForViewport);
-  }
   menu.querySelectorAll('a').forEach(function (link) {
     link.addEventListener('click', function () {
       if (window.matchMedia('(max-width: 899px)').matches) menu.open = false;

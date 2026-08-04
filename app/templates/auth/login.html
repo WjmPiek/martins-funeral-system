@@ -13,6 +13,8 @@
             fetchpriority="high"
             onerror="this.onerror=null;this.src='{{ brand_logo_fallback_url }}';"
         >
+        <h1>Martins System</h1>
+        <p>Martins Funeral System</p>
     </div>
 
     <form method="post" class="login-form">
@@ -20,7 +22,10 @@
         <input id="login-email" type="email" name="email" autocomplete="username" required>
 
         <label for="login-password">Password</label>
-        <input id="login-password" type="password" name="password" autocomplete="current-password" required>
+        <div class="login-password-row">
+            <input id="login-password" type="password" name="password" autocomplete="current-password" required>
+            <button class="login-password-toggle" type="button" onclick="var field=document.getElementById('login-password'); field.type = field.type === 'password' ? 'text' : 'password'; this.textContent = field.type === 'password' ? 'Show' : 'Hide';">Show</button>
+        </div>
 
         <button type="submit">Login</button>
     </form>

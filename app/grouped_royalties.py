@@ -57,24 +57,17 @@ def _identity_matched_main_franchise(user, linked):
     return None
 
 
-def identity_main_franchise_for_user(user, candidates=None):
-    candidates = list(candidates or [])
-    main = _identity_matched_main_franchise(user, candidates)
-    if main:
-        return main
-    all_franchises = Franchise.query.order_by(Franchise.business_name).all()
-    return _identity_matched_main_franchise(user, all_franchises)
-
-
 def _ordered_linked_franchises_for_user(user):
     linked = list(getattr(user, "assigned_franchises", []) or [])
+    if not linked:
+        return []
     primary_id = db.session.execute(
         db.select(user_franchises.c.franchise_id)
         .where(user_franchises.c.user_id == user.id)
         .where(user_franchises.c.is_primary == True)
     ).scalar()
     linked_sorted = sorted(linked, key=lambda item: item.business_name or "")
-    identity_main = identity_main_franchise_for_user(user, linked_sorted)
+    identity_main = _identity_matched_main_franchise(user, linked_sorted)
     if identity_main:
         rest = [item for item in linked_sorted if item.id != identity_main.id]
         return [identity_main] + rest
@@ -87,29 +80,6 @@ def _ordered_linked_franchises_for_user(user):
 
 def ordered_linked_franchises_for_user(user):
     return _ordered_linked_franchises_for_user(user)
-
-
-def normalise_franchise_user_links(user, selected_franchises):
-    """Keep a franchise user's Business Name franchise as the main grouped branch."""
-    selected = list(selected_franchises or [])
-    main = identity_main_franchise_for_user(user, selected)
-    if not main:
-        return sorted(selected, key=lambda item: item.business_name or ""), None
-    rest = sorted([item for item in selected if item.id != main.id], key=lambda item: item.business_name or "")
-    return [main] + rest, main
-
-
-def mark_primary_franchise_link(user, main_franchise):
-    if not user or not main_franchise:
-        return
-    db.session.flush()
-    db.session.execute(user_franchises.update().where(user_franchises.c.user_id == user.id).values(is_primary=False))
-    db.session.execute(
-        user_franchises.update()
-        .where(user_franchises.c.user_id == user.id)
-        .where(user_franchises.c.franchise_id == main_franchise.id)
-        .values(is_primary=True)
-    )
 
 
 def grouped_franchise_sets(touched_franchise_ids=None):
@@ -146,10 +116,11 @@ def _append_note(row, note):
 
 
 def apply_grouped_royalties_for_period(month, year, touched_franchise_ids=None):
-    """Calculate branch rows without replacing them with grouped totals.
+    """Roll linked franchise rows into the primary franchise for royalty billing.
 
-    Grouped totals are built as virtual rows in the monthly/royalty views so
-    each franchise still shows its own imported figures and calculated royalty.
+    Franchise grouping is controlled by user_franchises.is_primary.  The primary
+    linked franchise is the main Business Name, and its royalty method/scale are
+    used for the combined monthly figures of every linked branch in that group.
     """
     from app.royalty_engine import calculate_monthly_figure
 
@@ -168,9 +139,44 @@ def apply_grouped_royalties_for_period(month, year, touched_franchise_ids=None):
             continue
 
         rows_by_franchise = {row.franchise_id: row for row in rows}
-        for row in rows:
-            calculate_monthly_figure(row)
-            updated += 1
+        main_row = rows_by_franchise.get(main.id)
+        if not main_row:
+            main_row = MonthlyFigure(franchise_id=main.id, month=month, year=year, status="Published")
+            db.session.add(main_row)
+            rows.append(main_row)
+            rows_by_franchise[main.id] = main_row
 
+        grouped_row = SimpleNamespace(
+            franchise=main,
+            franchise_id=main.id,
+            month=month,
+            year=year,
+        )
+        for field in SUM_MONEY_FIELDS:
+            setattr(grouped_row, field, _money_total(rows, field))
+        for field in SUM_COUNT_FIELDS:
+            setattr(grouped_row, field, _count_total(rows, field))
+        grouped_row.number_of_funerals = int(getattr(grouped_row, "mf_files", 0) or getattr(grouped_row, "number_of_funerals", 0) or 0)
+        main_row.status = "Published" if main_row.status in {"Draft", "Imported", "Calculated"} else main_row.status
+        _append_note(main_row, "Grouped royalty total: linked branches calculated under this main franchise user.")
+
+        result = calculate_monthly_figure(grouped_row)
+        main_row.gross_turnover = grouped_row.gross_turnover
+        main_row.gross_revenue = grouped_row.gross_revenue
+        main_row.gross_method = grouped_row.gross_method
+        main_row.royalty_percentage = grouped_row.royalty_percentage
+        main_row.royalty_amount = grouped_row.royalty_amount
+        main_row.minimum_royalty_applied = grouped_row.minimum_royalty_applied
+        main_row.royalty_review = result
         grouped += 1
+        updated += 1
+
+        for row in rows:
+            if row.franchise_id == main.id:
+                continue
+            row.royalty_percentage = Decimal("0")
+            row.royalty_amount = Decimal("0")
+            row.minimum_royalty_applied = False
+            _append_note(row, f"Royalty grouped under main franchise: {main.business_name}.")
+            updated += 1
     return {"groups": grouped, "rows": updated}

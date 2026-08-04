@@ -5,12 +5,14 @@ from datetime import datetime
 
 from flask import Blueprint, render_template, redirect, url_for, flash, abort, send_file, request
 from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
 
 from app.extensions import db
 from app.audit import log_action
-from app.models import MonthlyFigure, Franchise, User, user_franchises
-from app.monthly.routes import recalculate_figures_for_display, calculate_royalty_base, calculate_royalty, get_royalty_scales_for_franchise
+from app.models import MonthlyFigure, Franchise, User
+from app.monthly.routes import recalculate_figures_for_display, calculate_royalty_base, calculate_royalty
 from app.franchise_context import get_selected_franchise, get_accessible_franchises, is_privileged_user, is_franchise_view_mode
+from app.grouped_royalties import grouped_franchise_sets, ordered_linked_franchises_for_user
 
 royalties_bp = Blueprint("royalties", __name__, url_prefix="/royalties")
 
@@ -69,25 +71,6 @@ def reporting_years():
 
 
 
-def has_valid_royalty_scale(franchise):
-    return bool(get_royalty_scales_for_franchise(franchise))
-
-
-def pick_royalty_scale_franchise(main_franchise, linked_franchises):
-    """Use the main franchise scale where possible; otherwise use the first linked franchise with a valid scale.
-
-    This prevents grouped royalty rows from staying at 0.00% when the main
-    dashboard branch has no saved brackets yet, but one of the linked franchise
-    records already has the correct scale imported/saved.
-    """
-    if main_franchise and has_valid_royalty_scale(main_franchise):
-        return main_franchise
-    for franchise in linked_franchises or []:
-        if has_valid_royalty_scale(franchise):
-            return franchise
-    return main_franchise
-
-
 def build_grouped_royalty_row(figures, main_franchise, selected_month, selected_year):
     """Build one combined royalty row for a main franchise user with linked branches.
 
@@ -123,7 +106,13 @@ def build_grouped_royalty_row(figures, main_franchise, selected_month, selected_
     grouped.cash_sales = total("cash_sales")
     grouped.tombstone_receipts = total("tombstone_receipts")
     grouped.obo_service_receipts = total("obo_service_receipts")
-    grouped.sales = total("sales")
+    grouped.sales = (
+        grouped.funeral_receipts
+        + grouped.society_receipts
+        + grouped.cash_sales
+        + grouped.tombstone_receipts
+        + grouped.obo_service_receipts
+    )
     grouped.insurance_receipts = total("insurance_receipts")
     grouped.insurance_payover = total("insurance_payover")
     grouped.admin_fee = total("admin_fee")
@@ -135,13 +124,66 @@ def build_grouped_royalty_row(figures, main_franchise, selected_month, selected_
     grouped.gross_turnover = royalty_base
     grouped.gross_revenue = royalty_base
     grouped.gross_method = gross_method
-    scale_franchise = pick_royalty_scale_franchise(main_franchise, [getattr(item, "franchise", None) for item in figures])
-    grouped.scale_franchise = scale_franchise
-    _gross, percentage, royalty_amount, minimum_applied = calculate_royalty(scale_franchise, royalty_base)
+    grouped.scale_franchise = main_franchise
+    _gross, percentage, royalty_amount, minimum_applied = calculate_royalty(main_franchise, royalty_base)
     grouped.royalty_percentage = percentage
     grouped.royalty_amount = royalty_amount
     grouped.minimum_royalty_applied = minimum_applied
+    for item in figures:
+        item.grouped_royalty_main_name = main_franchise.business_name
+        item.grouped_royalty_percentage = percentage
+        item.grouped_royalty_amount = royalty_amount
     return grouped
+
+
+def insert_grouped_summary_rows(figures, selected_month, selected_year):
+    if not figures:
+        return figures
+    rows_by_franchise = {int(item.franchise_id): item for item in figures if getattr(item, "franchise_id", None)}
+    grouped_by_main = {}
+    linked_to_main = {}
+    linked_rows_by_main = {}
+    for group in grouped_franchise_sets(rows_by_franchise.keys()):
+        main = group["main"]
+        linked = group["linked"]
+        linked_rows = [rows_by_franchise[franchise.id] for franchise in linked if franchise.id in rows_by_franchise]
+        if len(linked_rows) < 2 or main.id not in rows_by_franchise:
+            continue
+        grouped = build_grouped_royalty_row(linked_rows, main, selected_month, selected_year)
+        if not grouped:
+            continue
+        grouped.is_grouped_summary = True
+        grouped.status = "Grouped Total"
+        grouped_by_main[int(main.id)] = grouped
+        linked_rows_by_main[int(main.id)] = [
+            rows_by_franchise[franchise.id]
+            for franchise in linked
+            if franchise.id != main.id and franchise.id in rows_by_franchise
+        ]
+        for franchise in linked:
+            if franchise.id != main.id:
+                linked_to_main[int(franchise.id)] = main.business_name
+
+    output = []
+    emitted = set()
+    for item in figures:
+        franchise_id = int(item.franchise_id)
+        if franchise_id in emitted:
+            continue
+        if franchise_id in linked_to_main:
+            continue
+        output.append(item)
+        emitted.add(franchise_id)
+        linked_rows = linked_rows_by_main.get(franchise_id, [])
+        for linked_item in linked_rows:
+            linked_id = int(linked_item.franchise_id)
+            linked_item.grouped_royalty_main_name = item.franchise.business_name if item.franchise else linked_to_main.get(linked_id, "")
+            output.append(linked_item)
+            emitted.add(linked_id)
+        grouped = grouped_by_main.get(franchise_id)
+        if grouped:
+            output.append(grouped)
+    return output
 
 
 def permission_required(code):
@@ -169,20 +211,7 @@ def is_franchise_side_user():
 
 
 def get_ordered_linked_franchises_for_user(user):
-    linked = list(getattr(user, "assigned_franchises", []) or [])
-    if not linked:
-        return []
-    primary_id = db.session.execute(
-        db.select(user_franchises.c.franchise_id)
-        .where(user_franchises.c.user_id == user.id)
-        .where(user_franchises.c.is_primary == True)
-    ).scalar()
-    linked_sorted = sorted(linked, key=lambda item: item.business_name or "")
-    if primary_id:
-        primary = [item for item in linked_sorted if item.id == primary_id]
-        rest = [item for item in linked_sorted if item.id != primary_id]
-        return primary + rest
-    return linked_sorted
+    return ordered_linked_franchises_for_user(user)
 
 
 def get_user_linked_franchises():
@@ -192,25 +221,20 @@ def get_user_linked_franchises():
 def get_primary_franchise_for_user(user, linked_franchises):
     if not user or not linked_franchises:
         return None
-    primary_id = db.session.execute(
-        db.select(user_franchises.c.franchise_id)
-        .where(user_franchises.c.user_id == user.id)
-        .where(user_franchises.c.is_primary == True)
-    ).scalar()
-    if primary_id:
-        for franchise in linked_franchises:
-            if franchise.id == primary_id:
-                return franchise
-    return None
+    ordered = ordered_linked_franchises_for_user(user)
+    linked_ids = {franchise.id for franchise in linked_franchises}
+    for franchise in ordered:
+        if franchise.id in linked_ids:
+            return franchise
+    return linked_franchises[0]
 
 
 def get_main_franchise_for_group(linked_franchises, selected, group_user=None):
     """Pick the main franchise for grouped royalty calculation.
 
-    Imported grouped-franchise sheets mark the first branch as primary in the
-    user_franchises table.  That primary branch must drive the gross method and
-    royalty scale.  If no primary has been set yet, fall back to selected branch
-    and then the first linked branch.
+    The ordered linked-franchise list puts the main Business Name first. That
+    branch must drive the gross method and royalty scale for the whole group.
+    If no linked branch is available, fall back to the selected branch.
     """
     if not linked_franchises:
         return selected
@@ -299,6 +323,8 @@ def get_figures():
         MonthlyFigure.id.desc(),
     ).all()
     recalculate_figures_for_display(figures)
+    if show_all_franchises:
+        figures = insert_grouped_summary_rows(figures, selected_month, selected_year)
 
     return figures, selected, accessible_franchises, show_all_franchises, selected_month, selected_year
 
@@ -364,8 +390,27 @@ def export_pdf():
     figures, selected, accessible_franchises, show_all_franchises, selected_month, selected_year = get_figures()
     from app.reports.pdf import build_royalty_history_pdf
     period_label = month_label(selected_month, selected_year)
-    pdf_path = build_royalty_history_pdf(figures, selected or (figures[0].franchise if figures else None), current_user, period_label=period_label)
-    log_action("Royalties", "Exported royalty history PDF", f"{getattr(selected, 'business_name', 'All franchises')} - {period_label}")
+
+    if show_all_franchises:
+        export_franchise = SimpleNamespace(
+            business_name="Martin's Funerals South Africa",
+            franchise_code="MARTINS-SA",
+            pty_number="",
+            vat_number="",
+            office_address="South Africa",
+            office_number="",
+            after_hours_number="",
+            public_email="",
+            franchisee_email="",
+            is_company_profile=True,
+        )
+    else:
+        export_franchise = selected or (figures[0].franchise if figures else SimpleNamespace(business_name="Franchise"))
+
+    pdf_path = build_royalty_history_pdf(figures, export_franchise, current_user, period_label=period_label)
+    log_action("Royalties", "Exported royalty history PDF", f"{getattr(export_franchise, 'business_name', 'All franchises')} - {period_label}")
     db.session.commit()
     safe_label = period_label.lower().replace(" ", "-")
-    return send_file(pdf_path, as_attachment=True, download_name=f"royalty-history-{safe_label}.pdf")
+    franchise_name = getattr(export_franchise, "business_name", None) or "All Franchises"
+    safe_franchise = secure_filename(franchise_name).lower() or "all-franchises"
+    return send_file(pdf_path, as_attachment=True, download_name=f"royalty-history-{safe_franchise}-{safe_label}.pdf")
