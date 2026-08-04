@@ -107,10 +107,13 @@ def build_grouped_royalty_row(figures, main_franchise, selected_month, selected_
     grouped.is_grouped = True
     grouped.source_ids = [item.id for item in figures]
     grouped.source_figures = figures
-    grouped.source_branch_names = sorted({
-        (getattr(getattr(item, "franchise", None), "business_name", "") or "Unnamed Franchise")
-        for item in figures
-    })
+    grouped.source_branch_names = [
+        getattr(franchise, "business_name", "") or "Unnamed Franchise"
+        for franchise in sorted(
+            [getattr(item, "franchise", None) for item in figures if getattr(item, "franchise", None)],
+            key=lambda item: (0 if item.id == main_franchise.id else 1, item.business_name or ""),
+        )
+    ]
     grouped.franchise = main_franchise
     grouped.franchise_id = main_franchise.id
     grouped.month = selected_month
@@ -142,6 +145,74 @@ def build_grouped_royalty_row(figures, main_franchise, selected_month, selected_
     grouped.royalty_amount = royalty_amount
     grouped.minimum_royalty_applied = minimum_applied
     return grouped
+
+
+def franchise_side_users():
+    franchise_side_roles = {"Franchise User", "Franchise Manager", "Read Only User"}
+    users = []
+    for user in User.query.all():
+        user_roles = {role.name for role in getattr(user, "roles", [])}
+        if user_roles & franchise_side_roles:
+            users.append(user)
+    return users
+
+
+def decorate_group_member_row(figure, main_franchise):
+    figure.is_group_member = True
+    figure.group_main_franchise = main_franchise
+    figure.group_main_name = getattr(main_franchise, "business_name", None) or "Unnamed Franchise"
+    figure.group_sort_name = figure.group_main_name
+    return figure
+
+
+def build_all_branch_grouped_rows(figures, accessible_franchises, selected_month, selected_year):
+    """Insert grouped franchise rows into the Admin all-branches royalty view."""
+    by_franchise_id = {item.franchise_id: item for item in figures}
+    accessible_ids = {franchise.id for franchise in accessible_franchises}
+    grouped_owner_ids = set()
+    rows = []
+
+    for user in franchise_side_users():
+        linked_franchises = [
+            franchise
+            for franchise in get_ordered_linked_franchises_for_user(user)
+            if franchise.id in accessible_ids
+        ]
+        if len(linked_franchises) < 2:
+            continue
+
+        main_franchise = get_main_franchise_for_group(linked_franchises, None, user)
+        linked_figures = [by_franchise_id.get(franchise.id) for franchise in linked_franchises]
+        linked_figures = [item for item in linked_figures if item is not None]
+        if not linked_figures:
+            continue
+
+        grouped = build_grouped_royalty_row(linked_figures, main_franchise, selected_month, selected_year)
+        if not grouped:
+            continue
+        grouped.group_sort_name = getattr(main_franchise, "business_name", None) or "Unnamed Franchise"
+
+        rows.extend(decorate_group_member_row(item, main_franchise) for item in linked_figures)
+        rows.append(grouped)
+        grouped_owner_ids.update(item.franchise_id for item in linked_figures)
+
+    ungrouped = [item for item in figures if item.franchise_id not in grouped_owner_ids]
+    rows.extend(ungrouped)
+    return sorted(
+        rows,
+        key=lambda item: (
+            getattr(item, "group_sort_name", None)
+            or getattr(getattr(item, "franchise", None), "business_name", "")
+            or "",
+            1 if getattr(item, "is_group_member", False) else 2 if getattr(item, "is_grouped", False) else 0,
+            0
+            if getattr(item, "is_group_member", False)
+            and getattr(getattr(item, "franchise", None), "id", None)
+            == getattr(getattr(item, "group_main_franchise", None), "id", None)
+            else 1,
+            getattr(getattr(item, "franchise", None), "business_name", "") or "",
+        ),
+    )
 
 
 def permission_required(code):
@@ -299,6 +370,8 @@ def get_figures():
         MonthlyFigure.id.desc(),
     ).all()
     recalculate_figures_for_display(figures)
+    if show_all_franchises:
+        figures = build_all_branch_grouped_rows(figures, accessible_franchises, selected_month, selected_year)
 
     return figures, selected, accessible_franchises, show_all_franchises, selected_month, selected_year
 

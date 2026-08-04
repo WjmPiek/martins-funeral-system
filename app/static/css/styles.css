@@ -3140,7 +3140,119 @@ td input, td select, td textarea {
     display: none !important;
   }
 
-  .royalties-page .royalty-dashboard-grid {
-    grid-template-columns: 1fr !important;
+.royalties-page .royalty-dashboard-grid {
+  grid-template-columns: 1fr !important;
+  }
+}
+
+.royalties-page > .table-responsive {
+  margin-top: 18px !important;
+  border: 1px solid #dce2e8 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  box-shadow: 0 12px 30px rgba(31, 22, 43, .06) !important;
+}
+
+.royalties-page .royalties-table {
+  min-width: 1320px !important;
+  table-layout: auto !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.royalties-page .royalties-table th,
+.royalties-page .royalties-table td {
+  padding: 11px 10px !important;
+  vertical-align: middle !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+
+.royalties-page .royalties-table th {
+  white-space: normal !important;
+}
+
+.royalties-page .royalties-table td:nth-child(1),
+.royalties-page .royalties-table td:nth-child(3),
+.royalties-page .royalties-table td:nth-child(5),
+.royalties-page .royalties-table td:nth-child(6),
+.royalties-page .royalties-table td:nth-child(7),
+.royalties-page .royalties-table td:nth-child(8),
+.royalties-page .royalties-table td:nth-child(9),
+.royalties-page .royalties-table td:nth-child(10),
+.royalties-page .royalties-table td:nth-child(11),
+.royalties-page .royalties-table td:nth-child(12) {
+  white-space: nowrap !important;
+}
+
+.royalties-page .royalties-table th:nth-child(13),
+.royalties-page .royalties-table td:nth-child(13) {
+  min-width: 150px !important;
+  width: 150px !important;
+}
+
+.royalties-page .royalties-table .button-row {
+  display: grid !important;
+  grid-template-columns: minmax(64px, auto) minmax(86px, auto) !important;
+  gap: 8px !important;
+  align-items: center !important;
+  justify-content: end !important;
+}
+
+.royalties-page .royalties-table .button-row form {
+  margin: 0 !important;
+}
+
+.royalties-page .royalties-table .btn,
+.royalties-page .royalties-table button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 64px !important;
+  width: auto !important;
+  height: 38px !important;
+  padding: 8px 12px !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  line-height: 1 !important;
+}
+
+.royalties-page .royalties-table .badge {
+  white-space: nowrap !important;
+  min-width: 0 !important;
+}
+
+.royalties-page .royalty-group-member-row td {
+  background: #fbf8ff !important;
+  border-top-color: #eadff4 !important;
+}
+
+.royalties-page .royalty-group-member-row td:first-child {
+  border-left: 4px solid #cbb8e4 !important;
+}
+
+.royalties-page .royalty-group-total-row td {
+  background: #f2ecfa !important;
+  border-top: 2px solid #8f73bd !important;
+  border-bottom: 2px solid #8f73bd !important;
+  font-weight: 700 !important;
+}
+
+.royalties-page .royalty-group-total-row td:first-child {
+  border-left: 4px solid #6B4AA0 !important;
+}
+
+.royalties-page .royalty-group-total-row td:last-child {
+  border-right: 4px solid #6B4AA0 !important;
+}
+
+@media (max-width: 899px) {
+  .royalties-page > .table-responsive {
+    margin-left: -2px !important;
+    margin-right: -2px !important;
   }
 }
