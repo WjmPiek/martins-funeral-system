@@ -15,7 +15,6 @@ from app.permissions import MODULES, ACTIONS, ROLE_TEMPLATES, ROLE_DEFAULTS, per
 from app.audit import log_action
 from app.performance.cache import cache_stats, invalidate_performance_cache
 from app.performance.service import auto_hide_inactive_franchises, inactive_franchise_candidates, reactivate_franchise_performance, has_recent_performance_data, warm_performance_cache_for_period
-from app.grouped_royalties import normalise_franchise_user_links, ordered_linked_franchises_for_user, mark_primary_franchise_link
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -153,12 +152,7 @@ def normalise_user_scope_for_role(user, role_name, franchise_ids=None):
         ).order_by(Franchise.business_name).all()
         if not selected_franchises:
             return False, "Please link at least one active franchise for Regional Manager or Franchise User accounts."
-        if role_name == "Franchise User":
-            selected_franchises, main_franchise = normalise_franchise_user_links(user, selected_franchises)
-            user.assigned_franchises = selected_franchises
-            mark_primary_franchise_link(user, main_franchise)
-        else:
-            user.assigned_franchises = selected_franchises
+        user.assigned_franchises = selected_franchises
         return True, ""
 
     # Finance/Admin-side users are Martins users. Finance Manager is linked to all active franchises.
@@ -225,7 +219,20 @@ def can_manage_old_franchises():
 
 
 def ordered_franchises_for_user(user):
-    return ordered_linked_franchises_for_user(user)
+    linked = list(getattr(user, "assigned_franchises", []) or [])
+    if not linked:
+        return []
+    primary_id = db.session.execute(
+        db.select(user_franchises.c.franchise_id)
+        .where(user_franchises.c.user_id == user.id)
+        .where(user_franchises.c.is_primary == True)
+    ).scalar()
+    linked_sorted = sorted(linked, key=lambda item: item.business_name or "")
+    if primary_id:
+        primary = [item for item in linked_sorted if item.id == primary_id]
+        rest = [item for item in linked_sorted if item.id != primary_id]
+        return primary + rest
+    return linked_sorted
 
 def active_linked_franchises_for_user(user):
     return [franchise for franchise in ordered_franchises_for_user(user) if getattr(franchise, "is_performance_active", True)]
@@ -292,18 +299,6 @@ def repair_existing_user_visibility():
         david.roles.append(franchise_role)
         david.parent_franchise_user_id = None
         changed += 1
-
-    for user in User.query.order_by(User.id).all():
-        if not any(role.name == "Franchise User" for role in user.roles):
-            continue
-        ordered, main_franchise = normalise_franchise_user_links(user, getattr(user, "assigned_franchises", []))
-        if main_franchise:
-            current_ids = [franchise.id for franchise in getattr(user, "assigned_franchises", [])]
-            ordered_ids = [franchise.id for franchise in ordered]
-            if current_ids != ordered_ids:
-                user.assigned_franchises = ordered
-                changed += 1
-            mark_primary_franchise_link(user, main_franchise)
 
     employee_role_names = {"Franchise Manager", "Franchise Employee", "Franchise Agent"}
     owner_ids = {owner.id for owner in all_franchise_owner_users()}
@@ -687,12 +682,7 @@ def update_user_roles(user_id):
         if not selected_franchises:
             flash("Regional Manager and Franchise User accounts must be linked to at least one active franchise.", "danger")
             return redirect(url_for("admin.users"))
-        if "Franchise User" in selected_role_names:
-            selected_franchises, main_franchise = normalise_franchise_user_links(user, selected_franchises)
-            user.assigned_franchises = selected_franchises
-            mark_primary_franchise_link(user, main_franchise)
-        else:
-            user.assigned_franchises = selected_franchises
+        user.assigned_franchises = selected_franchises
     else:
         # Admin > Users is only for Martins users and registered franchise owner/user accounts.
         # Franchise employees are managed separately under Admin > Employees and created by franchise owners.
@@ -768,12 +758,7 @@ def update_user(user_id):
         if not selected_franchises:
             flash("Regional Manager and Franchise User accounts must be linked to at least one active franchise.", "danger")
             return redirect(url_for("admin.users"))
-        if "Franchise User" in selected_role_names:
-            selected_franchises, main_franchise = normalise_franchise_user_links(user, selected_franchises)
-            user.assigned_franchises = selected_franchises
-            mark_primary_franchise_link(user, main_franchise)
-        else:
-            user.assigned_franchises = selected_franchises
+        user.assigned_franchises = selected_franchises
     else:
         user.parent_franchise_user_id = None
 
@@ -3036,10 +3021,7 @@ def assign_user_franchises(user_id):
         return redirect(url_for("admin.users"))
 
     franchise_ids = [int(item) for item in request.form.getlist("franchise_ids")]
-    selected_franchises = Franchise.query.filter(Franchise.id.in_(franchise_ids)).all() if franchise_ids else []
-    selected_franchises, main_franchise = normalise_franchise_user_links(user, selected_franchises)
-    user.assigned_franchises = selected_franchises
-    mark_primary_franchise_link(user, main_franchise)
+    user.assigned_franchises = Franchise.query.filter(Franchise.id.in_(franchise_ids)).all() if franchise_ids else []
     log_action("Users", "Updated user franchise access", f"User: {user.full_name}")
     db.session.commit()
     flash(f"Franchise access updated for {user.full_name}.", "success")

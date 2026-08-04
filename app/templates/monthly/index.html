@@ -1,41 +1,5 @@
 {% extends "base.html" %}
 {% block app_content %}
-<style>
-.monthly-context-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,520px);gap:1.5rem;align-items:end;min-height:250px}
-.monthly-context-main{display:grid;gap:1rem}
-.monthly-branch-control{display:grid;grid-template-columns:auto minmax(280px,620px);gap:1rem;align-items:center}
-.monthly-period-form{display:grid;grid-template-columns:auto minmax(120px,1fr) auto minmax(120px,1fr) auto;gap:.75rem;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:1.15rem;box-shadow:0 16px 40px rgba(88,59,136,.10)}
-.monthly-period-form label{font-weight:700;color:#3c3348}
-.monthly-period-form select{min-width:0;width:100%;height:48px}
-.monthly-period-form .btn{height:48px;min-width:128px}
-.monthly-table-wrap{border:1px solid #dce2e8;border-radius:12px;background:#fff;overflow:auto}
-.monthly-figures-table{min-width:1680px;table-layout:fixed;font-size:.86rem}
-.monthly-figures-table th,.monthly-figures-table td{padding:.7rem .55rem;white-space:normal;line-height:1.2;vertical-align:top}
-.monthly-figures-table th:nth-child(1),.monthly-figures-table td:nth-child(1){width:82px}
-.monthly-figures-table th:nth-child(2),.monthly-figures-table td:nth-child(2){width:130px}
-.monthly-figures-table th:nth-child(3),.monthly-figures-table td:nth-child(3){width:78px}
-.monthly-figures-table th:nth-child(4),.monthly-figures-table td:nth-child(4),
-.monthly-figures-table th:nth-child(5),.monthly-figures-table td:nth-child(5),
-.monthly-figures-table th:nth-child(6),.monthly-figures-table td:nth-child(6),
-.monthly-figures-table th:nth-child(7),.monthly-figures-table td:nth-child(7),
-.monthly-figures-table th:nth-child(8),.monthly-figures-table td:nth-child(8),
-.monthly-figures-table th:nth-child(9),.monthly-figures-table td:nth-child(9),
-.monthly-figures-table th:nth-child(10),.monthly-figures-table td:nth-child(10),
-.monthly-figures-table th:nth-child(11),.monthly-figures-table td:nth-child(11),
-.monthly-figures-table th:nth-child(12),.monthly-figures-table td:nth-child(12),
-.monthly-figures-table th:nth-child(13),.monthly-figures-table td:nth-child(13),
-.monthly-figures-table th:nth-child(14),.monthly-figures-table td:nth-child(14),
-.monthly-figures-table th:nth-child(17),.monthly-figures-table td:nth-child(17),
-.monthly-figures-table th:nth-child(20),.monthly-figures-table td:nth-child(20){width:104px}
-.monthly-figures-table th:nth-child(15),.monthly-figures-table td:nth-child(15),
-.monthly-figures-table th:nth-child(16),.monthly-figures-table td:nth-child(16),
-.monthly-figures-table th:nth-child(19),.monthly-figures-table td:nth-child(19),
-.monthly-figures-table th:nth-child(21),.monthly-figures-table td:nth-child(21){width:80px}
-.monthly-figures-table th:nth-child(18),.monthly-figures-table td:nth-child(18){width:112px}
-.monthly-figures-table th:nth-child(22),.monthly-figures-table td:nth-child(22){width:150px}
-@media(max-width:1200px){.monthly-context-card{grid-template-columns:1fr;min-height:0}.monthly-period-form{max-width:100%}.monthly-branch-control{grid-template-columns:1fr}}
-@media(max-width:700px){.monthly-period-form{grid-template-columns:1fr}.monthly-period-form .btn{width:100%}}
-</style>
 <section class="page-section">
   <div class="section-header">
     <div>
@@ -52,8 +16,7 @@
       {% endif %}
     </div>
   </div>
-  <div class="filter-card branch-context-card monthly-context-card">
-    <div class="monthly-context-main">
+  <div class="filter-card branch-context-card">
     {% if show_all_franchises %}
       <h2>All Branches</h2>
       <p class="muted">Admin view: showing active franchises with imported monthly figures for {{ selected_period_label }} only.</p>
@@ -62,7 +25,7 @@
       <p class="muted">Showing monthly figures for {{ selected_period_label }} for this branch only.</p>
     {% endif %}
     {% if accessible_franchises and accessible_franchises|length > 1 %}
-      <div class="branch-selector-row monthly-branch-control">
+      <div class="branch-selector-row">
         <label for="branchSelector"><strong>Open branch dashboard</strong></label>
         <select id="branchSelector" onchange="if (this.value) window.location.href=this.value;">
           <option value="">Select a branch...</option>
@@ -70,14 +33,7 @@
             <option value="{{ url_for('dashboard.select_franchise', franchise_id=franchise.id) }}" {% if selected and selected.id == franchise.id and not show_all_franchises %}selected{% endif %}>{{ franchise.business_name or 'Unnamed Franchise' }}</option>
           {% endfor %}
         </select>
-        {% if not show_all_franchises and current_user.has_permission('franchise_management:view') %}
-          <a class="btn secondary button-auto" href="{{ url_for('dashboard.main_dashboard') }}">Show All Branches</a>
-        {% endif %}
-      </div>
-    {% endif %}
-    </div>
-    {% if accessible_franchises and accessible_franchises|length > 1 %}
-        <form method="get" action="{{ url_for('monthly.index') }}" class="period-filter-form monthly-period-form">
+        <form method="get" action="{{ url_for('monthly.index') }}" class="period-filter-form">
           <label for="monthlyMonth"><strong>Month</strong></label>
           <select id="monthlyMonth" name="month">
             {% for value, label in month_options %}
@@ -92,9 +48,14 @@
           </select>
           <button class="btn secondary button-auto" type="submit">Apply</button>
         </form>
+        {% if not show_all_franchises and current_user.has_permission('franchise_management:view') %}
+          <a class="btn secondary button-auto" href="{{ url_for('dashboard.main_dashboard') }}">Show All Branches</a>
+        {% endif %}
+      </div>
     {% endif %}
     {% if not (accessible_franchises and accessible_franchises|length > 1) %}
-        <form method="get" action="{{ url_for('monthly.index') }}" class="period-filter-form monthly-period-form">
+      <div class="branch-selector-row">
+        <form method="get" action="{{ url_for('monthly.index') }}" class="period-filter-form">
           <label for="monthlyMonthSolo"><strong>Month</strong></label>
           <select id="monthlyMonthSolo" name="month">
             {% for value, label in month_options %}
@@ -109,6 +70,7 @@
           </select>
           <button class="btn secondary button-auto" type="submit">Apply</button>
         </form>
+      </div>
     {% endif %}
   </div>
 
@@ -241,7 +203,7 @@
       </div>
     {% endfor %}
   {% else %}
-  <div class="table-responsive monthly-table-wrap">
+  <div class="table-responsive">
     <table class="system-report-table monthly-table monthly-import-table monthly-figures-table">
       <thead>
         <tr>

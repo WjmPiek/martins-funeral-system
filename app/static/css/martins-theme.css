@@ -45,8 +45,7 @@ a {
 }
 
 .login-card {
-  width: min(100%, 360px) !important;
-  max-width: 360px !important;
+  width: min(100%, 430px) !important;
   margin: 0 auto !important;
   padding: 34px 30px 28px !important;
   background: var(--martins-card) !important;
@@ -384,8 +383,6 @@ td {
 
   .login-card {
     padding: 28px 20px 24px !important;
-    width: min(100%, 340px) !important;
-    max-width: 340px !important;
   }
 
   .login-card-header {
@@ -396,109 +393,4 @@ td {
   .sidebar-nav {
     background: var(--martins-primary) !important;
   }
-}
-
-/* Keep the auth card compact even if an older login template is still rendered. */
-.auth-container > .login-card,
-.auth-container .login-card {
-  width: min(100%, 360px) !important;
-  max-width: 360px !important;
-}
-
-.auth-container .login-card form,
-.auth-container .login-form,
-.auth-container .login-card input,
-.auth-container .login-card button {
-  max-width: 100% !important;
-}
-
-/* Login page visual match: compact attendance-style card. */
-.auth-container .login-card {
-  width: min(100%, 520px) !important;
-  max-width: 520px !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  text-align: left !important;
-  border-radius: 12px !important;
-  box-shadow: 0 22px 55px rgba(24, 32, 42, .10) !important;
-}
-.auth-container .login-branding {
-  margin: 0 !important;
-  padding: 46px 38px 28px !important;
-  border-bottom: 1px solid #dce2e8 !important;
-}
-.auth-container .login-logo {
-  width: 270px !important;
-  max-width: 100% !important;
-  height: auto !important;
-  max-height: 120px !important;
-  margin-bottom: 10px !important;
-}
-.auth-container .login-branding h1 {
-  margin: 0 !important;
-  color: #18202a !important;
-  font-size: 20px !important;
-  line-height: 1.2 !important;
-  font-weight: 700 !important;
-}
-.auth-container .login-branding p {
-  margin: 0 !important;
-  color: #64707d !important;
-  font-size: 14px !important;
-  line-height: 1.35 !important;
-  font-weight: 700 !important;
-}
-.auth-container .login-form {
-  padding: 34px 38px 0 !important;
-}
-.auth-container .login-form label {
-  margin: 0 0 10px !important;
-  font-size: 14px !important;
-  line-height: 1.2 !important;
-}
-.auth-container .login-form label + input,
-.auth-container .login-password-row {
-  margin-bottom: 22px !important;
-}
-.auth-container .login-card input,
-.auth-container .login-password-toggle,
-.auth-container .login-form > button[type="submit"] {
-  min-height: 54px !important;
-  font-size: 16px !important;
-  border-radius: 7px !important;
-}
-.auth-container .login-password-row {
-  display: grid !important;
-  grid-template-columns: 1fr 88px !important;
-  gap: 10px !important;
-}
-.auth-container .login-password-row input {
-  margin: 0 !important;
-}
-.auth-container .login-password-toggle {
-  width: 88px !important;
-  margin: 0 !important;
-  color: #6B4AA0 !important;
-  background: #fff !important;
-  border: 1px solid #dce2e8 !important;
-  font-weight: 700 !important;
-}
-.auth-container .login-form > button[type="submit"] {
-  margin: 0 !important;
-  background: #6B4AA0 !important;
-  border-color: #6B4AA0 !important;
-  border-radius: 8px !important;
-}
-.auth-container .login-links {
-  margin: 0 !important;
-  padding: 22px 38px 36px !important;
-  font-size: 16px !important;
-}
-@media (max-width: 899px) {
-  .auth-container .login-card { width: min(100%, 520px) !important; max-width: 520px !important; }
-  .auth-container .login-branding { padding: 34px 24px 24px !important; }
-  .auth-container .login-form { padding: 28px 24px 0 !important; }
-  .auth-container .login-links { padding: 20px 24px 30px !important; }
-  .auth-container .login-password-row { grid-template-columns: 1fr 78px !important; }
-  .auth-container .login-password-toggle { width: 78px !important; }
 }

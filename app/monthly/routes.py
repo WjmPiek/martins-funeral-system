@@ -20,7 +20,6 @@ from app.extensions import db
 from app.franchise.routes import get_or_create_franchise
 from app.franchise_context import get_selected_franchise, get_accessible_franchises, is_privileged_user, is_franchise_view_mode
 from app.models import MonthlyFigure, RoyaltyScale, Franchise, User, Role, user_franchises
-from app.grouped_royalties import ordered_linked_franchises_for_user
 
 monthly_bp = Blueprint("monthly", __name__, url_prefix="/monthly-figures")
 
@@ -161,7 +160,20 @@ def is_franchise_side_user():
 
 
 def get_ordered_linked_franchises_for_user(user):
-    return ordered_linked_franchises_for_user(user)
+    linked = list(getattr(user, "assigned_franchises", []) or [])
+    if not linked:
+        return []
+    primary_id = db.session.execute(
+        db.select(user_franchises.c.franchise_id)
+        .where(user_franchises.c.user_id == user.id)
+        .where(user_franchises.c.is_primary == True)
+    ).scalar()
+    linked_sorted = sorted(linked, key=lambda item: item.business_name or "")
+    if primary_id:
+        primary = [item for item in linked_sorted if item.id == primary_id]
+        rest = [item for item in linked_sorted if item.id != primary_id]
+        return primary + rest
+    return linked_sorted
 
 
 def get_group_user_for_selected_franchise(selected_franchise):
@@ -210,13 +222,7 @@ def build_grouped_monthly_totals(figures, main_franchise, selected_month, select
     grouped.cash_sales = total("cash_sales")
     grouped.tombstone_receipts = total("tombstone_receipts")
     grouped.obo_service_receipts = total("obo_service_receipts")
-    grouped.sales = (
-        grouped.funeral_receipts
-        + grouped.society_receipts
-        + grouped.cash_sales
-        + grouped.tombstone_receipts
-        + grouped.obo_service_receipts
-    )
+    grouped.sales = total("sales")
     grouped.insurance_receipts = total("insurance_receipts")
     grouped.insurance_payover = total("insurance_payover")
     grouped.admin_fee = total("admin_fee")
@@ -231,10 +237,6 @@ def build_grouped_monthly_totals(figures, main_franchise, selected_month, select
     grouped.royalty_percentage = percentage
     grouped.royalty_amount = royalty_amount
     grouped.minimum_royalty_applied = minimum_applied
-    for item in figures:
-        item.grouped_royalty_main_name = main_franchise.business_name
-        item.grouped_royalty_percentage = percentage
-        item.grouped_royalty_amount = royalty_amount
     return grouped
 
 def get_primary_franchise_for_user(user, linked_franchises):
@@ -345,12 +347,6 @@ def calculate_royalty_base(monthly_figure, franchise):
         period_month=getattr(monthly_figure, "month", None),
         period_year=getattr(monthly_figure, "year", None),
     )[0]
-    source_figures = getattr(monthly_figure, "source_figures", None)
-    if method == "old" and source_figures:
-        return sum(
-            calculate_base(item, getattr(item, "franchise", None), method="old")
-            for item in source_figures
-        ), method
     return calculate_base(monthly_figure, franchise, method=method), method
 
 def normalize_franchise_name_for_royalties(value):
@@ -457,8 +453,6 @@ def calculate_royalty(franchise, royalty_base):
     return base, percentage, royalty_amount, minimum_applied
 
 def recalculate_monthly_figure(monthly_figure):
-    if int(getattr(monthly_figure, "number_of_funerals", 0) or 0) <= 0 and int(getattr(monthly_figure, "mf_files", 0) or 0) > 0:
-        monthly_figure.number_of_funerals = int(monthly_figure.mf_files or 0)
     from app.royalty_engine import calculate_monthly_figure
     result = calculate_monthly_figure(monthly_figure)
     monthly_figure.royalty_review = result
@@ -496,21 +490,6 @@ def recalculate_figures_for_display(figures, commit=True):
         )
         if before != after:
             changed = True
-    if figures:
-        try:
-            from app.grouped_royalties import apply_grouped_royalties_for_period
-            periods = {
-                (int(item.month), int(item.year))
-                for item in figures
-                if getattr(item, "month", None) and getattr(item, "year", None)
-            }
-            touched_ids = {int(item.franchise_id) for item in figures if getattr(item, "franchise_id", None)}
-            for month, year in periods:
-                result = apply_grouped_royalties_for_period(month, year, touched_ids)
-                if result.get("rows"):
-                    changed = True
-        except Exception as exc:
-            current_app.logger.exception("Grouped royalty display recalculation failed: %s", exc)
     if changed and commit:
         db.session.commit()
     return figures
@@ -1127,7 +1106,6 @@ def import_monthly_figures_excel_file(file_storage, allocate_users=True, progres
             monthly_figure.insurance_payover = excel_decimal(values.get("insurance_payover"))
             monthly_figure.insurance_joinings = parse_int(values.get("insurance_joinings"))
             monthly_figure.mf_files = parse_int(values.get("mf_files"))
-            monthly_figure.number_of_funerals = monthly_figure.mf_files
             monthly_figure.notes = (
                 f"Imported from Excel workbook: {file_storage.filename}; "
                 f"Sheet: {sheet_title}; Franchise: {franchise_name}; Column: {column}"
@@ -1279,7 +1257,6 @@ def create_monthly_figure_from_pdf(file_storage, franchise_id=None, month=None, 
 
     monthly_figure.insurance_joinings = imported.get("insurance_joinings", 0)
     monthly_figure.mf_files = imported.get("mf_files", 0)
-    monthly_figure.number_of_funerals = monthly_figure.mf_files
     monthly_figure.notes = f"Imported from PDF: {file_storage.filename}"
 
     # Calculate and publish the imported period immediately so Admin, Finance
@@ -1521,11 +1498,6 @@ def edit(figure_id):
 
         monthly_figure.insurance_payover = parse_decimal(request.form.get("insurance_payover"))
         recalculate_monthly_figure(monthly_figure)
-        try:
-            from app.grouped_royalties import apply_grouped_royalties_for_period
-            apply_grouped_royalties_for_period(monthly_figure.month, monthly_figure.year, {monthly_figure.franchise_id})
-        except Exception as exc:
-            current_app.logger.exception("Grouped royalty recalculation failed after monthly edit: %s", exc)
         monthly_figure.status = "Calculated"
         log_action("Monthly Figures", "Saved payover and recalculated monthly figures", f"Period: {monthly_figure.period_label}")
         db.session.commit()
@@ -1623,9 +1595,7 @@ def export_period_pdf():
     log_action("Monthly Figures", "Exported monthly figures period PDF", period_label)
     db.session.commit()
     safe_label = period_label.lower().replace(" ", "-")
-    franchise_name = getattr(selected, "business_name", None) or "All Franchises"
-    safe_franchise = secure_filename(franchise_name).lower() or "all-franchises"
-    return send_file(pdf_path, as_attachment=True, download_name=f"monthly-figures-{safe_franchise}-{safe_label}.pdf")
+    return send_file(pdf_path, as_attachment=True, download_name=f"monthly-figures-{safe_label}.pdf")
 
 
 @monthly_bp.route("/<int:figure_id>/export-pdf")
@@ -1637,6 +1607,4 @@ def export_pdf(figure_id):
     pdf_path = build_monthly_figure_pdf(monthly_figure, current_user)
     log_action("Monthly Figures", "Exported PDF", f"Period: {monthly_figure.period_label}")
     db.session.commit()
-    franchise_name = getattr(getattr(monthly_figure, "franchise", None), "business_name", None) or "franchise"
-    safe_franchise = secure_filename(franchise_name).lower() or "franchise"
-    return send_file(pdf_path, as_attachment=True, download_name=f"monthly-figures-{safe_franchise}-{monthly_figure.period_label}.pdf")
+    return send_file(pdf_path, as_attachment=True, download_name=f"monthly-figures-{monthly_figure.period_label}.pdf")
